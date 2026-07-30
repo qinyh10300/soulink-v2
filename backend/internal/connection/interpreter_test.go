@@ -1,0 +1,83 @@
+package connection
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestInterpreterUnderstandsCampusMealIntent(t *testing.T) {
+	t.Parallel()
+
+	result := NewInterpreter().Interpret("今晚想在紫荆找个饭搭子，轻松聊聊 AI")
+
+	if result.Category != CategoryMeal {
+		t.Fatalf("category = %q, want %q", result.Category, CategoryMeal)
+	}
+	if result.TimeWindow != "今晚" {
+		t.Fatalf("timeWindow = %q, want 今晚", result.TimeWindow)
+	}
+	if result.Location != "紫荆" {
+		t.Fatalf("location = %q, want 紫荆", result.Location)
+	}
+	if result.Visibility != VisibilityFeed {
+		t.Fatalf("visibility = %q, want %q", result.Visibility, VisibilityFeed)
+	}
+	if len(result.Questions) != 0 {
+		t.Fatalf("questions = %#v, want no clarification questions", result.Questions)
+	}
+	if result.Confidence < 0.9 {
+		t.Fatalf("confidence = %.2f, want at least 0.9", result.Confidence)
+	}
+}
+
+func TestInterpreterKeepsRomanticIntentPrivate(t *testing.T) {
+	t.Parallel()
+
+	result := NewInterpreter().Interpret("希望认真认识一个耐心、有好奇心的人，想发展长期关系")
+
+	if result.Category != CategoryRomantic {
+		t.Fatalf("category = %q, want %q", result.Category, CategoryRomantic)
+	}
+	if result.Visibility != VisibilityCandidates {
+		t.Fatalf("visibility = %q, want %q", result.Visibility, VisibilityCandidates)
+	}
+	if !strings.Contains(strings.Join(result.Inferences, " "), "仅向推荐候选人可见") {
+		t.Fatalf("inferences = %#v, want romantic visibility explanation", result.Inferences)
+	}
+}
+
+func TestInterpreterAsksOnlyMaterialProjectQuestions(t *testing.T) {
+	t.Parallel()
+
+	result := NewInterpreter().Interpret("想找一个 CTO 一起做校园 AI 产品")
+
+	if result.Category != CategoryCofounder {
+		t.Fatalf("category = %q, want %q", result.Category, CategoryCofounder)
+	}
+	if len(result.Questions) == 0 || len(result.Questions) > 3 {
+		t.Fatalf("questions count = %d, want between 1 and 3", len(result.Questions))
+	}
+
+	foundSkills := false
+	for _, question := range result.Questions {
+		if question.ID == "skills" {
+			foundSkills = true
+		}
+	}
+	if !foundSkills {
+		t.Fatalf("questions = %#v, want a skills clarification", result.Questions)
+	}
+}
+
+func TestInterpreterFlagsPublicContactDetails(t *testing.T) {
+	t.Parallel()
+
+	result := NewInterpreter().Interpret("找跑步搭子，可以直接加微信号 13800138000")
+
+	if result.Safety.Level != "review" {
+		t.Fatalf("safety level = %q, want review", result.Safety.Level)
+	}
+	if !strings.Contains(result.Safety.Notice, "联系方式") {
+		t.Fatalf("safety notice = %q, want contact warning", result.Safety.Notice)
+	}
+}

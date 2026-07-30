@@ -14,6 +14,7 @@ import (
 	"soulink-backend/internal/auth"
 	"soulink-backend/internal/chat"
 	"soulink-backend/internal/config"
+	"soulink-backend/internal/connection"
 	"soulink-backend/internal/feedback"
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/gate"
@@ -98,6 +99,7 @@ func main() {
 	feedbackService := feedback.NewService(dataStore, logger)
 	profileService := profile.NewService(dataStore)
 	playgroundService := playground.NewService(dataStore)
+	connectionService := connection.NewService(dataStore, connection.NewInterpreter())
 	questionnaireService := questionnaire.NewService(
 		dataStore,
 		questionnaireCatalog,
@@ -134,6 +136,7 @@ func main() {
 		FriendHandler:        friend.NewHandler(friendService),
 		ChatHandler:          chat.NewHandler(chatService, chatHub),
 		PlaygroundHandler:    playground.NewHandler(playgroundService),
+		ConnectionHandler:    connection.NewHandler(connectionService),
 		WSHandler:            chat.ServeWS(chatHub, chatService, dataStore, tokenManager, logger),
 	})
 

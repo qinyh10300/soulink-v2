@@ -9,6 +9,7 @@ import (
 
 	"soulink-backend/internal/auth"
 	"soulink-backend/internal/chat"
+	"soulink-backend/internal/connection"
 	"soulink-backend/internal/feedback"
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/httpapi"
@@ -33,6 +34,7 @@ type Dependencies struct {
 	FriendHandler        *friend.Handler
 	ChatHandler          *chat.Handler
 	PlaygroundHandler    *playground.Handler
+	ConnectionHandler    *connection.Handler
 	WSHandler            http.HandlerFunc
 }
 
@@ -105,6 +107,38 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/users/me/delete/send-code", deps.AuthHandler.SendDeleteAccountCode)
 			r.Delete("/users/me", deps.AuthHandler.DeleteAccount)
 			r.Post("/feedback", deps.FeedbackHandler.Submit)
+
+			if deps.ConnectionHandler != nil {
+				r.Post("/intent-interpretations", deps.ConnectionHandler.Interpret)
+				r.Get("/users/me/matching-profile", deps.ConnectionHandler.GetMatchingProfile)
+				r.Put("/users/me/matching-profile", deps.ConnectionHandler.UpdateMatchingProfile)
+
+				r.Route("/intents", func(r chi.Router) {
+					r.Get("/feed", deps.ConnectionHandler.ListFeed)
+					r.Get("/mine", deps.ConnectionHandler.ListMine)
+					r.Post("/", deps.ConnectionHandler.CreateIntent)
+					r.Get("/{intentId}", deps.ConnectionHandler.GetIntent)
+					r.Put("/{intentId}", deps.ConnectionHandler.UpdateIntent)
+					r.Delete("/{intentId}", deps.ConnectionHandler.ExpireIntent)
+					r.Post("/{intentId}/save", deps.ConnectionHandler.SaveIntent)
+					r.Delete("/{intentId}/save", deps.ConnectionHandler.UnsaveIntent)
+					r.Post("/{intentId}/interest", deps.ConnectionHandler.ExpressInterest)
+					r.Delete("/{intentId}/interest", deps.ConnectionHandler.WithdrawInterest)
+					r.Get("/{intentId}/interests", deps.ConnectionHandler.ListInterests)
+					r.Post("/{intentId}/interests/{candidateId}/accept", deps.ConnectionHandler.AcceptInterest)
+					r.Post("/{intentId}/interests/{candidateId}/decline", deps.ConnectionHandler.DeclineInterest)
+					r.Get("/{intentId}/recommendations", deps.ConnectionHandler.Recommendations)
+				})
+
+				r.Route("/match-rooms", func(r chi.Router) {
+					r.Get("/", deps.ConnectionHandler.ListMatchRooms)
+					r.Get("/{roomId}", deps.ConnectionHandler.GetMatchRoom)
+					r.Put("/{roomId}/plan", deps.ConnectionHandler.UpdateMatchRoomPlan)
+					r.Put("/{roomId}/contact-sharing", deps.ConnectionHandler.SetContactSharing)
+					r.Get("/{roomId}/messages", deps.ConnectionHandler.ListRoomMessages)
+					r.Post("/{roomId}/messages", deps.ConnectionHandler.CreateRoomMessage)
+				})
+			}
 
 			r.Get("/questionnaires/current", deps.QuestionnaireHandler.GetCurrent)
 			r.Get("/questionnaires/current/progress", deps.QuestionnaireHandler.GetProgress)
