@@ -72,10 +72,10 @@ services:
       ADMIN_EMAILS: "demo@mails.tsinghua.edu.cn"
       DEMO_SEED_ENABLED: "true"
       DEMO_SEED_PASSWORD: "Soulink2026!"
-      MAIL_DRIVER: log
+      MAIL_DRIVER: smtp
       MAIL_FROM_NAME: SouLink
       MAIL_FROM_ADDRESS: noreply@soulink.local
-      SMTP_HOST: ""
+      SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_USERNAME: ""
       SMTP_PASSWORD: ""
