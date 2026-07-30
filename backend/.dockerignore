@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+
+data/
+results/
+tmp/
+coverage/
+*.test
+*.tar
+*.tar.gz
+
+.DS_Store
+.idea/
+.vscode/

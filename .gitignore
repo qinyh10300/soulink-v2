@@ -1,0 +1,39 @@
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/*.local.json
+**/secrets.json
+**/credentials.json
+
+# Certificates and private keys
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Generated data and deployment artifacts
+data/
+results/
+*.tar
+*.tar.gz
+*.csv
+*.xlsx
+deploy/configs/mail/
+
+# Local tooling
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+dist/
+coverage/
+.venv/
+venv/
+__pycache__/
+*.py[cod]

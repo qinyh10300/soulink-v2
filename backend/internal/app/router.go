@@ -1,0 +1,148 @@
+package app
+
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"soulink-backend/internal/auth"
+	"soulink-backend/internal/chat"
+	"soulink-backend/internal/feedback"
+	"soulink-backend/internal/friend"
+	"soulink-backend/internal/httpapi"
+	"soulink-backend/internal/match"
+	"soulink-backend/internal/meta"
+	"soulink-backend/internal/playground"
+	"soulink-backend/internal/profile"
+	"soulink-backend/internal/questionnaire"
+)
+
+type Dependencies struct {
+	Logger               *slog.Logger
+	AllowedOrigins       []string
+	AuthMiddleware       func(http.Handler) http.Handler
+	MatchWriteGuard      func(http.Handler) http.Handler
+	AuthHandler          *auth.Handler
+	FeedbackHandler      *feedback.Handler
+	ProfileHandler       *profile.Handler
+	MetaHandler          *meta.Handler
+	QuestionnaireHandler *questionnaire.Handler
+	MatchHandler         *match.Handler
+	FriendHandler        *friend.Handler
+	ChatHandler          *chat.Handler
+	PlaygroundHandler    *playground.Handler
+	WSHandler            http.HandlerFunc
+}
+
+// NewRouter 创建 Web API 路由。
+func NewRouter(deps Dependencies) http.Handler {
+	authMiddleware := deps.AuthMiddleware
+	if authMiddleware == nil {
+		authMiddleware = passthroughMiddleware
+	}
+	matchWriteGuard := deps.MatchWriteGuard
+	if matchWriteGuard == nil {
+		matchWriteGuard = passthroughMiddleware
+	}
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(CORS(deps.AllowedOrigins))
+	r.Use(RequestLogger(deps.Logger))
+	r.Use(Recoverer(deps.Logger))
+
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		httpapi.OK(w, map[string]string{"status": "ok"})
+	})
+
+	r.Route("/api/v1", func(api chi.Router) {
+		if deps.WSHandler != nil {
+			api.Get("/ws", deps.WSHandler)
+		}
+
+		api.Post("/auth/login", deps.AuthHandler.Login)
+		api.Post("/auth/register/send-code", deps.AuthHandler.SendRegisterCode)
+		api.Post("/auth/register/verify-code", deps.AuthHandler.VerifyRegisterCode)
+		api.Post("/auth/register", deps.AuthHandler.Register)
+		api.Post("/auth/password/forgot/send-code", deps.AuthHandler.SendForgotPasswordCode)
+		api.Post("/auth/password/forgot/reset", deps.AuthHandler.ResetForgotPassword)
+
+		api.Get("/meta/departments", deps.MetaHandler.Departments)
+		api.Get("/meta/grades", deps.MetaHandler.Grades)
+		api.Get("/meta/contact-types", deps.MetaHandler.ContactTypes)
+		api.Get("/meta/registered-user-count", deps.MetaHandler.RegisteredUserCount)
+		api.Get("/meta/pku-registered-user-count", deps.MetaHandler.PKURegisteredUserCount)
+		api.Get("/meta/bnu-registered-user-count", deps.MetaHandler.BNURegisteredUserCount)
+		api.Get("/meta/ruc-registered-user-count", deps.MetaHandler.RUCRegisteredUserCount)
+		api.Get("/meta/cuc-registered-user-count", deps.MetaHandler.CUCRegisteredUserCount)
+		api.Get("/meta/bfsu-registered-user-count", deps.MetaHandler.BFSURegisteredUserCount)
+		api.Get("/meta/ustb-registered-user-count", deps.MetaHandler.USTBRegisteredUserCount)
+		api.Get("/meta/csu-registered-user-count", deps.MetaHandler.CSURegisteredUserCount)
+		api.Get("/meta/tju-registered-user-count", deps.MetaHandler.TJURegisteredUserCount)
+		api.Get("/meta/sjtu-registered-user-count", deps.MetaHandler.SJTURegisteredUserCount)
+		api.Get("/meta/fdu-registered-user-count", deps.MetaHandler.FDURegisteredUserCount)
+		api.Get("/meta/nus-registered-user-count", deps.MetaHandler.NUSRegisteredUserCount)
+		api.Get("/meta/ntu-registered-user-count", deps.MetaHandler.NTURegisteredUserCount)
+		api.Get("/meta/zuel-registered-user-count", deps.MetaHandler.ZUELRegisteredUserCount)
+
+		api.Group(func(r chi.Router) {
+			r.Use(authMiddleware)
+
+			r.Post("/auth/logout", deps.AuthHandler.Logout)
+			r.Get("/auth/me", deps.AuthHandler.Me)
+
+			r.Get("/users/me/profile", deps.ProfileHandler.GetProfile)
+			r.With(matchWriteGuard).Put("/users/me/profile", deps.ProfileHandler.UpdateProfile)
+			r.Get("/users/{userId}/profile", deps.ProfileHandler.GetPublicProfile)
+			r.Get("/users/me/contacts", deps.ProfileHandler.GetContacts)
+			r.With(matchWriteGuard).Put("/users/me/contacts/{contactType}", deps.ProfileHandler.UpsertContact)
+			r.With(matchWriteGuard).Delete("/users/me/contacts/{contactType}", deps.ProfileHandler.DeleteContact)
+			r.Post("/users/me/password/send-code", deps.AuthHandler.SendChangePasswordCode)
+			r.Post("/users/me/password", deps.AuthHandler.ChangePassword)
+			r.Post("/users/me/delete/send-code", deps.AuthHandler.SendDeleteAccountCode)
+			r.Delete("/users/me", deps.AuthHandler.DeleteAccount)
+			r.Post("/feedback", deps.FeedbackHandler.Submit)
+
+			r.Get("/questionnaires/current", deps.QuestionnaireHandler.GetCurrent)
+			r.Get("/questionnaires/current/progress", deps.QuestionnaireHandler.GetProgress)
+			r.Get("/questionnaires/current/portrait", deps.QuestionnaireHandler.GetPortrait)
+			r.With(matchWriteGuard).Put("/questionnaires/current/participation", deps.QuestionnaireHandler.UpdateParticipation)
+			r.With(matchWriteGuard).Put("/questionnaires/current/answers", deps.QuestionnaireHandler.SaveAnswers)
+			r.With(matchWriteGuard).Put("/questionnaires/current/answers/{questionId}", deps.QuestionnaireHandler.SaveAnswer)
+
+			r.Get("/matches/current", deps.MatchHandler.GetCurrent)
+			r.Get("/matches/history", deps.MatchHandler.GetHistory)
+			r.Get("/matches/cycle/status", deps.MatchHandler.GetCycleStatus)
+			r.Post("/matches/{matchId}/contact", deps.MatchHandler.ContactMatchedPartner)
+			r.Get("/matches/{matchId}", deps.MatchHandler.GetDetail)
+
+			r.Post("/friends/request", deps.FriendHandler.SendRequest)
+			r.Post("/friends/accept", deps.FriendHandler.AcceptRequest)
+			r.Post("/friends/reject", deps.FriendHandler.RejectRequest)
+			r.Get("/friends", deps.FriendHandler.ListFriends)
+			r.Get("/friends/requests/received", deps.FriendHandler.ListReceivedRequests)
+			r.Get("/friends/requests/sent", deps.FriendHandler.ListSentRequests)
+			r.Delete("/friends/{friendshipId}", deps.FriendHandler.RemoveFriend)
+
+			r.Get("/conversations", deps.ChatHandler.ListConversations)
+			r.Get("/conversations/{conversationId}/messages", deps.ChatHandler.ListMessages)
+			r.Post("/conversations/{conversationId}/read", deps.ChatHandler.MarkRead)
+			r.Get("/conversations/unread-count", deps.ChatHandler.GetUnreadCount)
+
+			if deps.PlaygroundHandler != nil {
+				r.Get("/playground/posts", deps.PlaygroundHandler.ListPosts)
+				r.Post("/playground/posts", deps.PlaygroundHandler.CreatePost)
+				r.Post("/playground/posts/{postId}/likes", deps.PlaygroundHandler.LikePost)
+				r.Delete("/playground/posts/{postId}/likes", deps.PlaygroundHandler.UnlikePost)
+				r.Post("/playground/posts/{postId}/comments", deps.PlaygroundHandler.CreateComment)
+				r.Post("/playground/comments/{commentId}/likes", deps.PlaygroundHandler.LikeComment)
+				r.Delete("/playground/comments/{commentId}/likes", deps.PlaygroundHandler.UnlikeComment)
+			}
+		})
+	})
+
+	return r
+}

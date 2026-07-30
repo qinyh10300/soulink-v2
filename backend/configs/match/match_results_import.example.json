@@ -1,0 +1,13 @@
+{
+  "questionnaireKey": "thu-date",
+  "questionnaireVersion": "v0.2",
+  "cycleKey": "thu-date-v0.2-offline-import-20260331",
+  "title": "THU Date v0.2 匹配结果导入",
+  "revealStatus": "revealed",
+  "revealAt": "2026-03-31T21:00:00+08:00",
+  "dryRun": true,
+  "matchedMessage": "匹配成功",
+  "unmatchedMessage": "本轮未匹配成功",
+  "reasonTemplate": "本轮结果来自离线匹配算法。",
+  "markUnmatchedUsers": true
+}

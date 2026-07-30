@@ -1,0 +1,22 @@
+﻿{
+  "sourceCatalogFile": "thu_questionnaire_template.md",
+  "sourceQuestionnaireKey": "thu-date",
+  "sourceQuestionnaireVersion": "v0.1",
+  "targetCatalogFile": "thu_questionnaire_template_v0.2.md",
+  "targetQuestionnaireKey": "thu-date",
+  "targetQuestionnaireVersion": "v0.2",
+  "mappings": [
+    {
+      "sourceQuestionId": "1",
+      "targetQuestionId": "1"
+    },
+    {
+      "sourceQuestionId": "2",
+      "targetQuestionId": "2"
+    },
+    {
+      "sourceQuestionId": "3",
+      "targetQuestionId": "3"
+    }
+  ]
+}

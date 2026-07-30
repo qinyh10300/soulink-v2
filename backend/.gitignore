@@ -1,0 +1,62 @@
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# CLI tool binaries (cross-compiled or local builds)
+/questionnaireexport
+/questionnairemigrate
+/questionnairematch
+
+# Exported data files\
+results/
+/export.csv
+/*.export.csv
+/match_results.csv
+/*.csv
+
+# Test binary, built with `go test -c`
+*.test
+
+# Code coverage profiles and other test artifacts
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+
+# local mail secrets
+configs/mail/*.local.json
+
+# Python（soulagent / 脚本）
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Accidental PowerShell artifact (e.g. mis-redirected output)
+$null
+
+# Editor/IDE
+# .idea/
+# .vscode/

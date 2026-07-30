@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Ma+Shan+Zheng&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --font-sans:
+    'Instrument Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+  --font-serif:
+    'Newsreader', 'Source Han Serif SC', 'Songti SC', 'Noto Serif SC', serif;
+  --shadow-soft: 0 24px 80px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+:root {
+  --background: #f4f7fb;
+  --foreground: #172033;
+  --card: rgba(255, 255, 255, 0.84);
+  --card-foreground: #172033;
+  --muted: #eef2f8;
+  --muted-foreground: #607089;
+  --border: rgba(141, 157, 181, 0.24);
+  --primary: #274c9b;
+  --primary-foreground: #f8fbff;
+  --secondary: #ffffff;
+  --secondary-foreground: #172033;
+  --accent: #dfe8ff;
+  --accent-foreground: #274c9b;
+  --ring: rgba(39, 76, 155, 0.2);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    min-width: 320px;
+    background-image:
+      radial-gradient(circle at top left, rgba(120, 150, 220, 0.14), transparent 32%),
+      radial-gradient(circle at top right, rgba(121, 185, 168, 0.14), transparent 28%),
+      linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 38%, #edf2f7 100%);
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .bg-mesh {
+    background-image:
+      linear-gradient(rgba(122, 138, 166, 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(122, 138, 166, 0.09) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}

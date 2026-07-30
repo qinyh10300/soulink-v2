@@ -1,0 +1,19 @@
+services:
+  web:
+    # 与 deploy.sh / Dockerfile 中镜像名一致；服务器仅用 load 的 tar，不在此目录构建
+    image: soulink-web:latest
+    container_name: soulink-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /root/ssl/cert.pem:/etc/nginx/ssl/cert.pem:ro
+      - /root/ssl/key.pem:/etc/nginx/ssl/key.pem:ro
+      - /var/log/soulink-web:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s

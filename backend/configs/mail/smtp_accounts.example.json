@@ -1,0 +1,12 @@
+{
+  "accounts": [
+    {
+      "host": "smtp.example.com",
+      "port": 587,
+      "username": "noreply@example.com",
+      "password": "",
+      "from_name": "SouLink",
+      "from_address": "noreply@example.com"
+    }
+  ]
+}
