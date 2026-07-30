@@ -351,6 +351,12 @@ func (s *Store) ListFeedConnectionIntents(ctx context.Context, tx *sql.Tx, viewe
 		  AND (i.expires_at IS NULL OR i.expires_at > NOW())
 		  AND ($2 = '' OR i.category = $2)
 		  AND u.deleted_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_blocks b
+			WHERE (b.blocker_id = $1 AND b.blocked_id = i.author_id)
+			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
+		  )
 		ORDER BY i.published_at DESC NULLS LAST, i.id DESC
 		LIMIT $3
 	`, viewerID, category, normalizeConnectionLimit(limit))
@@ -367,6 +373,12 @@ func (s *Store) ListRecommendationCandidates(ctx context.Context, tx *sql.Tx, vi
 		    OR ($2 <> 'romantic' AND i.category <> 'romantic')
 		  )
 		  AND u.deleted_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_blocks b
+			WHERE (b.blocker_id = $1 AND b.blocked_id = i.author_id)
+			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
+		  )
 		ORDER BY i.updated_at DESC, i.id DESC
 		LIMIT $3
 	`, viewerID, sourceCategory, normalizeConnectionLimit(limit))

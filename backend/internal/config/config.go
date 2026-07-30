@@ -19,6 +19,7 @@ type Config struct {
 	Mail           MailConfig
 	Match          MatchConfig
 	Questionnaire  QuestionnaireConfig
+	Safety         SafetyConfig
 }
 
 type DatabaseConfig struct {
@@ -61,6 +62,10 @@ type QuestionnaireConfig struct {
 
 type MatchConfig struct {
 	ResultCacheTTL time.Duration
+}
+
+type SafetyConfig struct {
+	AdminEmails []string
 }
 
 func Load() (Config, error) {
@@ -152,6 +157,9 @@ func Load() (Config, error) {
 		},
 		Match: MatchConfig{
 			ResultCacheTTL: resultCacheTTL,
+		},
+		Safety: SafetyConfig{
+			AdminEmails: normalizeEmails(splitCSV(envString("ADMIN_EMAILS", ""))),
 		},
 	}, nil
 }
@@ -268,6 +276,17 @@ func splitCSV(value string) []string {
 		item := strings.TrimSpace(part)
 		if item != "" {
 			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func normalizeEmails(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		email := strings.ToLower(strings.TrimSpace(value))
+		if email != "" {
+			out = append(out, email)
 		}
 	}
 	return out

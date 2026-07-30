@@ -166,3 +166,31 @@ func TestLoadReadsQuestionnaireConfig(t *testing.T) {
 		t.Fatal("Questionnaire.SoulAgentEnabled = true, want false")
 	}
 }
+
+func TestLoadReadsSafetyAdminEmails(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	contents := "ADMIN_EMAILS=Admin@Mails.Tsinghua.Edu.Cn, ops@tsinghua.edu.cn\n"
+	if err := os.WriteFile(envPath, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get wd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if len(cfg.Safety.AdminEmails) != 2 {
+		t.Fatalf("len(Safety.AdminEmails) = %d, want 2", len(cfg.Safety.AdminEmails))
+	}
+	if cfg.Safety.AdminEmails[0] != "admin@mails.tsinghua.edu.cn" {
+		t.Fatalf("Safety.AdminEmails[0] = %q", cfg.Safety.AdminEmails[0])
+	}
+}

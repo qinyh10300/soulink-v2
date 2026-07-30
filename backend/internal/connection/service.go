@@ -193,6 +193,13 @@ func (s *Service) GetIntent(ctx context.Context, viewerID, intentID int64) (Inte
 		return IntentView{}, mapStoreError(err, "找不到这个意图")
 	}
 	if intent.AuthorID != viewerID {
+		blocked, err := s.store.UsersBlocked(ctx, nil, viewerID, intent.AuthorID)
+		if err != nil {
+			return IntentView{}, httpapi.InternalError(err)
+		}
+		if blocked {
+			return IntentView{}, forbidden("这个意图当前不可见")
+		}
 		if intent.Status != StatusActive || intent.Visibility == VisibilityPrivate {
 			return IntentView{}, forbidden("这个意图当前不可见")
 		}

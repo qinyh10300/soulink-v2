@@ -63,6 +63,10 @@ const SafetyPage = lazy(async () => {
   const module = await import('@/pages/safety-page')
   return { default: module.SafetyPage }
 })
+const SafetyAdminPage = lazy(async () => {
+  const module = await import('@/pages/safety-admin-page')
+  return { default: module.SafetyAdminPage }
+})
 const SurveyPage = lazy(async () => {
   const module = await import('@/pages/survey-page')
   return { default: module.SurveyPage }
@@ -136,6 +140,10 @@ export const router = createBrowserRouter([
           {
             path: '/feedback',
             element: withSuspense(<FeedbackPage />),
+          },
+          {
+            path: '/admin/safety',
+            element: withSuspense(<SafetyAdminPage />),
           },
           {
             path: '/dashboard',

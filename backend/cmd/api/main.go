@@ -27,6 +27,7 @@ import (
 	"soulink-backend/internal/playground"
 	"soulink-backend/internal/profile"
 	"soulink-backend/internal/questionnaire"
+	"soulink-backend/internal/safety"
 	"soulink-backend/internal/store"
 )
 
@@ -100,6 +101,7 @@ func main() {
 	profileService := profile.NewService(dataStore)
 	playgroundService := playground.NewService(dataStore)
 	connectionService := connection.NewService(dataStore, connection.NewInterpreter())
+	safetyService := safety.NewService(dataStore, cfg.Safety.AdminEmails)
 	questionnaireService := questionnaire.NewService(
 		dataStore,
 		questionnaireCatalog,
@@ -137,6 +139,7 @@ func main() {
 		ChatHandler:          chat.NewHandler(chatService, chatHub),
 		PlaygroundHandler:    playground.NewHandler(playgroundService),
 		ConnectionHandler:    connection.NewHandler(connectionService),
+		SafetyHandler:        safety.NewHandler(safetyService),
 		WSHandler:            chat.ServeWS(chatHub, chatService, dataStore, tokenManager, logger),
 	})
 

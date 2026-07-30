@@ -2,6 +2,7 @@ import {
   AlertCircle,
   Check,
   ChevronRight,
+  ClipboardCheck,
   Eye,
   Heart,
   LoaderCircle,
@@ -22,6 +23,7 @@ import {
   updateMatchingProfile,
   type MatchingProfile,
 } from '@/lib/connection-api'
+import { fetchSafetyCapabilities } from '@/lib/safety-api'
 import { cn } from '@/lib/utils'
 import { getStoredUserProfile } from '@/lib/user-profile-storage'
 
@@ -88,24 +90,28 @@ export function ConnectionProfilePage() {
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
   const [saved, setSaved] = useState(false)
+  const [isSafetyAdmin, setIsSafetyAdmin] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      try {
-        const result = await fetchMatchingProfile()
-        if (!cancelled) {
-          setProfile(result)
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setNotice(getErrorMessage(error, 'AI 档案暂时无法加载'))
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+      const [profileResult, capabilitiesResult] = await Promise.allSettled([
+        fetchMatchingProfile(),
+        fetchSafetyCapabilities(),
+      ])
+      if (cancelled) {
+        return
       }
+      if (profileResult.status === 'fulfilled') {
+        setProfile(profileResult.value)
+      } else {
+        setNotice(getErrorMessage(profileResult.reason, 'AI 档案暂时无法加载'))
+      }
+      setIsSafetyAdmin(
+        capabilitiesResult.status === 'fulfilled' &&
+          capabilitiesResult.value.isAdmin,
+      )
+      setLoading(false)
     }
     void load()
     return () => {
@@ -486,7 +492,10 @@ export function ConnectionProfilePage() {
               <ChevronRight size={15} className="text-[#8d8982]" />
             </Link>
             <Link
-              className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/60"
+              className={cn(
+                'flex items-center gap-3 px-4 py-3.5 hover:bg-white/60',
+                isSafetyAdmin && 'border-b border-[#e1ded8]',
+              )}
               to="/safety"
             >
               <ShieldCheck size={16} className="text-[#527164]" />
@@ -498,6 +507,23 @@ export function ConnectionProfilePage() {
               </span>
               <ChevronRight size={15} className="text-[#8d8982]" />
             </Link>
+            {isSafetyAdmin ? (
+              <Link
+                className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/60"
+                to="/admin/safety"
+              >
+                <ClipboardCheck size={16} className="text-[#6c4a80]" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-[#4f4b46]">
+                    安全工单
+                  </span>
+                  <span className="mt-0.5 block text-[10px] text-[#817d76]">
+                    核查举报并更新处理状态
+                  </span>
+                </span>
+                <ChevronRight size={15} className="text-[#8d8982]" />
+              </Link>
+            ) : null}
           </section>
         </aside>
       </div>

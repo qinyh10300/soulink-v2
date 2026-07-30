@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 import { IntentCategoryIcon } from '@/components/connection/intent-category'
 import { getErrorMessage } from '@/lib/api'
 import { fetchMatchRooms, type MatchRoom } from '@/lib/connection-api'
+import { cn } from '@/lib/utils'
 
 function formatMeeting(value?: string) {
   if (!value) {
@@ -99,9 +100,16 @@ export function MatchRoomsPage() {
                           <h2 className="truncate text-base font-semibold text-[#302e2b]">
                             和 {room.other.nickname}
                           </h2>
-                          <span className="inline-flex items-center gap-1 rounded-md bg-[#e8f3ed] px-2 py-1 text-[11px] font-semibold text-[#2d6a53]">
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold',
+                              room.status === 'open'
+                                ? 'bg-[#e8f3ed] text-[#2d6a53]'
+                                : 'bg-[#edeae5] text-[#6d6963]',
+                            )}
+                          >
                             <ShieldCheck size={11} />
-                            双方同意
+                            {room.status === 'open' ? '双方同意' : '交流已结束'}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-sm text-[#706c65]">
@@ -118,7 +126,12 @@ export function MatchRoomsPage() {
                       {room.fitReason}
                     </p>
 
-                    <div className="mt-4 grid gap-2 border-t border-[#ebe8e3] pt-3 text-xs text-[#69655f] sm:grid-cols-2">
+                    <div
+                      className={cn(
+                        'mt-4 grid gap-2 border-t border-[#ebe8e3] pt-3 text-xs text-[#69655f] sm:grid-cols-2',
+                        room.status !== 'open' && 'opacity-60',
+                      )}
+                    >
                       <span className="inline-flex items-center gap-1.5">
                         <Clock3 size={14} />
                         {formatMeeting(room.scheduledAt)}

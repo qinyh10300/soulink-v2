@@ -18,6 +18,7 @@ import (
 	"soulink-backend/internal/playground"
 	"soulink-backend/internal/profile"
 	"soulink-backend/internal/questionnaire"
+	"soulink-backend/internal/safety"
 )
 
 type Dependencies struct {
@@ -35,6 +36,7 @@ type Dependencies struct {
 	ChatHandler          *chat.Handler
 	PlaygroundHandler    *playground.Handler
 	ConnectionHandler    *connection.Handler
+	SafetyHandler        *safety.Handler
 	WSHandler            http.HandlerFunc
 }
 
@@ -138,6 +140,13 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/{roomId}/messages", deps.ConnectionHandler.ListRoomMessages)
 					r.Post("/{roomId}/messages", deps.ConnectionHandler.CreateRoomMessage)
 				})
+			}
+
+			if deps.SafetyHandler != nil {
+				r.Get("/safety/capabilities", deps.SafetyHandler.Capabilities)
+				r.Post("/safety/reports", deps.SafetyHandler.SubmitReport)
+				r.Get("/admin/safety-reports", deps.SafetyHandler.ListReports)
+				r.Put("/admin/safety-reports/{reportId}", deps.SafetyHandler.UpdateReport)
 			}
 
 			r.Get("/questionnaires/current", deps.QuestionnaireHandler.GetCurrent)

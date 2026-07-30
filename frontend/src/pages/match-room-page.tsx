@@ -6,9 +6,11 @@ import {
   Clock3,
   ContactRound,
   Copy,
+  Flag,
   LoaderCircle,
   MapPin,
   MessageCircle,
+  MessageSquareText,
   Send,
   ShieldCheck,
   Sparkles,
@@ -187,6 +189,19 @@ export function MatchRoomPage() {
     )
   }
 
+  const feedbackSubject = `和 ${room.other.nickname} 的匹配 · ${room.intentTitle}`
+  const feedbackPath = `/feedback?${new URLSearchParams({
+    category: 'match',
+    roomId: String(room.id),
+    subject: feedbackSubject,
+  }).toString()}`
+  const reportPath = `/feedback?${new URLSearchParams({
+    category: 'report',
+    roomId: String(room.id),
+    subject: feedbackSubject,
+  }).toString()}`
+  const roomClosed = room.status !== 'open'
+
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <header className="flex items-center justify-between gap-4 border-b border-[#dfdcd6] pb-5">
@@ -210,9 +225,16 @@ export function MatchRoomPage() {
             </h1>
           </div>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#e8f3ed] px-2.5 py-1.5 text-xs font-semibold text-[#2d6a53]">
+        <span
+          className={cn(
+            'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold',
+            roomClosed
+              ? 'bg-[#edeae5] text-[#6d6963]'
+              : 'bg-[#e8f3ed] text-[#2d6a53]',
+          )}
+        >
           <ShieldCheck size={13} />
-          双方同意
+          {roomClosed ? '交流已结束' : '双方同意'}
         </span>
       </header>
 
@@ -264,6 +286,7 @@ export function MatchRoomPage() {
                   <input
                     className="h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] pl-9 pr-2 text-xs outline-none focus:border-[#7a5a8e]"
                     onChange={(event) => setScheduledAt(event.target.value)}
+                    disabled={roomClosed}
                     type="datetime-local"
                     value={scheduledAt}
                   />
@@ -280,6 +303,7 @@ export function MatchRoomPage() {
                     className="h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] pl-9 pr-2 text-xs outline-none focus:border-[#7a5a8e]"
                     list="suggested-places"
                     onChange={(event) => setPlace(event.target.value)}
+                    disabled={roomClosed}
                     placeholder="选择或输入校内地点"
                     value={place}
                   />
@@ -302,6 +326,7 @@ export function MatchRoomPage() {
                   )}
                   key={suggestion}
                   onClick={() => setPlace(suggestion)}
+                  disabled={roomClosed}
                   type="button"
                 >
                   {suggestion}
@@ -311,7 +336,7 @@ export function MatchRoomPage() {
             <div className="mt-4 flex justify-end">
               <button
                 className="inline-flex h-9 items-center gap-2 rounded-md bg-[#376f5b] px-4 text-xs font-semibold text-white disabled:opacity-50"
-                disabled={savingPlan}
+                disabled={savingPlan || roomClosed}
                 onClick={() => void savePlan()}
                 type="button"
               >
@@ -340,7 +365,7 @@ export function MatchRoomPage() {
                   ? 'border-[#bcd4c9] bg-[#edf6f1]'
                   : 'border-[#d9d5cf] bg-white',
               )}
-              disabled={sharingContact}
+              disabled={sharingContact || roomClosed}
               onClick={() => void toggleContact()}
               type="button"
             >
@@ -393,6 +418,23 @@ export function MatchRoomPage() {
                 对方还没有选择显示联系方式，站内消息仍然可用。
               </p>
             )}
+          </section>
+
+          <section className="flex flex-wrap items-center gap-2 border-t border-[#dfdcd6] pt-4">
+            <Link
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#d8d3cc] bg-white px-3 text-xs font-semibold text-[#5f5b55] hover:border-[#bbaac5] hover:text-[#5b3477]"
+              to={feedbackPath}
+            >
+              <MessageSquareText size={14} />
+              见面后反馈
+            </Link>
+            <Link
+              className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-[#8b4559] hover:bg-[#fff0f4]"
+              to={reportPath}
+            >
+              <Flag size={14} />
+              举报与拉黑
+            </Link>
           </section>
         </div>
 
@@ -468,6 +510,7 @@ export function MatchRoomPage() {
                 className="min-h-11 max-h-28 flex-1 resize-none rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 py-2.5 text-sm leading-5 outline-none focus:border-[#7a5a8e]"
                 maxLength={1000}
                 onChange={(event) => setMessage(event.target.value)}
+                disabled={roomClosed}
                 onKeyDown={(event) => {
                   if (
                     event.key === 'Enter' &&
@@ -478,14 +521,14 @@ export function MatchRoomPage() {
                     void sendMessage()
                   }
                 }}
-                placeholder="写一句具体的话..."
+                placeholder={roomClosed ? '这个匹配房间已停止交流' : '写一句具体的话...'}
                 rows={1}
                 value={message}
               />
               <button
                 aria-label="发送消息"
                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#5b3477] text-white disabled:opacity-50"
-                disabled={!message.trim() || sendingMessage}
+                disabled={roomClosed || !message.trim() || sendingMessage}
                 onClick={() => void sendMessage()}
                 title="发送"
                 type="button"

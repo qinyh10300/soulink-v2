@@ -5,6 +5,7 @@ import {
   Check,
   Clock3,
   Eye,
+  Flag,
   HeartHandshake,
   LoaderCircle,
   MapPin,
@@ -222,6 +223,11 @@ export function IntentDetailPage() {
   }
 
   const meta = intentCategoryMeta[intent.category]
+  const reportPath = `/feedback?${new URLSearchParams({
+    category: 'report',
+    intentId: String(intent.id),
+    subject: intent.title,
+  }).toString()}`
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -620,6 +626,15 @@ export function IntentDetailPage() {
               <br />
               到期于 {formatDateTime(intent.expiresAt)}
             </p>
+            {!intent.isOwner ? (
+              <Link
+                className="mt-3 inline-flex items-center gap-1.5 font-medium text-[#8b4559] hover:text-[#75384a]"
+                to={reportPath}
+              >
+                <Flag size={13} />
+                举报这个意图
+              </Link>
+            ) : null}
           </section>
         </aside>
       </div>
