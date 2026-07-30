@@ -409,6 +409,9 @@ func (s *Service) Recommendations(ctx context.Context, userID, intentID int64) (
 	}
 	recommendations := make([]RecommendationView, 0, len(candidates))
 	for _, candidate := range candidates {
+		if !recommendationCategoryEligible(source.Category, candidate.Category) {
+			continue
+		}
 		score, reason, uncertainty, shared := scoreRecommendation(source, candidate)
 		recommendations = append(recommendations, RecommendationView{
 			Intent:        toIntentView(candidate, userID),
@@ -1101,6 +1104,10 @@ func categoriesCompatible(left, right string) bool {
 		CategoryMeal: true, CategoryEvent: true, CategoryConversation: true,
 	}
 	return casual[left] && casual[right]
+}
+
+func recommendationCategoryEligible(source, candidate string) bool {
+	return categoriesCompatible(source, candidate)
 }
 
 func intersection(left, right []string) []string {

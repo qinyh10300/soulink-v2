@@ -126,7 +126,7 @@ A clean local startup must satisfy:
 1. `docker compose up -d --build` reaches healthy status.
 2. Database migrations run through `000018`.
 3. The demo account can sign in from the browser.
-4. Demo data contains five users, six intents, one mutual room, and two messages.
+4. Demo data contains five users, eight intents, one mutual room, and two messages.
 5. The demo account sees four public opportunities, one owned CTO intent, and three recommendations.
 6. Repeated API startup creates no duplicate demo users, intents, or rooms.
 7. Web production build, ESLint, Go tests, and `go vet` pass.

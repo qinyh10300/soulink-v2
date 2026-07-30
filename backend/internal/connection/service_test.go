@@ -85,6 +85,23 @@ func TestRecommendationScoringUsesProjectMemoAndProfileSkills(t *testing.T) {
 	}
 }
 
+func TestRecommendationCategoryEligibilityKeepsProjectPoolFocused(t *testing.T) {
+	t.Parallel()
+
+	if !recommendationCategoryEligible(CategoryCofounder, CategoryProject) {
+		t.Fatal("cofounder intent should accept project candidates")
+	}
+	if recommendationCategoryEligible(CategoryCofounder, CategoryMeal) {
+		t.Fatal("cofounder intent should reject meal candidates")
+	}
+	if recommendationCategoryEligible(CategoryStudy, CategorySport) {
+		t.Fatal("study intent should reject sport candidates")
+	}
+	if !recommendationCategoryEligible(CategoryMeal, CategoryConversation) {
+		t.Fatal("meal intent should accept low-pressure conversation candidates")
+	}
+}
+
 func TestRomanticIntentPreviewHidesIdentityBeforeConsent(t *testing.T) {
 	t.Parallel()
 
