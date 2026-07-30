@@ -69,6 +69,9 @@ services:
       VERIFICATION_CODE_TTL: "5m"
       VERIFICATION_CODE_COOLDOWN: "60s"
       BCRYPT_COST: "10"
+      ADMIN_EMAILS: "demo@mails.tsinghua.edu.cn"
+      DEMO_SEED_ENABLED: "true"
+      DEMO_SEED_PASSWORD: "Soulink2026!"
       MAIL_DRIVER: log
       MAIL_FROM_NAME: SouLink
       MAIL_FROM_ADDRESS: noreply@soulink.local
@@ -108,6 +111,7 @@ services:
       context: ./frontend
       args:
         NGINX_CONF: nginx.local/default.conf
+        VITE_DEMO_MODE: "true"
     image: soulink-web:local
     container_name: soulink-local-web
     restart: unless-stopped

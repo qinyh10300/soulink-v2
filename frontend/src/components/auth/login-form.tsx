@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AnimatePresence, motion } from 'framer-motion'
+import { KeyRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -21,6 +22,10 @@ const panelTransition = {
   duration: 0.22,
   ease: [0.22, 1, 0.36, 1] as const,
 }
+
+const demoMode = import.meta.env.VITE_DEMO_MODE === 'true'
+const demoEmail = 'demo@mails.tsinghua.edu.cn'
+const demoPassword = 'Soulink2026!'
 
 export function LoginForm() {
   const navigate = useNavigate()
@@ -83,6 +88,25 @@ export function LoginForm() {
     setIsAgreementModalOpen(false)
   }
 
+  const fillDemoAccount = () => {
+    setValue('email', demoEmail, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    })
+    setValue('password', demoPassword, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    })
+    setValue('agreement', true, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    })
+    clearErrors()
+  }
+
   const currentEmail = watch('email')
 
   useEffect(() => {
@@ -113,6 +137,29 @@ export function LoginForm() {
             </p>
           </div>
         </div>
+
+        {demoMode ? (
+          <section className="flex items-center gap-3 rounded-lg border border-[#cbd9d2] bg-[#eef5f1] p-3">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#376f5b]">
+              <KeyRound size={17} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold text-[#3d574d]">
+                本地演示账号
+              </span>
+              <span className="mt-0.5 block truncate font-mono text-[10px] text-[#687b73]">
+                {demoEmail} · {demoPassword}
+              </span>
+            </span>
+            <button
+              className="h-8 shrink-0 rounded-md border border-[#b9cec4] bg-white px-3 text-[11px] font-semibold text-[#376f5b] hover:bg-[#f8fbf9]"
+              onClick={fillDemoAccount}
+              type="button"
+            >
+              填入账号
+            </button>
+          </section>
+        ) : null}
 
         <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-2">

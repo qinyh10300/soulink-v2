@@ -33,6 +33,7 @@ export interface IntentInterpretation {
   confidence: number
   questions: ClarifyingQuestion[]
   inferences: string[]
+  projectMemo?: ProjectMemo
   safety: {
     level: 'clear' | 'review'
     notice: string
@@ -55,6 +56,17 @@ export interface MatchingProfile {
   updatedAt?: string
 }
 
+export interface ProjectMemo {
+  building: string
+  stage: string
+  weeklyTime: string
+  compensation: string
+  requiredSkills: string[]
+  niceToHaveSkills: string[]
+  workingStyle: string
+  riskAppetite: string
+}
+
 export interface IntentInput {
   category: IntentCategory
   title: string
@@ -67,6 +79,7 @@ export interface IntentInput {
   constraints: string[]
   dealBreakers: string[]
   desiredNextStep: string
+  projectMemo: ProjectMemo | null
   expiresAt: string | null
 }
 

@@ -2,6 +2,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  BriefcaseBusiness,
   Check,
   Clock3,
   Eye,
@@ -188,6 +189,7 @@ export function IntentDetailPage() {
           constraints: intent.constraints,
           dealBreakers: intent.dealBreakers,
           desiredNextStep: intent.desiredNextStep,
+          projectMemo: intent.projectMemo,
           expiresAt: intent.expiresAt,
         }),
       )
@@ -228,6 +230,7 @@ export function IntentDetailPage() {
     intentId: String(intent.id),
     subject: intent.title,
   }).toString()}`
+  const projectMemo = intent.projectMemo
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -330,6 +333,100 @@ export function IntentDetailPage() {
               </p>
             </div>
           </section>
+
+          {projectMemo &&
+          (intent.category === 'project' || intent.category === 'cofounder') ? (
+            <section className="rounded-lg border border-[#d9d0df] bg-[#faf8fb] p-5 sm:p-6">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#4d2d66]">
+                <BriefcaseBusiness size={17} />
+                项目 memo
+              </div>
+
+              {projectMemo.building ? (
+                <div className="mt-4">
+                  <p className="text-[11px] font-medium text-[#81768a]">正在做什么</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-7 text-[#574d5c]">
+                    {projectMemo.building}
+                  </p>
+                </div>
+              ) : null}
+
+              <dl className="mt-5 grid gap-4 border-y border-[#e3dce7] py-4 sm:grid-cols-3">
+                <div>
+                  <dt className="text-[11px] text-[#81768a]">当前阶段</dt>
+                  <dd className="mt-1 text-sm font-medium text-[#4f4654]">
+                    {projectMemo.stage || '待确认'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-[#81768a]">每周投入</dt>
+                  <dd className="mt-1 text-sm font-medium text-[#4f4654]">
+                    {projectMemo.weeklyTime || '待确认'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-[#81768a]">权益或补偿</dt>
+                  <dd className="mt-1 text-sm font-medium text-[#4f4654]">
+                    {projectMemo.compensation || '尚未说明'}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-medium text-[#81768a]">必备技能</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {projectMemo.requiredSkills.length > 0 ? (
+                      projectMemo.requiredSkills.map((skill) => (
+                        <span
+                          className="rounded-md bg-[#eae3ee] px-2 py-1 text-[11px] text-[#5b3477]"
+                          key={skill}
+                        >
+                          {skill}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-[#8a828e]">待确认</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[#81768a]">加分技能</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {projectMemo.niceToHaveSkills.length > 0 ? (
+                      projectMemo.niceToHaveSkills.map((skill) => (
+                        <span
+                          className="rounded-md bg-white px-2 py-1 text-[11px] text-[#6f6275]"
+                          key={skill}
+                        >
+                          {skill}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-[#8a828e]">无额外要求</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {projectMemo.workingStyle || projectMemo.riskAppetite ? (
+                <div className="mt-5 grid gap-4 border-t border-[#e3dce7] pt-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] text-[#81768a]">协作方式</p>
+                    <p className="mt-1 text-xs leading-6 text-[#665b6b]">
+                      {projectMemo.workingStyle || '待沟通'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-[#81768a]">风险偏好</p>
+                    <p className="mt-1 text-xs leading-6 text-[#665b6b]">
+                      {projectMemo.riskAppetite || '待沟通'}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {intent.isOwner ? (
             <>

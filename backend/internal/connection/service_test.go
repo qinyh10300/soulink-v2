@@ -2,6 +2,7 @@ package connection
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,6 +53,35 @@ func TestRecommendationScoringRewardsConcreteOverlap(t *testing.T) {
 	}
 	if len(shared) == 0 {
 		t.Fatal("shared context is empty, want concrete overlap")
+	}
+}
+
+func TestRecommendationScoringUsesProjectMemoAndProfileSkills(t *testing.T) {
+	t.Parallel()
+
+	source := store.ConnectionIntent{
+		Category: CategoryCofounder,
+		ProjectMemo: store.ProjectMemo{
+			RequiredSkills: []string{"React", "工程架构"},
+			WeeklyTime:     "每周 10 小时",
+		},
+	}
+	candidate := store.ConnectionIntent{
+		Category:           CategoryProject,
+		AuthorSkills:       []string{"React", "前端工程"},
+		AuthorAvailability: "每周工作日晚间",
+	}
+
+	score, reason, _, shared := scoreRecommendation(source, candidate)
+
+	if score < 70 {
+		t.Fatalf("score = %d, want strong project skill signal", score)
+	}
+	if !strings.Contains(reason, "显式技能") {
+		t.Fatalf("reason = %q, want skill-specific explanation", reason)
+	}
+	if len(shared) == 0 || shared[0] != "React" {
+		t.Fatalf("shared = %#v, want React", shared)
 	}
 }
 

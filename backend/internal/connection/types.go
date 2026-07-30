@@ -47,19 +47,31 @@ type MatchingProfileView struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
 
+type ProjectMemo struct {
+	Building         string   `json:"building"`
+	Stage            string   `json:"stage"`
+	WeeklyTime       string   `json:"weeklyTime"`
+	Compensation     string   `json:"compensation"`
+	RequiredSkills   []string `json:"requiredSkills"`
+	NiceToHaveSkills []string `json:"niceToHaveSkills"`
+	WorkingStyle     string   `json:"workingStyle"`
+	RiskAppetite     string   `json:"riskAppetite"`
+}
+
 type IntentInput struct {
-	Category        string     `json:"category"`
-	Title           string     `json:"title"`
-	Description     string     `json:"description"`
-	Goal            string     `json:"goal"`
-	TimeWindow      string     `json:"timeWindow"`
-	Location        string     `json:"location"`
-	Visibility      string     `json:"visibility"`
-	Status          string     `json:"status"`
-	Constraints     []string   `json:"constraints"`
-	DealBreakers    []string   `json:"dealBreakers"`
-	DesiredNextStep string     `json:"desiredNextStep"`
-	ExpiresAt       *time.Time `json:"expiresAt"`
+	Category        string       `json:"category"`
+	Title           string       `json:"title"`
+	Description     string       `json:"description"`
+	Goal            string       `json:"goal"`
+	TimeWindow      string       `json:"timeWindow"`
+	Location        string       `json:"location"`
+	Visibility      string       `json:"visibility"`
+	Status          string       `json:"status"`
+	Constraints     []string     `json:"constraints"`
+	DealBreakers    []string     `json:"dealBreakers"`
+	DesiredNextStep string       `json:"desiredNextStep"`
+	ProjectMemo     *ProjectMemo `json:"projectMemo,omitempty"`
+	ExpiresAt       *time.Time   `json:"expiresAt"`
 }
 
 type AuthorPreview struct {
@@ -83,6 +95,7 @@ type IntentView struct {
 	Constraints     []string      `json:"constraints"`
 	DealBreakers    []string      `json:"dealBreakers,omitempty"`
 	DesiredNextStep string        `json:"desiredNextStep"`
+	ProjectMemo     *ProjectMemo  `json:"projectMemo,omitempty"`
 	ExpiresAt       *time.Time    `json:"expiresAt,omitempty"`
 	PublishedAt     *time.Time    `json:"publishedAt,omitempty"`
 	InterestCount   int           `json:"interestCount"`

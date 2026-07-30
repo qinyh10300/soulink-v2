@@ -20,6 +20,7 @@ type Config struct {
 	Match          MatchConfig
 	Questionnaire  QuestionnaireConfig
 	Safety         SafetyConfig
+	Demo           DemoConfig
 }
 
 type DatabaseConfig struct {
@@ -66,6 +67,11 @@ type MatchConfig struct {
 
 type SafetyConfig struct {
 	AdminEmails []string
+}
+
+type DemoConfig struct {
+	Enabled  bool
+	Password string
 }
 
 func Load() (Config, error) {
@@ -117,6 +123,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	demoEnabled, err := envBool("DEMO_SEED_ENABLED", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		AppEnv:         envString("APP_ENV", "development"),
@@ -160,6 +170,10 @@ func Load() (Config, error) {
 		},
 		Safety: SafetyConfig{
 			AdminEmails: normalizeEmails(splitCSV(envString("ADMIN_EMAILS", ""))),
+		},
+		Demo: DemoConfig{
+			Enabled:  demoEnabled,
+			Password: envString("DEMO_SEED_PASSWORD", "Soulink2026!"),
 		},
 	}, nil
 }

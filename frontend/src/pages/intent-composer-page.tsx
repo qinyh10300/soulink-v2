@@ -30,6 +30,7 @@ import {
   type IntentInterpretation,
   type IntentVisibility,
   type MatchingProfile,
+  type ProjectMemo,
 } from '@/lib/connection-api'
 import { cn } from '@/lib/utils'
 
@@ -71,10 +72,27 @@ const blankDraft: IntentInput = {
   constraints: [],
   dealBreakers: [],
   desiredNextStep: '',
+  projectMemo: null,
   expiresAt: null,
 }
 
+function emptyProjectMemo(): ProjectMemo {
+  return {
+    building: '',
+    stage: '',
+    weeklyTime: '',
+    compensation: '',
+    requiredSkills: [],
+    niceToHaveSkills: [],
+    workingStyle: '',
+    riskAppetite: '',
+  }
+}
+
 function toDraft(interpretation: IntentInterpretation): IntentInput {
+  const isProject =
+    interpretation.category === 'project' ||
+    interpretation.category === 'cofounder'
   return {
     category: interpretation.category,
     title: interpretation.title,
@@ -87,6 +105,12 @@ function toDraft(interpretation: IntentInterpretation): IntentInput {
     constraints: interpretation.constraints,
     dealBreakers: [],
     desiredNextStep: interpretation.desiredNextStep,
+    projectMemo: isProject
+      ? interpretation.projectMemo ?? {
+          ...emptyProjectMemo(),
+          building: interpretation.description,
+        }
+      : null,
     expiresAt: null,
   }
 }
@@ -169,6 +193,27 @@ export function IntentComposerPage() {
     }
     if (questionId === 'skills') {
       updateDraft('constraints', Array.from(new Set([...draft.constraints, value])))
+      setDraft((current) => ({
+        ...current,
+        projectMemo: {
+          ...(current.projectMemo ?? emptyProjectMemo()),
+          requiredSkills: Array.from(
+            new Set([
+              ...(current.projectMemo?.requiredSkills ?? []),
+              value,
+            ]),
+          ),
+        },
+      }))
+    }
+    if (questionId === 'projectStage') {
+      setDraft((current) => ({
+        ...current,
+        projectMemo: {
+          ...(current.projectMemo ?? emptyProjectMemo()),
+          stage: value,
+        },
+      }))
     }
     if (questionId === 'category') {
       const category =
@@ -181,7 +226,26 @@ export function IntentComposerPage() {
       if (category === 'romantic') {
         updateDraft('visibility', 'candidates')
       }
+      updateDraft(
+        'projectMemo',
+        category === 'project'
+          ? draft.projectMemo ?? emptyProjectMemo()
+          : null,
+      )
     }
+  }
+
+  const updateProjectMemo = <K extends keyof ProjectMemo>(
+    key: K,
+    value: ProjectMemo[K],
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      projectMemo: {
+        ...(current.projectMemo ?? emptyProjectMemo()),
+        [key]: value,
+      },
+    }))
   }
 
   const handleSubmit = async (status: 'draft' | 'active') => {
@@ -404,6 +468,20 @@ export function IntentComposerPage() {
               </div>
 
               <div>
+                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-goal">
+                  希望这次连接达成什么
+                </label>
+                <input
+                  className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                  id="intent-goal"
+                  maxLength={200}
+                  onChange={(event) => updateDraft('goal', event.target.value)}
+                  placeholder="例如：先确认双方是否适合长期协作"
+                  value={draft.goal}
+                />
+              </div>
+
+              <div>
                 <span className="text-xs font-semibold text-[#5f5b55]">意图类型</span>
                 <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
                   {intentCategoryOrder.map((category) => {
@@ -423,6 +501,12 @@ export function IntentComposerPage() {
                           if (category === 'romantic') {
                             updateDraft('visibility', 'candidates')
                           }
+                          updateDraft(
+                            'projectMemo',
+                            category === 'project' || category === 'cofounder'
+                              ? draft.projectMemo ?? emptyProjectMemo()
+                              : null,
+                          )
                         }}
                         type="button"
                       >
@@ -433,6 +517,139 @@ export function IntentComposerPage() {
                   })}
                 </div>
               </div>
+
+              {(draft.category === 'project' ||
+                draft.category === 'cofounder') &&
+              draft.projectMemo ? (
+                <section className="border-y border-[#ddd7e1] bg-[#faf8fb] px-1 py-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-[#4d2d66]">
+                        项目 memo
+                      </h3>
+                      <p className="mt-1 text-[11px] text-[#81768a]">
+                        这些信息会参与工程伙伴与 CTO 匹配。
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-[#eee8f2] px-2 py-1 text-[10px] font-semibold text-[#5b3477]">
+                      PROJECT
+                    </span>
+                  </div>
+
+                  <div className="mt-5 space-y-4">
+                    <label className="block text-xs font-semibold text-[#5f5b55]">
+                      正在做什么
+                      <textarea
+                        className="mt-2 min-h-24 w-full resize-y rounded-md border border-[#d9d5cf] bg-white p-3 text-sm leading-6 outline-none focus:border-[#7a5a8e]"
+                        maxLength={600}
+                        onChange={(event) =>
+                          updateProjectMemo('building', event.target.value)
+                        }
+                        placeholder="产品解决什么问题，已经有了哪些证据。"
+                        value={draft.projectMemo.building}
+                      />
+                    </label>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-xs font-semibold text-[#5f5b55]">
+                        当前阶段
+                        <input
+                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                          maxLength={240}
+                          onChange={(event) =>
+                            updateProjectMemo('stage', event.target.value)
+                          }
+                          placeholder="想法 / 验证需求 / 已有 MVP"
+                          value={draft.projectMemo.stage}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-[#5f5b55]">
+                        每周投入
+                        <input
+                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                          maxLength={240}
+                          onChange={(event) =>
+                            updateProjectMemo('weeklyTime', event.target.value)
+                          }
+                          placeholder="例如：每周 8 到 12 小时"
+                          value={draft.projectMemo.weeklyTime}
+                        />
+                      </label>
+                    </div>
+
+                    <label className="block text-xs font-semibold text-[#5f5b55]">
+                      权益或补偿预期
+                      <input
+                        className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                        maxLength={240}
+                        onChange={(event) =>
+                          updateProjectMemo('compensation', event.target.value)
+                        }
+                        placeholder="可留空，也可以说明股权、薪资或尚待讨论"
+                        value={draft.projectMemo.compensation}
+                      />
+                    </label>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-xs font-semibold text-[#5f5b55]">
+                        必备技能
+                        <input
+                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                          onChange={(event) =>
+                            updateProjectMemo(
+                              'requiredSkills',
+                              splitTags(event.target.value),
+                            )
+                          }
+                          placeholder="React，工程架构，AI 应用"
+                          value={draft.projectMemo.requiredSkills.join('，')}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-[#5f5b55]">
+                        加分技能
+                        <input
+                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                          onChange={(event) =>
+                            updateProjectMemo(
+                              'niceToHaveSkills',
+                              splitTags(event.target.value),
+                            )
+                          }
+                          placeholder="Go，推荐系统，校园产品"
+                          value={draft.projectMemo.niceToHaveSkills.join('，')}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-xs font-semibold text-[#5f5b55]">
+                        协作方式
+                        <textarea
+                          className="mt-2 min-h-20 w-full resize-y rounded-md border border-[#d9d5cf] bg-white p-3 text-sm leading-6 outline-none focus:border-[#7a5a8e]"
+                          maxLength={240}
+                          onChange={(event) =>
+                            updateProjectMemo('workingStyle', event.target.value)
+                          }
+                          placeholder="如何决策、同步和交付。"
+                          value={draft.projectMemo.workingStyle}
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold text-[#5f5b55]">
+                        风险偏好
+                        <textarea
+                          className="mt-2 min-h-20 w-full resize-y rounded-md border border-[#d9d5cf] bg-white p-3 text-sm leading-6 outline-none focus:border-[#7a5a8e]"
+                          maxLength={240}
+                          onChange={(event) =>
+                            updateProjectMemo('riskAppetite', event.target.value)
+                          }
+                          placeholder="对早期不确定性、现金流或长期投入的看法。"
+                          value={draft.projectMemo.riskAppetite}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -474,6 +691,34 @@ export function IntentComposerPage() {
                   placeholder="用逗号分隔，例如：低压力，守时，每周可投入 10 小时"
                   value={draft.constraints.join('，')}
                 />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-deal-breakers">
+                  明确不合适的情况
+                  <input
+                    className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                    id="intent-deal-breakers"
+                    onChange={(event) =>
+                      updateDraft('dealBreakers', splitTags(event.target.value))
+                    }
+                    placeholder="用逗号分隔，可留空"
+                    value={draft.dealBreakers.join('，')}
+                  />
+                </label>
+                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-next-step">
+                  希望的下一步
+                  <input
+                    className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
+                    id="intent-next-step"
+                    maxLength={200}
+                    onChange={(event) =>
+                      updateDraft('desiredNextStep', event.target.value)
+                    }
+                    placeholder="例如：先聊 30 分钟"
+                    value={draft.desiredNextStep}
+                  />
+                </label>
               </div>
 
               <div>

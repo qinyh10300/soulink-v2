@@ -194,3 +194,31 @@ func TestLoadReadsSafetyAdminEmails(t *testing.T) {
 		t.Fatalf("Safety.AdminEmails[0] = %q", cfg.Safety.AdminEmails[0])
 	}
 }
+
+func TestLoadReadsDemoConfig(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	contents := "DEMO_SEED_ENABLED=true\nDEMO_SEED_PASSWORD=local-password\n"
+	if err := os.WriteFile(envPath, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get wd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if !cfg.Demo.Enabled {
+		t.Fatal("Demo.Enabled = false, want true")
+	}
+	if cfg.Demo.Password != "local-password" {
+		t.Fatalf("Demo.Password = %q", cfg.Demo.Password)
+	}
+}

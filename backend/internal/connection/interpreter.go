@@ -28,6 +28,7 @@ type IntentInterpretation struct {
 	Visibility      string               `json:"visibility"`
 	Constraints     []string             `json:"constraints"`
 	DesiredNextStep string               `json:"desiredNextStep"`
+	ProjectMemo     *ProjectMemo         `json:"projectMemo,omitempty"`
 	Confidence      float64              `json:"confidence"`
 	Questions       []ClarifyingQuestion `json:"questions"`
 	Inferences      []string             `json:"inferences"`
@@ -47,6 +48,7 @@ func (i *Interpreter) Interpret(raw string) IntentInterpretation {
 	location := inferLocation(description)
 	timeWindow := inferTimeWindow(description)
 	constraints := inferConstraints(description)
+	projectMemo := inferProjectMemo(description, category)
 	visibility := "feed"
 	if category == CategoryRomantic {
 		visibility = "candidates"
@@ -73,6 +75,13 @@ func (i *Interpreter) Interpret(raw string) IntentInterpretation {
 				ID:      "skills",
 				Prompt:  "对方最需要具备哪类能力？",
 				Options: []string{"技术研发", "产品与设计", "增长与运营"},
+			})
+		}
+		if projectMemo != nil && projectMemo.Stage == "" && len(questions) < 3 {
+			questions = append(questions, ClarifyingQuestion{
+				ID:      "projectStage",
+				Prompt:  "项目现在大约走到哪一步？",
+				Options: []string{"刚有想法", "正在验证需求", "已有可用原型"},
 			})
 		}
 	} else if location == "" && len(questions) < 3 {
@@ -118,12 +127,67 @@ func (i *Interpreter) Interpret(raw string) IntentInterpretation {
 		Visibility:      visibility,
 		Constraints:     constraints,
 		DesiredNextStep: inferredNextStep(category),
+		ProjectMemo:     projectMemo,
 		Confidence:      confidence,
 		Questions:       questions,
 		Inferences:      inferences,
 		Safety:          assessSafety(description),
 		Engine:          "soulink-intent-engine-v1",
 	}
+}
+
+func inferProjectMemo(text, category string) *ProjectMemo {
+	if category != CategoryProject && category != CategoryCofounder {
+		return nil
+	}
+
+	memo := &ProjectMemo{
+		Building:         strings.TrimSpace(text),
+		RequiredSkills:   inferProjectSkills(text),
+		NiceToHaveSkills: []string{},
+	}
+	switch {
+	case containsAny(text, []string{"已有原型", "已有产品", "第一版", "mvp", "上线"}):
+		memo.Stage = "已有可用原型"
+	case containsAny(text, []string{"访谈", "验证需求", "用户验证", "调研"}):
+		memo.Stage = "正在验证需求"
+	case containsAny(text, []string{"想法", "idea", "准备做"}):
+		memo.Stage = "刚有想法"
+	}
+
+	weeklyPattern := regexp.MustCompile(`(?i)每周[^，。；;\n]{0,16}(?:小时|h)`)
+	memo.WeeklyTime = strings.TrimSpace(weeklyPattern.FindString(text))
+
+	switch {
+	case containsAny(text, []string{"股权", "期权", "联合创始"}):
+		memo.Compensation = "愿意讨论长期权益"
+	case containsAny(text, []string{"薪资", "报酬", "有偿"}):
+		memo.Compensation = "有偿合作，具体方式待沟通"
+	}
+	if containsAny(text, []string{"快速", "迭代", "验证", "原型"}) {
+		memo.WorkingStyle = "偏快速验证与迭代"
+	}
+	if containsAny(text, []string{"创业", "长期", "从零开始"}) {
+		memo.RiskAppetite = "接受早期不确定性，期待长期投入"
+	}
+	return memo
+}
+
+func inferProjectSkills(text string) []string {
+	skills := []string{
+		"前端", "React", "后端", "Go", "Python", "算法", "全栈", "AI 应用",
+		"产品", "设计", "运营", "增长", "infra", "硬件",
+	}
+	result := make([]string, 0, 5)
+	for _, skill := range skills {
+		if containsAny(text, []string{skill}) {
+			result = append(result, skill)
+		}
+		if len(result) == 5 {
+			break
+		}
+	}
+	return result
 }
 
 func inferCategory(text string) (string, float64) {

@@ -41,30 +41,46 @@ type UpsertMatchingProfileParams struct {
 	Now                time.Time
 }
 
+type ProjectMemo struct {
+	Building         string   `json:"building"`
+	Stage            string   `json:"stage"`
+	WeeklyTime       string   `json:"weeklyTime"`
+	Compensation     string   `json:"compensation"`
+	RequiredSkills   []string `json:"requiredSkills"`
+	NiceToHaveSkills []string `json:"niceToHaveSkills"`
+	WorkingStyle     string   `json:"workingStyle"`
+	RiskAppetite     string   `json:"riskAppetite"`
+}
+
 type ConnectionIntent struct {
-	ID               int64
-	AuthorID         int64
-	AuthorNickname   string
-	AuthorDepartment string
-	AuthorGrade      string
-	Category         string
-	Title            string
-	Description      string
-	Goal             string
-	TimeWindow       string
-	Location         string
-	Visibility       string
-	Status           string
-	Constraints      []string
-	DealBreakers     []string
-	DesiredNextStep  string
-	ExpiresAt        sql.NullTime
-	PublishedAt      sql.NullTime
-	InterestCount    int
-	InterestState    string
-	SavedByMe        bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                       int64
+	AuthorID                 int64
+	AuthorNickname           string
+	AuthorDepartment         string
+	AuthorGrade              string
+	AuthorBio                string
+	AuthorSkills             []string
+	AuthorAvailability       string
+	AuthorCollaborationStyle string
+	Category                 string
+	Title                    string
+	Description              string
+	Goal                     string
+	TimeWindow               string
+	Location                 string
+	Visibility               string
+	Status                   string
+	Constraints              []string
+	DealBreakers             []string
+	DesiredNextStep          string
+	ProjectMemo              ProjectMemo
+	ExpiresAt                sql.NullTime
+	PublishedAt              sql.NullTime
+	InterestCount            int
+	InterestState            string
+	SavedByMe                bool
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 type CreateConnectionIntentParams struct {
@@ -80,6 +96,7 @@ type CreateConnectionIntentParams struct {
 	Constraints     []string
 	DealBreakers    []string
 	DesiredNextStep string
+	ProjectMemo     ProjectMemo
 	ExpiresAt       sql.NullTime
 	PublishedAt     sql.NullTime
 	Now             time.Time
@@ -99,6 +116,7 @@ type UpdateConnectionIntentParams struct {
 	Constraints     []string
 	DealBreakers    []string
 	DesiredNextStep string
+	ProjectMemo     ProjectMemo
 	ExpiresAt       sql.NullTime
 	PublishedAt     sql.NullTime
 	Now             time.Time
@@ -243,25 +261,53 @@ func (s *Store) CreateConnectionIntent(ctx context.Context, tx *sql.Tx, params C
 	if err != nil {
 		return 0, err
 	}
+	projectMemo, err := marshalProjectMemo(params.ProjectMemo)
+	if err != nil {
+		return 0, err
+	}
 
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		INSERT INTO connection_intents (
 			author_id, category, title, description, goal, time_window, location,
 			visibility, status, constraints, deal_breakers, desired_next_step,
-			expires_at, published_at, created_at, updated_at
+			project_memo, expires_at, published_at, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb,
-			$12, $13, $14, $15, $15
+			$12, $13::jsonb, $14, $15, $16, $16
 		)
 		RETURNING id
 	`, params.AuthorID, params.Category, params.Title, params.Description, params.Goal,
 		params.TimeWindow, params.Location, params.Visibility, params.Status,
-		constraints, dealBreakers, params.DesiredNextStep, nullableTime(params.ExpiresAt),
-		nullableTime(params.PublishedAt), params.Now)
+		constraints, dealBreakers, params.DesiredNextStep, projectMemo,
+		nullableTime(params.ExpiresAt), nullableTime(params.PublishedAt), params.Now)
 
 	var intentID int64
 	if err := row.Scan(&intentID); err != nil {
 		return 0, fmt.Errorf("create connection intent: %w", err)
+	}
+	return intentID, nil
+}
+
+func (s *Store) FindConnectionIntentIDByAuthorAndTitle(
+	ctx context.Context,
+	tx *sql.Tx,
+	authorID int64,
+	title string,
+) (int64, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, `
+		SELECT id
+		FROM connection_intents
+		WHERE author_id = $1 AND title = $2
+		ORDER BY id ASC
+		LIMIT 1
+	`, authorID, title)
+
+	var intentID int64
+	if err := row.Scan(&intentID); err != nil {
+		if err == sql.ErrNoRows {
+			return 0, ErrNotFound
+		}
+		return 0, fmt.Errorf("find connection intent: %w", err)
 	}
 	return intentID, nil
 }
@@ -272,6 +318,10 @@ func (s *Store) UpdateConnectionIntent(ctx context.Context, tx *sql.Tx, params U
 		return err
 	}
 	dealBreakers, err := marshalStringList(params.DealBreakers)
+	if err != nil {
+		return err
+	}
+	projectMemo, err := marshalProjectMemo(params.ProjectMemo)
 	if err != nil {
 		return err
 	}
@@ -289,14 +339,15 @@ func (s *Store) UpdateConnectionIntent(ctx context.Context, tx *sql.Tx, params U
 		    constraints = $11::jsonb,
 		    deal_breakers = $12::jsonb,
 		    desired_next_step = $13,
-		    expires_at = $14,
-		    published_at = $15,
-		    updated_at = $16
+		    project_memo = $14::jsonb,
+		    expires_at = $15,
+		    published_at = $16,
+		    updated_at = $17
 		WHERE id = $1 AND author_id = $2
 	`, params.IntentID, params.AuthorID, params.Category, params.Title, params.Description,
 		params.Goal, params.TimeWindow, params.Location, params.Visibility, params.Status,
-		constraints, dealBreakers, params.DesiredNextStep, nullableTime(params.ExpiresAt),
-		nullableTime(params.PublishedAt), params.Now)
+		constraints, dealBreakers, params.DesiredNextStep, projectMemo,
+		nullableTime(params.ExpiresAt), nullableTime(params.PublishedAt), params.Now)
 	if err != nil {
 		return fmt.Errorf("update connection intent: %w", err)
 	}
@@ -318,9 +369,11 @@ func (s *Store) UpdateConnectionIntentStatus(ctx context.Context, tx *sql.Tx, in
 func (s *Store) GetConnectionIntent(ctx context.Context, tx *sql.Tx, viewerID, intentID int64) (ConnectionIntent, error) {
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		SELECT i.id, i.author_id, u.nickname, u.department, u.grade,
+		       COALESCE(mp.bio, ''), COALESCE(mp.skills, '[]'::jsonb)::text,
+		       COALESCE(mp.availability, ''), COALESCE(mp.collaboration_style, ''),
 		       i.category, i.title, i.description, i.goal, i.time_window, i.location,
 		       i.visibility, i.status, i.constraints::text, i.deal_breakers::text,
-		       i.desired_next_step, i.expires_at, i.published_at,
+		       i.desired_next_step, i.project_memo::text, i.expires_at, i.published_at,
 		       (SELECT COUNT(*) FROM intent_interests ii
 		        WHERE ii.intent_id = i.id AND ii.status IN ('interested', 'accepted')) AS interest_count,
 		       COALESCE((SELECT ii.status FROM intent_interests ii
@@ -329,6 +382,7 @@ func (s *Store) GetConnectionIntent(ctx context.Context, tx *sql.Tx, viewerID, i
 		       i.created_at, i.updated_at
 		FROM connection_intents i
 		JOIN users u ON u.id = i.author_id
+		LEFT JOIN matching_profiles mp ON mp.user_id = i.author_id
 		WHERE i.id = $2 AND u.deleted_at IS NULL
 	`, viewerID, intentID)
 	return scanConnectionIntent(row)
@@ -387,9 +441,11 @@ func (s *Store) ListRecommendationCandidates(ctx context.Context, tx *sql.Tx, vi
 func (s *Store) listConnectionIntents(ctx context.Context, tx *sql.Tx, clause string, args ...any) ([]ConnectionIntent, error) {
 	query := `
 		SELECT i.id, i.author_id, u.nickname, u.department, u.grade,
+		       COALESCE(mp.bio, ''), COALESCE(mp.skills, '[]'::jsonb)::text,
+		       COALESCE(mp.availability, ''), COALESCE(mp.collaboration_style, ''),
 		       i.category, i.title, i.description, i.goal, i.time_window, i.location,
 		       i.visibility, i.status, i.constraints::text, i.deal_breakers::text,
-		       i.desired_next_step, i.expires_at, i.published_at,
+		       i.desired_next_step, i.project_memo::text, i.expires_at, i.published_at,
 		       (SELECT COUNT(*) FROM intent_interests ii
 		        WHERE ii.intent_id = i.id AND ii.status IN ('interested', 'accepted')) AS interest_count,
 		       COALESCE((SELECT ii.status FROM intent_interests ii
@@ -398,6 +454,7 @@ func (s *Store) listConnectionIntents(ctx context.Context, tx *sql.Tx, clause st
 		       i.created_at, i.updated_at
 		FROM connection_intents i
 		JOIN users u ON u.id = i.author_id
+		LEFT JOIN matching_profiles mp ON mp.user_id = i.author_id
 	` + clause
 
 	rows, err := queryContext(executor(s.db, tx), ctx, query, args...)
@@ -455,6 +512,28 @@ func (s *Store) SetIntentInterest(ctx context.Context, tx *sql.Tx, intentID, use
 		return fmt.Errorf("set intent interest: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) GetIntentInterestStatus(
+	ctx context.Context,
+	tx *sql.Tx,
+	intentID int64,
+	userID int64,
+) (string, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, `
+		SELECT status
+		FROM intent_interests
+		WHERE intent_id = $1 AND user_id = $2
+	`, intentID, userID)
+
+	var status string
+	if err := row.Scan(&status); err != nil {
+		if err == sql.ErrNoRows {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("get intent interest status: %w", err)
+	}
+	return status, nil
 }
 
 func (s *Store) UpdateIntentInterestStatus(ctx context.Context, tx *sql.Tx, intentID, userID int64, status string, now time.Time) error {
@@ -540,6 +619,29 @@ func (s *Store) CreateMatchRoom(ctx context.Context, tx *sql.Tx, params CreateMa
 	var roomID int64
 	if err := row.Scan(&roomID); err != nil {
 		return 0, fmt.Errorf("create match room: %w", err)
+	}
+	return roomID, nil
+}
+
+func (s *Store) FindMatchRoomID(
+	ctx context.Context,
+	tx *sql.Tx,
+	intentID int64,
+	candidateID int64,
+) (int64, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, `
+		SELECT id
+		FROM match_rooms
+		WHERE intent_id = $1 AND candidate_id = $2
+		LIMIT 1
+	`, intentID, candidateID)
+
+	var roomID int64
+	if err := row.Scan(&roomID); err != nil {
+		if err == sql.ErrNoRows {
+			return 0, ErrNotFound
+		}
+		return 0, fmt.Errorf("find match room: %w", err)
 	}
 	return roomID, nil
 }
@@ -716,13 +818,15 @@ func scanMatchingProfile(row rowScanner) (MatchingProfile, error) {
 
 func scanConnectionIntent(row rowScanner) (ConnectionIntent, error) {
 	var intent ConnectionIntent
-	var rawConstraints, rawDealBreakers string
+	var rawAuthorSkills, rawConstraints, rawDealBreakers, rawProjectMemo string
 	if err := row.Scan(
 		&intent.ID, &intent.AuthorID, &intent.AuthorNickname, &intent.AuthorDepartment,
-		&intent.AuthorGrade, &intent.Category, &intent.Title, &intent.Description,
+		&intent.AuthorGrade, &intent.AuthorBio, &rawAuthorSkills,
+		&intent.AuthorAvailability, &intent.AuthorCollaborationStyle,
+		&intent.Category, &intent.Title, &intent.Description,
 		&intent.Goal, &intent.TimeWindow, &intent.Location, &intent.Visibility,
 		&intent.Status, &rawConstraints, &rawDealBreakers, &intent.DesiredNextStep,
-		&intent.ExpiresAt, &intent.PublishedAt, &intent.InterestCount,
+		&rawProjectMemo, &intent.ExpiresAt, &intent.PublishedAt, &intent.InterestCount,
 		&intent.InterestState, &intent.SavedByMe, &intent.CreatedAt, &intent.UpdatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -733,9 +837,17 @@ func scanConnectionIntent(row rowScanner) (ConnectionIntent, error) {
 	if err := unmarshalStringList(rawConstraints, &intent.Constraints); err != nil {
 		return ConnectionIntent{}, err
 	}
+	if err := unmarshalStringList(rawAuthorSkills, &intent.AuthorSkills); err != nil {
+		return ConnectionIntent{}, err
+	}
 	if err := unmarshalStringList(rawDealBreakers, &intent.DealBreakers); err != nil {
 		return ConnectionIntent{}, err
 	}
+	if err := json.Unmarshal([]byte(rawProjectMemo), &intent.ProjectMemo); err != nil {
+		return ConnectionIntent{}, fmt.Errorf("unmarshal project memo: %w", err)
+	}
+	intent.ProjectMemo.RequiredSkills = nonNilStringList(intent.ProjectMemo.RequiredSkills)
+	intent.ProjectMemo.NiceToHaveSkills = nonNilStringList(intent.ProjectMemo.NiceToHaveSkills)
 	return intent, nil
 }
 
@@ -789,6 +901,23 @@ func unmarshalStringList(raw string, target *[]string) error {
 		*target = []string{}
 	}
 	return nil
+}
+
+func marshalProjectMemo(memo ProjectMemo) (string, error) {
+	memo.RequiredSkills = nonNilStringList(memo.RequiredSkills)
+	memo.NiceToHaveSkills = nonNilStringList(memo.NiceToHaveSkills)
+	raw, err := json.Marshal(memo)
+	if err != nil {
+		return "", fmt.Errorf("marshal project memo: %w", err)
+	}
+	return string(raw), nil
+}
+
+func nonNilStringList(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
 }
 
 func nullableTime(value sql.NullTime) any {

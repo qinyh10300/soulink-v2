@@ -69,6 +69,30 @@ func TestInterpreterAsksOnlyMaterialProjectQuestions(t *testing.T) {
 	}
 }
 
+func TestInterpreterBuildsProjectMemoFromConcreteSignals(t *testing.T) {
+	t.Parallel()
+
+	result := NewInterpreter().Interpret(
+		"已有第一版 AI 产品，想找 React 前端 CTO，每周投入 10 小时，可以讨论联合创始人股权",
+	)
+
+	if result.ProjectMemo == nil {
+		t.Fatal("project memo = nil")
+	}
+	if result.ProjectMemo.Stage != "已有可用原型" {
+		t.Fatalf("project stage = %q", result.ProjectMemo.Stage)
+	}
+	if result.ProjectMemo.WeeklyTime == "" {
+		t.Fatal("weekly time is empty")
+	}
+	if len(result.ProjectMemo.RequiredSkills) == 0 {
+		t.Fatal("required skills are empty")
+	}
+	if result.ProjectMemo.Compensation == "" {
+		t.Fatal("compensation is empty")
+	}
+}
+
 func TestInterpreterFlagsPublicContactDetails(t *testing.T) {
 	t.Parallel()
 

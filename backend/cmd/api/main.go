@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"soulink-backend/internal/chat"
 	"soulink-backend/internal/config"
 	"soulink-backend/internal/connection"
+	"soulink-backend/internal/demoseed"
 	"soulink-backend/internal/feedback"
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/gate"
@@ -53,6 +55,27 @@ func main() {
 	}
 
 	dataStore := store.New(db)
+	if cfg.Demo.Enabled {
+		if strings.EqualFold(cfg.AppEnv, "production") {
+			logger.Error("demo seed cannot be enabled in production")
+			os.Exit(1)
+		}
+		seedResult, err := demoseed.Ensure(ctx, dataStore, demoseed.Config{
+			Password:   cfg.Demo.Password,
+			BCryptCost: cfg.Auth.BCryptCost,
+		})
+		if err != nil {
+			logger.Error("seed local demo workspace", "error", err)
+			os.Exit(1)
+		}
+		logger.Info(
+			"local demo workspace ready",
+			"email", demoseed.DemoEmail,
+			"users_created", seedResult.UsersCreated,
+			"intents_created", seedResult.IntentsCreated,
+			"rooms_created", seedResult.RoomsCreated,
+		)
+	}
 
 	var redisCache *platformcache.Redis
 	var verificationCache auth.VerificationCodeCache

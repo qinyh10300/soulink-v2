@@ -122,6 +122,7 @@ func (s *Service) CreateIntent(ctx context.Context, userID int64, input IntentIn
 		Constraints:     prepared.Constraints,
 		DealBreakers:    prepared.DealBreakers,
 		DesiredNextStep: prepared.DesiredNextStep,
+		ProjectMemo:     toStoreProjectMemo(prepared.ProjectMemo),
 		ExpiresAt:       expiresAt,
 		PublishedAt:     publishedAt,
 		Now:             now,
@@ -164,6 +165,7 @@ func (s *Service) UpdateIntent(ctx context.Context, userID, intentID int64, inpu
 		Constraints:     prepared.Constraints,
 		DealBreakers:    prepared.DealBreakers,
 		DesiredNextStep: prepared.DesiredNextStep,
+		ProjectMemo:     toStoreProjectMemo(prepared.ProjectMemo),
 		ExpiresAt:       expiresAt,
 		PublishedAt:     publishedAt,
 		Now:             now,
@@ -549,6 +551,18 @@ func (s *Service) prepareIntent(ctx context.Context, userID int64, input IntentI
 	if err != nil {
 		return IntentInput{}, sql.NullTime{}, sql.NullTime{}, err
 	}
+	if input.Category == CategoryProject || input.Category == CategoryCofounder {
+		if input.ProjectMemo == nil {
+			input.ProjectMemo = &ProjectMemo{}
+		}
+		normalizedMemo, err := normalizeProjectMemo(*input.ProjectMemo)
+		if err != nil {
+			return IntentInput{}, sql.NullTime{}, sql.NullTime{}, err
+		}
+		input.ProjectMemo = &normalizedMemo
+	} else {
+		input.ProjectMemo = nil
+	}
 
 	profile, err := s.GetMatchingProfile(ctx, userID)
 	if err != nil {
@@ -623,6 +637,41 @@ func normalizeMatchingProfile(input MatchingProfileInput) (MatchingProfileInput,
 	return input, nil
 }
 
+func normalizeProjectMemo(input ProjectMemo) (ProjectMemo, error) {
+	input.Building = strings.TrimSpace(input.Building)
+	input.Stage = strings.TrimSpace(input.Stage)
+	input.WeeklyTime = strings.TrimSpace(input.WeeklyTime)
+	input.Compensation = strings.TrimSpace(input.Compensation)
+	input.WorkingStyle = strings.TrimSpace(input.WorkingStyle)
+	input.RiskAppetite = strings.TrimSpace(input.RiskAppetite)
+
+	if utf8.RuneCountInString(input.Building) > 600 {
+		return ProjectMemo{}, invalidParams("项目简介不能超过 600 个字")
+	}
+	for _, value := range []string{
+		input.Stage,
+		input.WeeklyTime,
+		input.Compensation,
+		input.WorkingStyle,
+		input.RiskAppetite,
+	} {
+		if utf8.RuneCountInString(value) > 240 {
+			return ProjectMemo{}, invalidParams("项目 memo 字段不能超过 240 个字")
+		}
+	}
+
+	var err error
+	input.RequiredSkills, err = normalizeStringList(input.RequiredSkills, 12, 60)
+	if err != nil {
+		return ProjectMemo{}, err
+	}
+	input.NiceToHaveSkills, err = normalizeStringList(input.NiceToHaveSkills, 12, 60)
+	if err != nil {
+		return ProjectMemo{}, err
+	}
+	return input, nil
+}
+
 func normalizeStringList(values []string, maxItems, maxLength int) ([]string, error) {
 	result := make([]string, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
@@ -685,6 +734,42 @@ func scoreRecommendation(source, candidate store.ConnectionIntent) (int, string,
 		reasons = append(reasons, "你们对见面方式有共同偏好")
 	}
 
+	if source.Category == CategoryProject || source.Category == CategoryCofounder {
+		requiredSkillMatches := fuzzyIntersection(
+			source.ProjectMemo.RequiredSkills,
+			candidate.AuthorSkills,
+		)
+		if len(requiredSkillMatches) > 0 {
+			added := len(requiredSkillMatches) * 6
+			if added > 18 {
+				added = 18
+			}
+			score += added
+			shared = append(shared, requiredSkillMatches...)
+			reasons = append(reasons, "对方的显式技能与项目必备能力有直接交集")
+		}
+
+		reciprocalSkillMatches := fuzzyIntersection(
+			candidate.ProjectMemo.RequiredSkills,
+			source.AuthorSkills,
+		)
+		if len(reciprocalSkillMatches) > 0 {
+			score += min(len(reciprocalSkillMatches)*4, 12)
+			shared = append(shared, reciprocalSkillMatches...)
+			reasons = append(reasons, "你的技能也能回应对方正在寻找的能力")
+		}
+
+		if source.ProjectMemo.WeeklyTime != "" &&
+			candidate.AuthorAvailability != "" &&
+			hasSharedTimeSignal(
+				source.ProjectMemo.WeeklyTime,
+				candidate.AuthorAvailability,
+			) {
+			score += 4
+			reasons = append(reasons, "投入节奏存在可以进一步对齐的线索")
+		}
+	}
+
 	commonSignals := sharedDescriptionSignals(source.Description, candidate.Description)
 	if len(commonSignals) > 0 {
 		added := len(commonSignals) * 3
@@ -713,7 +798,15 @@ func scoreRecommendation(source, candidate store.ConnectionIntent) (int, string,
 		uncertainties = append(uncertainties, "地点偏好还未确认")
 	}
 	if source.Category == CategoryProject || source.Category == CategoryCofounder {
-		uncertainties = append(uncertainties, "实际投入时间与分工仍需当面确认")
+		if source.ProjectMemo.WeeklyTime == "" || candidate.AuthorAvailability == "" {
+			uncertainties = append(uncertainties, "实际投入时间仍需确认")
+		}
+		if source.ProjectMemo.Compensation == "" {
+			uncertainties = append(uncertainties, "权益或补偿方式尚未说明")
+		}
+		if len(uncertainties) == 0 {
+			uncertainties = append(uncertainties, "分工、决策方式和风险偏好仍需当面确认")
+		}
 	}
 	if len(uncertainties) == 0 {
 		uncertainties = append(uncertainties, "文字意图无法替代一次真实交流")
@@ -779,6 +872,10 @@ func toIntentView(intent store.ConnectionIntent, viewerID int64) IntentView {
 		CreatedAt:       intent.CreatedAt,
 		UpdatedAt:       intent.UpdatedAt,
 	}
+	if intent.Category == CategoryProject || intent.Category == CategoryCofounder {
+		memo := fromStoreProjectMemo(intent.ProjectMemo)
+		view.ProjectMemo = &memo
+	}
 	if isOwner {
 		view.DealBreakers = nonNilStrings(intent.DealBreakers)
 	}
@@ -791,6 +888,35 @@ func toIntentView(intent store.ConnectionIntent, viewerID int64) IntentView {
 		view.PublishedAt = &value
 	}
 	return view
+}
+
+func toStoreProjectMemo(memo *ProjectMemo) store.ProjectMemo {
+	if memo == nil {
+		return store.ProjectMemo{}
+	}
+	return store.ProjectMemo{
+		Building:         memo.Building,
+		Stage:            memo.Stage,
+		WeeklyTime:       memo.WeeklyTime,
+		Compensation:     memo.Compensation,
+		RequiredSkills:   nonNilStrings(memo.RequiredSkills),
+		NiceToHaveSkills: nonNilStrings(memo.NiceToHaveSkills),
+		WorkingStyle:     memo.WorkingStyle,
+		RiskAppetite:     memo.RiskAppetite,
+	}
+}
+
+func fromStoreProjectMemo(memo store.ProjectMemo) ProjectMemo {
+	return ProjectMemo{
+		Building:         memo.Building,
+		Stage:            memo.Stage,
+		WeeklyTime:       memo.WeeklyTime,
+		Compensation:     memo.Compensation,
+		RequiredSkills:   nonNilStrings(memo.RequiredSkills),
+		NiceToHaveSkills: nonNilStrings(memo.NiceToHaveSkills),
+		WorkingStyle:     memo.WorkingStyle,
+		RiskAppetite:     memo.RiskAppetite,
+	}
 }
 
 func mapIntentViews(intents []store.ConnectionIntent, viewerID int64) []IntentView {
@@ -991,6 +1117,29 @@ func intersection(left, right []string) []string {
 	return uniqueStrings(result, 4)
 }
 
+func fuzzyIntersection(required, available []string) []string {
+	result := make([]string, 0, 4)
+	for _, requirement := range required {
+		requirementKey := strings.ToLower(strings.TrimSpace(requirement))
+		if requirementKey == "" {
+			continue
+		}
+		for _, skill := range available {
+			skillKey := strings.ToLower(strings.TrimSpace(skill))
+			if skillKey == "" {
+				continue
+			}
+			if requirementKey == skillKey ||
+				strings.Contains(requirementKey, skillKey) ||
+				strings.Contains(skillKey, requirementKey) {
+				result = append(result, skill)
+				break
+			}
+		}
+	}
+	return uniqueStrings(result, 4)
+}
+
 func sharedDescriptionSignals(left, right string) []string {
 	signals := []string{
 		"AI", "创业", "前端", "后端", "算法", "产品", "设计", "音乐", "电影",
@@ -1003,6 +1152,16 @@ func sharedDescriptionSignals(left, right string) []string {
 		}
 	}
 	return result
+}
+
+func hasSharedTimeSignal(left, right string) bool {
+	signals := []string{"每周", "工作日", "周末", "晚间", "晚上", "白天", "小时"}
+	for _, signal := range signals {
+		if containsAny(left, []string{signal}) && containsAny(right, []string{signal}) {
+			return true
+		}
+	}
+	return false
 }
 
 func uniqueStrings(values []string, limit int) []string {
