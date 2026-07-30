@@ -114,14 +114,14 @@ func (s *Store) UpdateSafetyReportStatus(
 ) error {
 	result, err := executor(s.db, tx).ExecContext(ctx, `
 		UPDATE safety_reports
-		SET status = $2,
+		SET status = $2::varchar,
 		    resolved_at = CASE
-				WHEN $2 IN ('resolved', 'dismissed') THEN $4
-				ELSE NULL
+				WHEN $2::varchar IN ('resolved', 'dismissed') THEN $4::timestamptz
+				ELSE NULL::timestamptz
 			END,
 		    resolved_by = CASE
-				WHEN $2 IN ('resolved', 'dismissed') THEN $3
-				ELSE NULL
+				WHEN $2::varchar IN ('resolved', 'dismissed') THEN $3::bigint
+				ELSE NULL::bigint
 			END
 		WHERE id = $1
 	`, reportID, status, resolvedBy, now)
