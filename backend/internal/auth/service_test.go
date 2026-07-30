@@ -1,4 +1,4 @@
-﻿package auth
+package auth
 
 import (
 	"context"
@@ -215,7 +215,7 @@ func TestServiceRegisterRefreshesRegisteredUserCount(t *testing.T) {
 	department := "\u8ba1\u7b97\u673a\u5b66\u9662"
 	grade := "\u672c\u79d1\u4e09\u5e74\u7ea7"
 
-	email := "register@pku.edu.cn"
+	email := "register@mails.tsinghua.edu.cn"
 	code := "123456"
 	if err := service.codeCache.Store(context.Background(), email, store.CodePurposeRegister, CachedVerificationCode{
 		CodeHash:  HashVerificationCode(string(store.CodePurposeRegister), email, code, "secret"),
@@ -227,9 +227,9 @@ func TestServiceRegisterRefreshesRegisteredUserCount(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(`(?s)INSERT INTO users .*RETURNING id, email, school_key, password_hash, nickname, department, grade, contact_type, contact_value,.*deleted_at`).
-		WithArgs(email, "pku", sqlmock.AnyArg(), nickname, department, grade, now).
+		WithArgs(email, "thu", sqlmock.AnyArg(), nickname, department, grade, now).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "school_key", "password_hash", "nickname", "department", "grade", "contact_type", "contact_value", "has_completed_questionnaire", "created_at", "updated_at", "deleted_at"}).
-			AddRow(int64(2), email, "pku", "hash", nickname, department, grade, nil, nil, false, now, now, nil))
+			AddRow(int64(2), email, "thu", "hash", nickname, department, grade, nil, nil, false, now, now, nil))
 	mock.ExpectQuery(`(?s)INSERT INTO auth_sessions .*RETURNING id, user_id, expires_at, created_at, last_seen_at, revoked_at`).
 		WithArgs(sqlmock.AnyArg(), int64(2), sqlmock.AnyArg(), now, now).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "expires_at", "created_at", "last_seen_at", "revoked_at"}).
@@ -271,7 +271,7 @@ func TestServiceRegisterRejectsDuplicateNickname(t *testing.T) {
 	department := "\u8ba1\u7b97\u673a\u5b66\u9662"
 	grade := "\u672c\u79d1\u4e09\u5e74\u7ea7"
 
-	email := "nickname-conflict@pku.edu.cn"
+	email := "nickname-conflict@mails.tsinghua.edu.cn"
 	code := "123456"
 	if err := service.codeCache.Store(context.Background(), email, store.CodePurposeRegister, CachedVerificationCode{
 		CodeHash:  HashVerificationCode(string(store.CodePurposeRegister), email, code, "secret"),
@@ -283,7 +283,7 @@ func TestServiceRegisterRejectsDuplicateNickname(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(`(?s)INSERT INTO users .*RETURNING id, email, school_key, password_hash, nickname, department, grade, contact_type, contact_value,.*deleted_at`).
-		WithArgs(email, "pku", sqlmock.AnyArg(), "duplicate-name", department, grade, now).
+		WithArgs(email, "thu", sqlmock.AnyArg(), "duplicate-name", department, grade, now).
 		WillReturnError(errors.New(`duplicate key value violates unique constraint "ux_users_nickname_active"`))
 	mock.ExpectRollback()
 

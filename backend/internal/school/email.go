@@ -133,20 +133,17 @@ func EmailSuffixes(name Name) []string {
 }
 
 func SupportedEmailSuffixes() []string {
-	total := 0
-	for _, name := range Names() {
-		total += len(emailSuffixes[name])
-	}
-	suffixes := make([]string, 0, total)
-	for _, name := range Names() {
-		suffixes = append(suffixes, emailSuffixes[name]...)
-	}
-	return suffixes
+	return EmailSuffixes(Tsinghua)
 }
 
 func SupportsEmail(email string) bool {
-	_, ok := NameByEmail(email)
-	return ok
+	normalized := strings.ToLower(strings.TrimSpace(email))
+	for _, suffix := range emailSuffixes[Tsinghua] {
+		if strings.HasSuffix(normalized, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func NameByEmail(email string) (Name, bool) {

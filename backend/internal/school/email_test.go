@@ -41,6 +41,47 @@ func TestNameByEmail(t *testing.T) {
 	}
 }
 
+func TestSupportsEmailOnlyAcceptsTsinghuaIdentity(t *testing.T) {
+	t.Parallel()
+
+	accepted := []string{
+		"user@mails.tsinghua.edu.cn",
+		"user@mail.tsinghua.edu.cn",
+		"user@tsinghua.org.cn",
+		"user@student.pumc.edu.cn",
+	}
+	for _, email := range accepted {
+		if !SupportsEmail(email) {
+			t.Fatalf("SupportsEmail(%q) = false, want true", email)
+		}
+	}
+
+	rejected := []string{
+		"user@pku.edu.cn",
+		"user@mail.bnu.edu.cn",
+		"user@gmail.com",
+	}
+	for _, email := range rejected {
+		if SupportsEmail(email) {
+			t.Fatalf("SupportsEmail(%q) = true, want false", email)
+		}
+	}
+}
+
+func TestSupportedEmailSuffixesOnlyContainsTsinghuaDomains(t *testing.T) {
+	t.Parallel()
+
+	suffixes := SupportedEmailSuffixes()
+	if len(suffixes) != len(EmailSuffixes(Tsinghua)) {
+		t.Fatalf("SupportedEmailSuffixes() length = %d, want %d", len(suffixes), len(EmailSuffixes(Tsinghua)))
+	}
+	for _, suffix := range suffixes {
+		if suffix == "@pku.edu.cn" {
+			t.Fatal("SupportedEmailSuffixes() unexpectedly contains a non-Tsinghua domain")
+		}
+	}
+}
+
 func TestDisplayNameByEmail(t *testing.T) {
 	t.Parallel()
 

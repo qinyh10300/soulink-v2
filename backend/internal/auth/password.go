@@ -27,7 +27,7 @@ func ValidateEmail(email string) error {
 		return httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidEmail, "邮箱格式错误")
 	}
 	if !school.SupportsEmail(normalized) {
-		return httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidEmail, "邮箱格式错误")
+		return httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidEmail, "请使用清华大学邮箱")
 	}
 	return nil
 }

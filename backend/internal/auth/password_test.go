@@ -32,32 +32,18 @@ func TestValidateEmail(t *testing.T) {
 	if err := ValidateEmail("test@student.pumc.edu.cn"); err != nil {
 		t.Fatalf("ValidateEmail() unexpected error for student.pumc.edu.cn email: %v", err)
 	}
-	if err := ValidateEmail("test@pku.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for PKU email: %v", err)
-	}
-	if err := ValidateEmail("test@stu.pku.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for stu.pku.edu.cn email: %v", err)
-	}
-	if err := ValidateEmail("test@bimba.pku.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for bimba.pku.edu.cn email: %v", err)
-	}
-	if err := ValidateEmail("test@bfsu.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for bfsu.edu.cn email: %v", err)
-	}
-	if err := ValidateEmail("test@stu.zuel.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for ZUEL email: %v", err)
-	}
-	if err := ValidateEmail("test@u.nus.edu"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for NUS email: %v", err)
-	}
-	if err := ValidateEmail("test@e.ntu.edu.sg"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for NTU email: %v", err)
-	}
-	if err := ValidateEmail("test@m.fudan.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for Shanghai Jiao Tong email: %v", err)
-	}
-	if err := ValidateEmail("test@sjtu.edu.cn"); err != nil {
-		t.Fatalf("ValidateEmail() unexpected error for Fudan email: %v", err)
+	for _, email := range []string{
+		"test@pku.edu.cn",
+		"test@bfsu.edu.cn",
+		"test@stu.zuel.edu.cn",
+		"test@u.nus.edu",
+		"test@e.ntu.edu.sg",
+		"test@m.fudan.edu.cn",
+		"test@sjtu.edu.cn",
+	} {
+		if err := ValidateEmail(email); err == nil {
+			t.Fatalf("ValidateEmail(%q) expected error for non-Tsinghua email", email)
+		}
 	}
 	if err := ValidateEmail("bad-email"); err == nil {
 		t.Fatal("ValidateEmail() expected error for invalid email")
