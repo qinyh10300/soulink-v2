@@ -50,18 +50,18 @@ export function RegisterProfileStep({
   return (
     <div className="space-y-8">
       <div className="space-y-5">
-        <p className="text-sm font-semibold tracking-[0.22em] text-[#9a6d4d] uppercase">
-           Soulink
+        <p className="text-xs font-semibold text-[#6c4a80]">
+          SOULINK · 清华校内
         </p>
         <RegisterStepHeader activeStep={3} />
       </div>
 
       <div className="space-y-4">
-        <p className="text-sm font-semibold tracking-[0.22em] text-[#9a6d4d] uppercase">
+        <p className="text-xs font-semibold text-[#6c4a80]">
           Step 3
         </p>
-        <h1 className="font-serif text-5xl text-[#261f1b]">完善您的资料</h1>
-        <p className="text-base leading-7 text-[#7e6d61]">
+        <h1 className="text-3xl font-semibold text-[#292724]">完善基础资料</h1>
+        <p className="text-sm leading-7 text-[#77736c]">
           填写基本信息，让匹配更准确。
         </p>
       </div>
@@ -69,7 +69,7 @@ export function RegisterProfileStep({
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-nickname"
           >
             昵称
@@ -86,7 +86,7 @@ export function RegisterProfileStep({
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-department"
           >
             专业介绍
@@ -105,7 +105,7 @@ export function RegisterProfileStep({
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-grade"
           >
             年级
@@ -133,7 +133,7 @@ export function RegisterProfileStep({
         <button
           className={cn(
             buttonVariants({ size: 'lg' }),
-            'w-full rounded-full bg-[#8f6548] text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40]',
+            'w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
           )}
           disabled={!isValid || isSubmitting || isOptionsLoading}
           type="submit"
@@ -143,7 +143,7 @@ export function RegisterProfileStep({
       </form>
 
       <button
-        className="text-sm text-[#8e7b6d] transition-colors hover:text-[#725744]"
+        className="text-sm text-[#77736c] transition-colors hover:text-[#5b3477]"
         onClick={onBack}
         type="button"
       >

@@ -64,7 +64,7 @@ export function ForgotPasswordPanel({
     const parsedEmail = loginEmailSchema.safeParse(email)
 
     if (!parsedEmail.success) {
-      onEmailInvalid(parsedEmail.error.issues[0]?.message ?? '请先输入合法的学校邮箱')
+      onEmailInvalid(parsedEmail.error.issues[0]?.message ?? '请先输入合法的清华邮箱')
       setNotice('')
       return null
     }

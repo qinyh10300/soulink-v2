@@ -39,32 +39,29 @@ export function AuthHeroPanel({
           width={1536}
         />
       </picture>
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(58,41,35,0.16)_0%,rgba(78,55,45,0.2)_38%,rgba(40,25,22,0.42)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,216,194,0.22),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(146,92,66,0.22),transparent_30%)]" />
+      <div className="absolute inset-0 bg-[rgba(24,20,26,0.46)]" />
 
       <Link
-        className="absolute left-10 top-10 flex items-center gap-4 rounded-full border border-white/18 bg-white/10 px-5 py-3 text-white backdrop-blur-md transition-all duration-200 hover:bg-white/16 hover:shadow-[0_16px_36px_rgba(20,14,12,0.16)]"
+        className="absolute left-10 top-10 flex items-center gap-3 rounded-md border border-white/25 bg-black/15 px-4 py-3 text-white backdrop-blur-md transition-colors hover:bg-black/25"
         to="/"
       >
         <img
           alt=" Soulink"
-          className="h-11 w-11 rounded-2xl border border-white/18 object-cover"
+          className="h-9 w-9 rounded-md border border-white/20 object-cover"
           src={brandIcon}
         />
         <div>
-          <p className="text-sm font-semibold tracking-[0.18em] uppercase">
-             Soulink
-          </p>
-          <p className="text-sm text-white/76">AI社交匹配平台</p>
+          <p className="text-sm font-semibold">SouLink</p>
+          <p className="text-xs text-white/76">清华校内 AI 匹配</p>
         </div>
       </Link>
 
       <div className="absolute inset-x-10 bottom-12">
         <div className="max-w-xl space-y-5">
-          <h2 className="text-balance font-serif text-6xl leading-[0.98] text-[#f4d6b7] drop-shadow-[0_14px_40px_rgba(27,16,12,0.28)]">
+          <h2 className="text-balance text-5xl font-semibold leading-[1.05] text-white">
             {title}
           </h2>
-          <p className="font-serif text-[1.5rem] italic tracking-[0.18em] text-[#f4d6b7]">
+          <p className="text-lg text-white/78">
             {subtitle}
           </p>
         </div>

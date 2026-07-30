@@ -156,7 +156,7 @@ export function RegisterPage() {
 
       saveAuthenticatedUser(result.token, result.user)
       resetDashboardAnnouncementSeen()
-      navigate('/dashboard')
+      navigate('/home')
     } catch (error) {
       setErrorStatus(error, '注册失败，请稍后重试')
     }
@@ -192,10 +192,10 @@ export function RegisterPage() {
       <FloatingToast message={toastNotice} />
 
       <AuthSplitLayout
-        imageAlt=" Soulink login hero"
+        imageAlt="清华校园"
         imageSrc={heroImage}
-        subtitle="With All Soulinkers"
-        title="探索新的AI社交范式"
+        subtitle="In Tsinghua, meet with a reason."
+        title="从一个具体意图开始"
       >
         {currentStep === 1 ? (
           <div className="space-y-6">

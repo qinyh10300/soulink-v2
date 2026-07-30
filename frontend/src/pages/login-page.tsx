@@ -11,11 +11,11 @@ const loginHeroImage = {
 export function LoginPage() {
   return (
     <AuthSplitLayout
-      imageAlt=" Soulink login hero"
+      imageAlt="清华校园"
       imageSources={loginHeroImage}
       imageSrc={loginHeroImage.webp}
-      subtitle="With All Soulinkers"
-      title="探索新的AI社交范式"
+      subtitle="In Tsinghua, meet with a reason."
+      title="找到下一位值得认识的人"
     >
       <LoginForm />
     </AuthSplitLayout>

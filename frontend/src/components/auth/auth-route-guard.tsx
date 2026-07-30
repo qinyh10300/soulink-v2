@@ -183,7 +183,7 @@ export function RedirectIfAuthenticated() {
   }
 
   if (status === 'authenticated') {
-    return <Navigate replace to="/dashboard" />
+    return <Navigate replace to="/home" />
   }
 
   return <Outlet />

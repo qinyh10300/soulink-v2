@@ -42,14 +42,14 @@ export function RegisterForm({ defaultEmail, onContinue }: RegisterFormProps) {
   return (
     <div className="space-y-8">
       <div className="space-y-5">
-        <p className="text-sm font-semibold tracking-[0.22em] text-[#9a6d4d] uppercase">
-           Soulink
+        <p className="text-xs font-semibold text-[#6c4a80]">
+          SOULINK · 清华校内
         </p>
         <RegisterStepHeader activeStep={1} />
         <div className="space-y-3">
-          <h1 className="font-serif text-5xl text-[#261f1b]">创建您的账号</h1>
-          <p className="text-base leading-7 text-[#7e6d61]">
-            使用支持的高校邮箱注册，开始寻找您的契合之人。
+          <h1 className="text-3xl font-semibold text-[#292724]">创建账号</h1>
+          <p className="text-sm leading-7 text-[#77736c]">
+            使用清华邮箱验证身份，开始一次有明确理由的连接。
           </p>
         </div>
       </div>
@@ -57,15 +57,14 @@ export function RegisterForm({ defaultEmail, onContinue }: RegisterFormProps) {
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-email"
           >
-            {/* 学校邮箱（目前支持清华(协和)、北大、人大、中传、北外、北师大） */}
-            学校邮箱
+            清华邮箱
           </label>
           <Input
             id="register-email"
-            placeholder="请输入学校邮箱"
+            placeholder="请输入清华邮箱"
             type="email"
             {...register('email')}
           />
@@ -77,7 +76,7 @@ export function RegisterForm({ defaultEmail, onContinue }: RegisterFormProps) {
         <button
           className={cn(
             buttonVariants({ size: 'lg' }),
-            'w-full rounded-full bg-[#8f6548] text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40]',
+            'w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
           )}
           disabled={!isValid || isSubmitting}
           type="submit"
@@ -86,9 +85,9 @@ export function RegisterForm({ defaultEmail, onContinue }: RegisterFormProps) {
         </button>
       </form>
 
-      <p className="text-sm text-[#7e6d61]">
+      <p className="text-sm text-[#77736c]">
         已有账号？
-        <Link className="ml-2 text-[#9a6d4d] hover:text-[#7d5539]" to="/login">
+        <Link className="ml-2 text-[#5b3477] hover:text-[#45265e]" to="/login">
           立即登录
         </Link>
       </p>

@@ -132,7 +132,8 @@ export function syncAuthenticatedUser(user: StoredAuthUser, token?: string) {
 }
 
 export function getStoredUserProfile(fallbackEmail?: string): UserProfile {
-  const email = fallbackEmail || getAuthSession()?.email || 'yourname@pku.edu.cn'
+  const email =
+    fallbackEmail || getAuthSession()?.email || 'yourname@mails.tsinghua.edu.cn'
 
   if (!hasWindow()) {
     return createDefaultProfile(email)

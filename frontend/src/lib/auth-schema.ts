@@ -7,23 +7,6 @@ export const supportedEmailSuffixes = [
   '@mail.tsinghua.org.cn',
   '@tsinghua.edu.cn',
   '@student.pumc.edu.cn',
-  '@pku.edu.cn',
-  '@stu.pku.edu.cn',
-  '@bimba.pku.edu.cn',
-  '@mail.bnu.edu.cn',
-  '@mails.cuc.edu.cn',
-  '@cuc.edu.cn',
-  '@ruc.edu.cn',
-  '@mail.bfsu.edu.cn',
-  '@bfsu.edu.cn',
-  '@mail.xs.ustb.edu.cn',
-  '@csu.edu.cn',
-  '@tongji.edu.cn',
-  '@stu.zuel.edu.cn',
-  '@u.nus.edu',
-  '@e.ntu.edu.sg',
-  '@m.fudan.edu.cn',
-  '@sjtu.edu.cn',
 ] as const
 
 export const majorDescriptionMaxLength = 20
@@ -46,10 +29,10 @@ function createSchoolEmailSchema(invalidDomainMessage: string) {
 }
 
 export const loginEmailSchema = createSchoolEmailSchema(
-  '仅支持清华、北大、人大、中传、北外、北师大、北科大、中南、同济及协和邮箱登录',
+  '仅支持清华大学及协和体系邮箱登录',
 )
 export const registerEmailSchema =
-  createSchoolEmailSchema('仅支持清华、北大、人大、中传、北外、北师大、北科大、中南、同济及协和邮箱注册')
+  createSchoolEmailSchema('仅支持清华大学及协和体系邮箱注册')
 
 export const loginSchema = z.object({
   email: loginEmailSchema,

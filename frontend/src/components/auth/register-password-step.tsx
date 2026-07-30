@@ -50,26 +50,26 @@ export function RegisterPasswordStep({
   return (
     <div className="space-y-8">
       <div className="space-y-5">
-        <p className="text-sm font-semibold tracking-[0.22em] text-[#9a6d4d] uppercase">
-           Soulink
+        <p className="text-xs font-semibold text-[#6c4a80]">
+          SOULINK · 清华校内
         </p>
         <RegisterStepHeader activeStep={2} />
       </div>
 
       <div className="space-y-4">
-        <p className="text-sm font-semibold tracking-[0.22em] text-[#9a6d4d] uppercase">
+        <p className="text-xs font-semibold text-[#6c4a80]">
           Step 2
         </p>
-        <h1 className="font-serif text-5xl text-[#261f1b]">验证并设置密码</h1>
-        <p className="text-base leading-7 text-[#7e6d61]">
-          验证码已发送至 <span className="font-medium text-[#5d493d]">{email}</span>
+        <h1 className="text-3xl font-semibold text-[#292724]">验证并设置密码</h1>
+        <p className="text-sm leading-7 text-[#77736c]">
+          验证码已发送至 <span className="font-medium text-[#4f4b46]">{email}</span>
         </p>
       </div>
 
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-code"
           >
             验证码
@@ -84,9 +84,9 @@ export function RegisterPasswordStep({
             <button
               className={cn(
                 buttonVariants({ variant: 'secondary', size: 'default' }),
-                'rounded-2xl border-[#eadfd7] bg-white/76 text-[#8f6548] shadow-none hover:bg-white',
+                'rounded-md border-[#d9d5cf] bg-white text-[#5b3477] shadow-none hover:bg-[#f5f3ef]',
                 (countdown > 0 || isSubmitting) &&
-                  'cursor-default text-[#b2a194] hover:bg-white/76',
+                'cursor-default text-[#9a958d] hover:bg-white',
               )}
               disabled={countdown > 0 || isSubmitting}
               onClick={() => {
@@ -106,7 +106,7 @@ export function RegisterPasswordStep({
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-password"
           >
             设置密码
@@ -124,7 +124,7 @@ export function RegisterPasswordStep({
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#3a302a]"
+            className="text-sm font-medium text-[#4f4b46]"
             htmlFor="register-confirm-password"
           >
             确认密码
@@ -145,7 +145,7 @@ export function RegisterPasswordStep({
         <button
           className={cn(
             buttonVariants({ size: 'lg' }),
-            'w-full rounded-full bg-[#8f6548] text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40]',
+            'w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
           )}
           disabled={!isValid || isSubmitting}
           type="submit"
@@ -155,7 +155,7 @@ export function RegisterPasswordStep({
       </form>
 
       <button
-        className="text-sm text-[#8e7b6d] transition-colors hover:text-[#725744]"
+        className="text-sm text-[#77736c] transition-colors hover:text-[#5b3477]"
         onClick={onBack}
         type="button"
       >

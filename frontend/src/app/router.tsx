@@ -1,48 +1,51 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import {
   RedirectIfAuthenticated,
   RequireAuth,
 } from '@/components/auth/auth-route-guard'
-import { DashboardShell } from '@/components/dashboard/dashboard-shell'
+import { ConnectionShell } from '@/components/connection/connection-shell'
 
-const App = lazy(() => import('@/App'))
-const AboutPage = lazy(async () => {
-  const module = await import('@/pages/about-page')
-  return { default: module.AboutPage }
+const ConnectionHomePage = lazy(async () => {
+  const module = await import('@/pages/connection-home-page')
+  return { default: module.ConnectionHomePage }
 })
-const AlliancePage = lazy(async () => {
-  const module = await import('@/pages/alliance-page')
-  return { default: module.AlliancePage }
-})
-const ChatPage = lazy(async () => {
-  const module = await import('@/pages/chat-page')
-  return { default: module.ChatPage }
-})
-const DashboardPage = lazy(async () => {
-  const module = await import('@/pages/dashboard-page')
-  return { default: module.DashboardPage }
+const ConnectionProfilePage = lazy(async () => {
+  const module = await import('@/pages/connection-profile-page')
+  return { default: module.ConnectionProfilePage }
 })
 const FeedbackPage = lazy(async () => {
   const module = await import('@/pages/feedback-page')
   return { default: module.FeedbackPage }
 })
-const FriendsPage = lazy(async () => {
-  const module = await import('@/pages/friends-page')
-  return { default: module.FriendsPage }
+const IntentComposerPage = lazy(async () => {
+  const module = await import('@/pages/intent-composer-page')
+  return { default: module.IntentComposerPage }
+})
+const IntentDetailPage = lazy(async () => {
+  const module = await import('@/pages/intent-detail-page')
+  return { default: module.IntentDetailPage }
+})
+const IntentFeedPage = lazy(async () => {
+  const module = await import('@/pages/intent-feed-page')
+  return { default: module.IntentFeedPage }
 })
 const LoginPage = lazy(async () => {
   const module = await import('@/pages/login-page')
   return { default: module.LoginPage }
 })
-const MatchPage = lazy(async () => {
-  const module = await import('@/pages/match-page')
-  return { default: module.MatchPage }
+const MatchRoomPage = lazy(async () => {
+  const module = await import('@/pages/match-room-page')
+  return { default: module.MatchRoomPage }
 })
-const PlaygroundPage = lazy(async () => {
-  const module = await import('@/pages/playground-page')
-  return { default: module.PlaygroundPage }
+const MatchRoomsPage = lazy(async () => {
+  const module = await import('@/pages/match-rooms-page')
+  return { default: module.MatchRoomsPage }
+})
+const MyIntentsPage = lazy(async () => {
+  const module = await import('@/pages/my-intents-page')
+  return { default: module.MyIntentsPage }
 })
 const ProfilePage = lazy(async () => {
   const module = await import('@/pages/profile-page')
@@ -56,21 +59,31 @@ const RegisterPage = lazy(async () => {
   const module = await import('@/pages/register-page')
   return { default: module.RegisterPage }
 })
-const SchoolPage = lazy(async () => {
-  const module = await import('@/pages/school-page')
-  return { default: module.SchoolPage }
-})
-const SingaporeSchoolPage = lazy(async () => {
-  const module = await import('@/pages/singapore-school-page')
-  return { default: module.SingaporeSchoolPage }
+const SafetyPage = lazy(async () => {
+  const module = await import('@/pages/safety-page')
+  return { default: module.SafetyPage }
 })
 const SurveyPage = lazy(async () => {
   const module = await import('@/pages/survey-page')
   return { default: module.SurveyPage }
 })
+const V2LandingPage = lazy(async () => {
+  const module = await import('@/pages/v2-landing-page')
+  return { default: module.V2LandingPage }
+})
 
 function withSuspense(element: ReactNode) {
-  return <Suspense fallback={null}>{element}</Suspense>
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#f7f6f3] text-sm text-[#77736c]">
+          正在打开 SouLink...
+        </div>
+      }
+    >
+      {element}
+    </Suspense>
+  )
 }
 
 export const router = createBrowserRouter([
@@ -78,34 +91,42 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       {
-        element: <DashboardShell />,
+        element: <ConnectionShell />,
         children: [
           {
-            path: '/dashboard',
-            element: withSuspense(<DashboardPage />),
+            path: '/home',
+            element: withSuspense(<ConnectionHomePage />),
           },
           {
-            path: '/match',
-            element: withSuspense(<MatchPage />),
+            path: '/discover',
+            element: withSuspense(<IntentFeedPage />),
           },
           {
-            path: '/chat',
-            element: withSuspense(<ChatPage />),
+            path: '/intents',
+            element: withSuspense(<MyIntentsPage />),
           },
           {
-            path: '/chat/:conversationId',
-            element: withSuspense(<ChatPage />),
+            path: '/intents/new',
+            element: withSuspense(<IntentComposerPage />),
           },
           {
-            path: '/friends',
-            element: withSuspense(<FriendsPage />),
+            path: '/intents/:intentId',
+            element: withSuspense(<IntentDetailPage />),
           },
           {
-            path: '/playground',
-            element: withSuspense(<PlaygroundPage />),
+            path: '/matches',
+            element: withSuspense(<MatchRoomsPage />),
+          },
+          {
+            path: '/matches/:roomId',
+            element: withSuspense(<MatchRoomPage />),
           },
           {
             path: '/profile',
+            element: withSuspense(<ConnectionProfilePage />),
+          },
+          {
+            path: '/account',
             element: withSuspense(<ProfilePage />),
           },
           {
@@ -115,6 +136,30 @@ export const router = createBrowserRouter([
           {
             path: '/feedback',
             element: withSuspense(<FeedbackPage />),
+          },
+          {
+            path: '/dashboard',
+            element: <Navigate replace to="/home" />,
+          },
+          {
+            path: '/match',
+            element: <Navigate replace to="/intents" />,
+          },
+          {
+            path: '/chat',
+            element: <Navigate replace to="/matches" />,
+          },
+          {
+            path: '/chat/:conversationId',
+            element: <Navigate replace to="/matches" />,
+          },
+          {
+            path: '/friends',
+            element: <Navigate replace to="/discover" />,
+          },
+          {
+            path: '/playground',
+            element: <Navigate replace to="/discover" />,
           },
         ],
       },
@@ -139,36 +184,22 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: withSuspense(<App />),
-    children: [
-      {
-        index: true,
-        element: withSuspense(<AlliancePage />),
-      },
-      {
-        path: 'schools/nus',
-        element: withSuspense(<SingaporeSchoolPage schoolKey="nus" />),
-      },
-      {
-        path: 'schools/ntu',
-        element: withSuspense(<SingaporeSchoolPage schoolKey="ntu" />),
-      },
-      {
-        path: 'schools/fdu',
-        element: withSuspense(<SingaporeSchoolPage schoolKey="fdu" />),
-      },
-      {
-        path: 'schools/sjdu',
-        element: withSuspense(<SingaporeSchoolPage schoolKey="sjdu" />),
-      },
-      {
-        path: 'schools/:schoolKey',
-        element: withSuspense(<SchoolPage />),
-      },
-      {
-        path: 'about',
-        element: withSuspense(<AboutPage />),
-      },
-    ],
+    element: withSuspense(<V2LandingPage />),
+  },
+  {
+    path: '/safety',
+    element: withSuspense(<SafetyPage />),
+  },
+  {
+    path: '/schools/*',
+    element: <Navigate replace to="/" />,
+  },
+  {
+    path: '/alliance',
+    element: <Navigate replace to="/" />,
+  },
+  {
+    path: '*',
+    element: <Navigate replace to="/" />,
   },
 ])

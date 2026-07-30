@@ -55,7 +55,7 @@ export function LoginForm() {
 
       saveAuthenticatedUser(result.token, result.user)
       resetDashboardAnnouncementSeen()
-      navigate('/dashboard')
+      navigate('/home')
     } catch (error) {
       setToastNotice(getErrorMessage(error, '登录失败，请稍后重试'))
     }
@@ -103,13 +103,13 @@ export function LoginForm() {
 
       <div className="space-y-8">
         <div className="space-y-4">
-          <p className="text-sm font-semibold tracking-[0.22em] text-[#9a6d4d] uppercase">
-             Soulink
+          <p className="text-xs font-semibold text-[#6c4a80]">
+            SOULINK · 清华校内
           </p>
           <div className="space-y-3">
-            <h1 className="font-serif text-5xl text-[#261f1b]">欢迎回来</h1>
-            <p className="text-base leading-7 text-[#7e6d61]">
-              登录您的  Soulink 账号
+            <h1 className="text-3xl font-semibold text-[#292724]">欢迎回来</h1>
+            <p className="text-sm leading-7 text-[#77736c]">
+              登录后继续你的意图和匹配房间。
             </p>
           </div>
         </div>
@@ -117,15 +117,14 @@ export function LoginForm() {
         <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-2">
             <label
-              className="text-sm font-medium text-[#3a302a]"
+              className="text-sm font-medium text-[#4f4b46]"
               htmlFor="login-email"
             >
-              {/* 学校邮箱（目前支持清华(协和)、北大、人大、中传、北外、北师大） */}
-              学校邮箱
+              清华邮箱
             </label>
             <Input
               id="login-email"
-              placeholder="请输入学校邮箱"
+              placeholder="请输入清华邮箱"
               type="email"
               {...register('email')}
             />
@@ -137,13 +136,13 @@ export function LoginForm() {
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-4">
               <label
-                className="text-sm font-medium text-[#3a302a]"
+                className="text-sm font-medium text-[#4f4b46]"
                 htmlFor="login-password"
               >
                 密码
               </label>
               <button
-                className="text-sm text-[#9a6d4d] transition-colors hover:text-[#7d5539]"
+                className="text-sm text-[#5b3477] transition-colors hover:text-[#45265e]"
                 onClick={() =>
                   setIsForgotPasswordOpen((currentValue) => !currentValue)
                 }
@@ -183,22 +182,22 @@ export function LoginForm() {
               control={control}
               name="agreement"
               render={({ field }) => (
-                <label className="flex items-start gap-3 rounded-2xl border border-[#eadfd7] bg-white/58 px-4 py-3">
+                <label className="flex items-start gap-3 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-4 py-3">
                   <Checkbox
                     checked={field.value}
                     onCheckedChange={field.onChange}
                   />
-                  <span className="text-sm leading-6 text-[#68584d]">
+                  <span className="text-sm leading-6 text-[#65615b]">
                     我已阅读并同意
                     <button
-                      className="mx-1 text-[#9a6d4d] underline decoration-[#cfb29e] underline-offset-4 transition-colors hover:text-[#7d5539]"
+                      className="mx-1 text-[#5b3477] underline decoration-[#bba9c5] underline-offset-4 transition-colors hover:text-[#45265e]"
                       onClick={(event) => {
                         event.preventDefault()
                         setIsAgreementModalOpen(true)
                       }}
                       type="button"
                     >
-                      《 Soulink 用户协议》
+                      《SouLink 用户协议》
                     </button>
                   </span>
                 </label>
@@ -212,7 +211,7 @@ export function LoginForm() {
           <button
             className={cn(
               buttonVariants({ size: 'lg' }),
-              'mt-2 w-full rounded-full bg-[#8f6548] text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40]',
+              'mt-2 w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
             )}
             disabled={!isValid || isSubmitting}
             type="submit"
@@ -221,9 +220,9 @@ export function LoginForm() {
           </button>
         </form>
 
-        <p className="text-sm text-[#7e6d61]">
+        <p className="text-sm text-[#77736c]">
           还没有账号？
-          <Link className="ml-2 text-[#9a6d4d] hover:text-[#7d5539]" to="/register">
+          <Link className="ml-2 text-[#5b3477] hover:text-[#45265e]" to="/register">
             立即注册
           </Link>
         </p>

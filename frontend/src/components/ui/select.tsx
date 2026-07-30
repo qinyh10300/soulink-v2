@@ -12,7 +12,7 @@ const Select = React.forwardRef<
       <select
         ref={ref}
         className={cn(
-          'flex h-13 w-full appearance-none rounded-2xl border border-[#ded3ca] bg-white/88 px-4 pr-12 text-[15px] text-[#2d2623] shadow-[0_6px_16px_rgba(95,70,55,0.04)] outline-none transition-all focus:border-[#b98b68] focus:ring-4 focus:ring-[#b98b68]/12 disabled:cursor-not-allowed disabled:opacity-60',
+          'flex h-11 w-full appearance-none rounded-md border border-[#d9d5cf] bg-white px-3 pr-10 text-[15px] text-[#302e2b] outline-none transition-shadow focus:border-[#7a5a8e] focus:ring-3 focus:ring-[#5b3477]/10 disabled:cursor-not-allowed disabled:opacity-60',
           className,
         )}
         {...props}
@@ -20,7 +20,7 @@ const Select = React.forwardRef<
         {children}
       </select>
       <ChevronDown
-        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#b4a59a]"
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8d8982]"
         size={18}
       />
     </div>
