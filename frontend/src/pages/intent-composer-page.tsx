@@ -1,63 +1,47 @@
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   Check,
-  Eye,
-  EyeOff,
   LoaderCircle,
-  LockKeyhole,
   RotateCcw,
-  Save,
   Send,
   ShieldCheck,
   Sparkles,
+  X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import {
   IntentCategoryIcon,
   intentCategoryMeta,
-  intentCategoryOrder,
 } from '@/components/connection/intent-category'
+import { IntentReviewPanel } from '@/components/connection/intent-review-panel'
 import { getErrorMessage } from '@/lib/api'
 import {
   createIntent,
   fetchMatchingProfile,
   interpretIntent,
+  type ClarifyingQuestion,
   type IntentInput,
   type IntentInterpretation,
-  type IntentVisibility,
   type MatchingProfile,
   type ProjectMemo,
 } from '@/lib/connection-api'
 import { cn } from '@/lib/utils'
 
-const visibilityOptions: Array<{
-  value: IntentVisibility
-  label: string
-  description: string
-  icon: typeof Eye
-}> = [
-  {
-    value: 'private',
-    label: '仅 AI 搜索',
-    description: '不进入公开流',
-    icon: EyeOff,
-  },
-  {
-    value: 'candidates',
-    label: '仅候选可见',
-    description: '只向推荐的人展示',
-    icon: LockKeyhole,
-  },
-  {
-    value: 'feed',
-    label: '进入意图流',
-    description: '校内同学可发现',
-    icon: Eye,
-  },
+const starterPrompts = [
+  '今晚想在紫荆找个饭搭子',
+  '找一个能一起做产品的项目伙伴',
+  '想找人每周固定跑两次步',
+  '为我的 AI 项目找 CTO',
 ]
 
 const blankDraft: IntentInput = {
@@ -93,6 +77,7 @@ function toDraft(interpretation: IntentInterpretation): IntentInput {
   const isProject =
     interpretation.category === 'project' ||
     interpretation.category === 'cofounder'
+
   return {
     category: interpretation.category,
     title: interpretation.title,
@@ -122,15 +107,81 @@ function splitTags(value: string) {
     .filter(Boolean)
 }
 
+function AssistantMark({ small = false }: { small?: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-md bg-[#263b35] text-white',
+        small ? 'h-8 w-8' : 'h-10 w-10',
+      )}
+    >
+      <Sparkles size={small ? 15 : 18} strokeWidth={1.8} />
+    </span>
+  )
+}
+
+function AssistantMessage({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <motion.div
+      animate={{ opacity: 1, y: 0 }}
+      className={cn('flex items-start gap-3', className)}
+      initial={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.2 }}
+    >
+      <AssistantMark small />
+      <div className="min-w-0 flex-1 pt-1 text-sm leading-6 text-[#45413d]">
+        {children}
+      </div>
+    </motion.div>
+  )
+}
+
+function UserMessage({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      animate={{ opacity: 1, y: 0 }}
+      className="flex justify-end"
+      initial={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="max-w-[88%] rounded-lg bg-[#e9e5df] px-4 py-2.5 text-sm leading-6 text-[#34312e] sm:max-w-[76%]">
+        {children}
+      </div>
+    </motion.div>
+  )
+}
+
+function categoryFromAnswer(value: string) {
+  if (/饭|活动/.test(value)) {
+    return 'meal' as const
+  }
+  if (/学习|项目|协作/.test(value)) {
+    return 'project' as const
+  }
+  if (/关系|对象|恋爱/.test(value)) {
+    return 'romantic' as const
+  }
+  return null
+}
+
 export function IntentComposerPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const conversationEndRef = useRef<HTMLDivElement>(null)
+  const didAutoInterpretRef = useRef(false)
   const initialText = useMemo(() => {
     const state = location.state as { text?: string } | null
     return state?.text?.trim() ?? ''
   }, [location.state])
 
-  const [rawText, setRawText] = useState(initialText)
+  const [composerText, setComposerText] = useState('')
+  const [requestText, setRequestText] = useState(initialText)
   const [interpretation, setInterpretation] =
     useState<IntentInterpretation | null>(null)
   const [draft, setDraft] = useState<IntentInput>(blankDraft)
@@ -139,17 +190,36 @@ export function IntentComposerPage() {
   const [interpreting, setInterpreting] = useState(false)
   const [submitting, setSubmitting] = useState<'draft' | 'active' | null>(null)
   const [notice, setNotice] = useState('')
-  const [didAutoInterpret, setDidAutoInterpret] = useState(false)
+  const [mobileReviewOpen, setMobileReviewOpen] = useState(false)
 
-  async function runInterpretation(value = rawText) {
+  const currentQuestion = useMemo(
+    () =>
+      interpretation?.questions.find((question) => !answers[question.id]) ??
+      null,
+    [answers, interpretation],
+  )
+  const answeredCount = interpretation
+    ? interpretation.questions.filter((question) => answers[question.id]).length
+    : 0
+  const readyToReview = Boolean(interpretation && !currentQuestion)
+
+  const runInterpretation = async (value: string) => {
     const text = value.trim()
     if (!text || interpreting) {
       return
     }
+
+    const nextRequest =
+      interpretation && requestText
+        ? `${requestText}\n补充：${text}`
+        : text
+    setRequestText(nextRequest)
+    setComposerText('')
     setInterpreting(true)
     setNotice('')
+
     try {
-      const result = await interpretIntent(text)
+      const result = await interpretIntent(nextRequest)
       setInterpretation(result)
       setDraft(toDraft(result))
       setAnswers({})
@@ -167,72 +237,27 @@ export function IntentComposerPage() {
   }, [])
 
   useEffect(() => {
-    if (!initialText || didAutoInterpret) {
+    if (!initialText || didAutoInterpretRef.current) {
       return
     }
-    setDidAutoInterpret(true)
+    didAutoInterpretRef.current = true
     void runInterpretation(initialText)
-    // The initial route state is intentionally consumed once.
+    // Route state is consumed only once when the conversation opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [didAutoInterpret, initialText])
+  }, [initialText])
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    })
+  }, [answers, interpretation, interpreting, notice])
 
   const updateDraft = <K extends keyof IntentInput>(
     key: K,
     value: IntentInput[K],
   ) => {
     setDraft((current) => ({ ...current, [key]: value }))
-  }
-
-  const answerQuestion = (questionId: string, value: string) => {
-    setAnswers((current) => ({ ...current, [questionId]: value }))
-    if (questionId === 'timeWindow') {
-      updateDraft('timeWindow', value === '时间都可以' ? '时间灵活' : value)
-    }
-    if (questionId === 'location') {
-      updateDraft('location', value === '校内都可以' ? '校内均可' : value.replace('附近', ''))
-    }
-    if (questionId === 'skills') {
-      updateDraft('constraints', Array.from(new Set([...draft.constraints, value])))
-      setDraft((current) => ({
-        ...current,
-        projectMemo: {
-          ...(current.projectMemo ?? emptyProjectMemo()),
-          requiredSkills: Array.from(
-            new Set([
-              ...(current.projectMemo?.requiredSkills ?? []),
-              value,
-            ]),
-          ),
-        },
-      }))
-    }
-    if (questionId === 'projectStage') {
-      setDraft((current) => ({
-        ...current,
-        projectMemo: {
-          ...(current.projectMemo ?? emptyProjectMemo()),
-          stage: value,
-        },
-      }))
-    }
-    if (questionId === 'category') {
-      const category =
-        value === '一起吃饭或活动'
-          ? 'meal'
-          : value === '学习或项目协作'
-            ? 'project'
-            : 'romantic'
-      updateDraft('category', category)
-      if (category === 'romantic') {
-        updateDraft('visibility', 'candidates')
-      }
-      updateDraft(
-        'projectMemo',
-        category === 'project'
-          ? draft.projectMemo ?? emptyProjectMemo()
-          : null,
-      )
-    }
   }
 
   const updateProjectMemo = <K extends keyof ProjectMemo>(
@@ -246,6 +271,86 @@ export function IntentComposerPage() {
         [key]: value,
       },
     }))
+  }
+
+  const answerQuestion = (question: ClarifyingQuestion, value: string) => {
+    const answer = value.trim()
+    if (!answer) {
+      return
+    }
+
+    setAnswers((current) => ({ ...current, [question.id]: answer }))
+    setComposerText('')
+    setDraft((current) => {
+      const next = { ...current }
+
+      if (question.id === 'timeWindow') {
+        next.timeWindow = answer === '时间都可以' ? '时间灵活' : answer
+      }
+      if (question.id === 'location') {
+        next.location =
+          answer === '校内都可以' ? '校内均可' : answer.replace('附近', '')
+      }
+      if (question.id === 'skills') {
+        const skills = splitTags(answer)
+        next.constraints = Array.from(
+          new Set([...current.constraints, ...skills]),
+        )
+        next.projectMemo = {
+          ...(current.projectMemo ?? emptyProjectMemo()),
+          requiredSkills: Array.from(
+            new Set([
+              ...(current.projectMemo?.requiredSkills ?? []),
+              ...skills,
+            ]),
+          ),
+        }
+      }
+      if (question.id === 'projectStage') {
+        next.projectMemo = {
+          ...(current.projectMemo ?? emptyProjectMemo()),
+          stage: answer,
+        }
+      }
+      if (question.id === 'category') {
+        const category = categoryFromAnswer(answer)
+        if (category) {
+          next.category = category
+          next.visibility =
+            category === 'romantic' ? 'candidates' : next.visibility
+          next.projectMemo =
+            category === 'project'
+              ? current.projectMemo ?? emptyProjectMemo()
+              : null
+        }
+      }
+
+      return next
+    })
+  }
+
+  const handleComposerSubmit = () => {
+    if (!composerText.trim() || interpreting) {
+      return
+    }
+    if (currentQuestion) {
+      answerQuestion(currentQuestion, composerText)
+      return
+    }
+    void runInterpretation(composerText)
+  }
+
+  const handleComposerKeyDown = (
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault()
+      handleComposerSubmit()
+    }
   }
 
   const handleSubmit = async (status: 'draft' | 'active') => {
@@ -269,539 +374,313 @@ export function IntentComposerPage() {
     }
   }
 
-  const romanticNeedsOptIn =
-    draft.category === 'romantic' && profile && !profile.romanticOptIn
-  const canSubmit =
-    Boolean(draft.title.trim() && draft.description.trim()) &&
-    !romanticNeedsOptIn
+  const resetConversation = () => {
+    setComposerText('')
+    setRequestText('')
+    setInterpretation(null)
+    setDraft(blankDraft)
+    setAnswers({})
+    setNotice('')
+    setMobileReviewOpen(false)
+    didAutoInterpretRef.current = true
+  }
+
+  const composerPlaceholder = currentQuestion
+    ? '也可以直接输入你的答案'
+    : interpretation
+      ? '再补充一句，SouLink 会重新整理'
+      : '描述你想找的人，以及想一起做什么'
 
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <header className="flex items-center justify-between gap-4 border-b border-[#dfdcd6] pb-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            aria-label="返回"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[#6f6b65] hover:bg-[#eeece8]"
-            onClick={() => navigate(-1)}
-            title="返回"
-            type="button"
-          >
-            <ArrowLeft size={19} />
-          </button>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-[#6c4a80]">NEW INTENT</p>
-            <h1 className="truncate text-xl font-semibold text-[#292724] sm:text-2xl">
-              把一个念头变成可匹配的意图
-            </h1>
-          </div>
-        </div>
-        {interpretation ? (
-          <button
-            className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-[#66625c] hover:bg-[#eeece8]"
-            onClick={() => {
-              setInterpretation(null)
-              setDraft(blankDraft)
-              setAnswers({})
-            }}
-            type="button"
-          >
-            <RotateCcw size={15} />
-            <span className="hidden sm:inline">重新描述</span>
-          </button>
-        ) : null}
-      </header>
-
-      {notice ? (
-        <div className="mt-5 flex items-start gap-2 rounded-md border border-[#ead4ce] bg-[#fff6f3] px-4 py-3 text-sm text-[#8c463d]">
-          <AlertCircle className="mt-0.5 shrink-0" size={16} />
-          {notice}
-        </div>
-      ) : null}
-
-      {!interpretation ? (
-        <section className="mx-auto max-w-3xl py-10 sm:py-14">
-          <div className="mb-5 flex items-center gap-2 text-sm font-medium text-[#5b3477]">
-            <Sparkles size={17} />
-            先说人话就好
-          </div>
-          <textarea
-            aria-label="描述意图"
-            autoFocus
-            className="min-h-52 w-full resize-y rounded-lg border border-[#d8d4cd] bg-white p-5 text-lg leading-8 text-[#292724] outline-none transition-shadow placeholder:text-[#9a958d] focus:border-[#7a5a8e] focus:ring-3 focus:ring-[#5b3477]/10"
-            maxLength={1200}
-            onChange={(event) => setRawText(event.target.value)}
-            placeholder="例如：想找一个能每周投入 10 小时、偏前端和工程实现的 CTO，一起做 AI 社交产品。"
-            value={rawText}
-          />
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <span className="text-xs text-[#817d76]">
-              {rawText.length} / 1200
-            </span>
+    <div className="h-[calc(100dvh-8.75rem)] overflow-hidden bg-[#f7f6f3] lg:h-screen xl:grid xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="flex min-h-0 min-w-0 flex-col">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#dfdcd6] px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#5b3477] px-5 text-sm font-semibold text-white hover:bg-[#4c2b65] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!rawText.trim() || interpreting}
-              onClick={() => void runInterpretation()}
+              aria-label="返回"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[#6f6b65] hover:bg-[#eeece8]"
+              onClick={() => navigate(-1)}
+              title="返回"
               type="button"
             >
-              {interpreting ? (
-                <LoaderCircle className="animate-spin" size={17} />
-              ) : (
-                <Sparkles size={17} />
-              )}
-              {interpreting ? '正在整理...' : '让 SouLink 整理'}
+              <ArrowLeft size={18} />
             </button>
-          </div>
-        </section>
-      ) : (
-        <div className="grid gap-7 py-7 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-          <aside className="min-w-0 space-y-5">
-            <section className="rounded-lg border border-[#dad5ce] bg-[#f1ecf4] p-5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#4d2d66]">
-                  <Sparkles size={16} />
-                  AI 整理结果
-                </span>
-                <span className="rounded-md bg-white/75 px-2 py-1 text-[11px] font-medium text-[#694a7d]">
-                  {Math.round(interpretation.confidence * 100)}% 置信
-                </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-sm font-semibold text-[#292724]">
+                  SouLink 助手
+                </h1>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#4f846f]" />
               </div>
-              <p className="mt-4 text-sm leading-6 text-[#5f5267]">
-                {interpretation.goal}
+              <p className="mt-0.5 truncate text-[11px] text-[#817d76]">
+                清华校内连接
               </p>
-              <div className="mt-4 border-t border-[#dcd2e1] pt-3">
-                {interpretation.inferences.map((inference) => (
-                  <p
-                    className="flex items-start gap-2 py-1 text-xs leading-5 text-[#736679]"
-                    key={inference}
+            </div>
+          </div>
+
+          {requestText ? (
+            <button
+              aria-label="重新开始"
+              className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-semibold text-[#66625c] hover:bg-[#eeece8]"
+              onClick={resetConversation}
+              title="重新开始"
+              type="button"
+            >
+              <RotateCcw size={15} />
+              <span className="hidden sm:inline">重新开始</span>
+            </button>
+          ) : null}
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {!requestText && !interpreting ? (
+            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-5 py-10 text-center">
+              <AssistantMark />
+              <h2 className="mt-5 text-2xl font-semibold text-[#262421] sm:text-[30px]">
+                现在，想认识谁？
+              </h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-[#77736c]">
+                从一件想一起做的事开始。
+              </p>
+              <div className="mt-8 grid w-full gap-2 sm:grid-cols-2">
+                {starterPrompts.map((prompt) => (
+                  <button
+                    className="min-h-12 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-3 py-2.5 text-left text-xs leading-5 text-[#5f5b55] transition-colors hover:border-[#9eaea8] hover:bg-white hover:text-[#2f5146]"
+                    key={prompt}
+                    onClick={() => void runInterpretation(prompt)}
+                    type="button"
                   >
-                    <Check className="mt-0.5 shrink-0" size={13} />
-                    {inference}
-                  </p>
+                    {prompt}
+                  </button>
                 ))}
               </div>
-            </section>
+            </div>
+          ) : (
+            <div className="mx-auto w-full max-w-3xl space-y-7 px-4 py-7 sm:px-7 sm:py-9">
+              <AssistantMessage>
+                告诉我你想和谁建立连接，以及你们准备一起做什么。
+              </AssistantMessage>
 
-            {interpretation.questions.length > 0 ? (
-              <section>
-                <h2 className="text-sm font-semibold text-[#36332f]">还差一点关键信息</h2>
-                <div className="mt-3 space-y-4">
-                  {interpretation.questions.map((question) => (
-                    <div
-                      className="border-b border-[#e0ddd7] pb-4 last:border-b-0"
-                      key={question.id}
-                    >
-                      <p className="text-sm leading-6 text-[#514d48]">{question.prompt}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {question.options.map((option) => (
-                          <button
-                            className={cn(
-                              'h-8 rounded-md border px-3 text-xs font-medium transition-colors',
-                              answers[question.id] === option
-                                ? 'border-[#6a477e] bg-[#eee7f2] text-[#4c2e61]'
-                                : 'border-[#d9d5cf] bg-[#fbfaf8] text-[#6d6963] hover:border-[#bbaac5]',
-                            )}
-                            key={option}
-                            onClick={() => answerQuestion(question.id, option)}
-                            type="button"
-                          >
-                            {option}
-                          </button>
-                        ))}
+              {requestText ? <UserMessage>{requestText}</UserMessage> : null}
+
+              <AnimatePresence mode="popLayout">
+                {interpreting ? (
+                  <AssistantMessage key="thinking">
+                    <span className="inline-flex items-center gap-2 text-[#66625c]">
+                      <LoaderCircle className="animate-spin" size={15} />
+                      正在理解你的目标和边界...
+                    </span>
+                  </AssistantMessage>
+                ) : null}
+              </AnimatePresence>
+
+              {interpretation && !interpreting ? (
+                <>
+                  <AssistantMessage>
+                    <div className="flex items-start gap-3">
+                      <IntentCategoryIcon
+                        category={interpretation.category}
+                        size={16}
+                      />
+                      <div className="min-w-0">
+                        <p>
+                          我先把它理解为
+                          <span className="font-semibold text-[#2f4f45]">
+                            「{interpretation.title}」
+                          </span>
+                          。
+                        </p>
+                        <p className="mt-1 text-[#706c65]">
+                          {interpretation.goal}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
 
-            <section
-              className={cn(
-                'flex items-start gap-3 rounded-md border px-4 py-3',
-                interpretation.safety.level === 'review'
-                  ? 'border-[#e8d6ae] bg-[#fff9e9] text-[#775c24]'
-                  : 'border-[#cfe0d7] bg-[#f0f7f3] text-[#426456]',
-              )}
-            >
-              <ShieldCheck className="mt-0.5 shrink-0" size={17} />
-              <p className="text-xs leading-5">{interpretation.safety.notice}</p>
-            </section>
-          </aside>
+                    {interpretation.inferences.length > 0 ? (
+                      <div className="mt-4 space-y-1.5 border-l-2 border-[#cddbd5] pl-3 text-xs leading-5 text-[#706c65]">
+                        {interpretation.inferences.slice(0, 3).map((inference) => (
+                          <p className="flex items-start gap-1.5" key={inference}>
+                            <Check
+                              className="mt-0.5 shrink-0 text-[#477062]"
+                              size={13}
+                            />
+                            {inference}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </AssistantMessage>
 
-          <section className="min-w-0 rounded-lg border border-[#ddd9d3] bg-white">
-            <div className="border-b border-[#e4e1dc] px-5 py-4 sm:px-6">
-              <div className="flex items-center gap-3">
-                <IntentCategoryIcon category={draft.category} size={18} />
-                <div>
-                  <p className="text-xs text-[#7d7972]">发布前确认</p>
-                  <h2 className="text-base font-semibold text-[#302e2b]">
-                    这会成为别人看到的需求
-                  </h2>
-                </div>
-              </div>
-            </div>
+                  {interpretation.questions.map((question) => {
+                    const answer = answers[question.id]
+                    const isCurrent = currentQuestion?.id === question.id
+                    if (!answer && !isCurrent) {
+                      return null
+                    }
 
-            <div className="space-y-6 p-5 sm:p-6">
-              <div>
-                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-title">
-                  标题
-                </label>
-                <input
-                  className="mt-2 h-11 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm text-[#302e2b] outline-none focus:border-[#7a5a8e] focus:ring-3 focus:ring-[#5b3477]/10"
-                  id="intent-title"
-                  maxLength={80}
-                  onChange={(event) => updateDraft('title', event.target.value)}
-                  value={draft.title}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-description">
-                  具体描述
-                </label>
-                <textarea
-                  className="mt-2 min-h-28 w-full resize-y rounded-md border border-[#d9d5cf] bg-[#fcfbf9] p-3 text-sm leading-6 text-[#302e2b] outline-none focus:border-[#7a5a8e] focus:ring-3 focus:ring-[#5b3477]/10"
-                  id="intent-description"
-                  maxLength={1200}
-                  onChange={(event) => updateDraft('description', event.target.value)}
-                  value={draft.description}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-goal">
-                  希望这次连接达成什么
-                </label>
-                <input
-                  className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                  id="intent-goal"
-                  maxLength={200}
-                  onChange={(event) => updateDraft('goal', event.target.value)}
-                  placeholder="例如：先确认双方是否适合长期协作"
-                  value={draft.goal}
-                />
-              </div>
-
-              <div>
-                <span className="text-xs font-semibold text-[#5f5b55]">意图类型</span>
-                <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {intentCategoryOrder.map((category) => {
-                    const meta = intentCategoryMeta[category]
-                    const Icon = meta.icon
                     return (
-                      <button
-                        className={cn(
-                          'flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-center text-[11px] font-medium transition-colors',
-                          draft.category === category
-                            ? 'border-[#735087] bg-[#f1ebf4] text-[#4d2d66]'
-                            : 'border-[#dedad4] bg-[#fcfbf9] text-[#6f6b65] hover:border-[#bbaac5]',
-                        )}
-                        key={category}
-                        onClick={() => {
-                          updateDraft('category', category)
-                          if (category === 'romantic') {
-                            updateDraft('visibility', 'candidates')
-                          }
-                          updateDraft(
-                            'projectMemo',
-                            category === 'project' || category === 'cofounder'
-                              ? draft.projectMemo ?? emptyProjectMemo()
-                              : null,
-                          )
-                        }}
-                        type="button"
-                      >
-                        <Icon className={meta.iconClassName} size={16} />
-                        {meta.shortLabel}
-                      </button>
+                      <div className="space-y-4" key={question.id}>
+                        <AssistantMessage>
+                          <p>{question.prompt}</p>
+                          {isCurrent ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {question.options.map((option) => (
+                                <button
+                                  className="min-h-9 rounded-md border border-[#ccd5d1] bg-[#f9fbfa] px-3 py-1.5 text-xs font-medium text-[#365b4f] transition-colors hover:border-[#6f9185] hover:bg-[#edf4f1]"
+                                  key={option}
+                                  onClick={() => answerQuestion(question, option)}
+                                  type="button"
+                                >
+                                  {option}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </AssistantMessage>
+                        {answer ? <UserMessage>{answer}</UserMessage> : null}
+                      </div>
                     )
                   })}
-                </div>
-              </div>
 
-              {(draft.category === 'project' ||
-                draft.category === 'cofounder') &&
-              draft.projectMemo ? (
-                <section className="border-y border-[#ddd7e1] bg-[#faf8fb] px-1 py-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-[#4d2d66]">
-                        项目 memo
-                      </h3>
-                      <p className="mt-1 text-[11px] text-[#81768a]">
-                        这些信息会参与工程伙伴与 CTO 匹配。
+                  {readyToReview ? (
+                    <AssistantMessage>
+                      <p>
+                        信息够了。我已经整理成一条
+                        {intentCategoryMeta[draft.category].label}
+                        意图，你可以确认后开始匹配。
                       </p>
-                    </div>
-                    <span className="rounded-md bg-[#eee8f2] px-2 py-1 text-[10px] font-semibold text-[#5b3477]">
-                      PROJECT
-                    </span>
-                  </div>
-
-                  <div className="mt-5 space-y-4">
-                    <label className="block text-xs font-semibold text-[#5f5b55]">
-                      正在做什么
-                      <textarea
-                        className="mt-2 min-h-24 w-full resize-y rounded-md border border-[#d9d5cf] bg-white p-3 text-sm leading-6 outline-none focus:border-[#7a5a8e]"
-                        maxLength={600}
-                        onChange={(event) =>
-                          updateProjectMemo('building', event.target.value)
-                        }
-                        placeholder="产品解决什么问题，已经有了哪些证据。"
-                        value={draft.projectMemo.building}
-                      />
-                    </label>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block text-xs font-semibold text-[#5f5b55]">
-                        当前阶段
-                        <input
-                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                          maxLength={240}
-                          onChange={(event) =>
-                            updateProjectMemo('stage', event.target.value)
-                          }
-                          placeholder="想法 / 验证需求 / 已有 MVP"
-                          value={draft.projectMemo.stage}
-                        />
-                      </label>
-                      <label className="block text-xs font-semibold text-[#5f5b55]">
-                        每周投入
-                        <input
-                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                          maxLength={240}
-                          onChange={(event) =>
-                            updateProjectMemo('weeklyTime', event.target.value)
-                          }
-                          placeholder="例如：每周 8 到 12 小时"
-                          value={draft.projectMemo.weeklyTime}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="block text-xs font-semibold text-[#5f5b55]">
-                      权益或补偿预期
-                      <input
-                        className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                        maxLength={240}
-                        onChange={(event) =>
-                          updateProjectMemo('compensation', event.target.value)
-                        }
-                        placeholder="可留空，也可以说明股权、薪资或尚待讨论"
-                        value={draft.projectMemo.compensation}
-                      />
-                    </label>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block text-xs font-semibold text-[#5f5b55]">
-                        必备技能
-                        <input
-                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                          onChange={(event) =>
-                            updateProjectMemo(
-                              'requiredSkills',
-                              splitTags(event.target.value),
-                            )
-                          }
-                          placeholder="React，工程架构，AI 应用"
-                          value={draft.projectMemo.requiredSkills.join('，')}
-                        />
-                      </label>
-                      <label className="block text-xs font-semibold text-[#5f5b55]">
-                        加分技能
-                        <input
-                          className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-white px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                          onChange={(event) =>
-                            updateProjectMemo(
-                              'niceToHaveSkills',
-                              splitTags(event.target.value),
-                            )
-                          }
-                          placeholder="Go，推荐系统，校园产品"
-                          value={draft.projectMemo.niceToHaveSkills.join('，')}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block text-xs font-semibold text-[#5f5b55]">
-                        协作方式
-                        <textarea
-                          className="mt-2 min-h-20 w-full resize-y rounded-md border border-[#d9d5cf] bg-white p-3 text-sm leading-6 outline-none focus:border-[#7a5a8e]"
-                          maxLength={240}
-                          onChange={(event) =>
-                            updateProjectMemo('workingStyle', event.target.value)
-                          }
-                          placeholder="如何决策、同步和交付。"
-                          value={draft.projectMemo.workingStyle}
-                        />
-                      </label>
-                      <label className="block text-xs font-semibold text-[#5f5b55]">
-                        风险偏好
-                        <textarea
-                          className="mt-2 min-h-20 w-full resize-y rounded-md border border-[#d9d5cf] bg-white p-3 text-sm leading-6 outline-none focus:border-[#7a5a8e]"
-                          maxLength={240}
-                          onChange={(event) =>
-                            updateProjectMemo('riskAppetite', event.target.value)
-                          }
-                          placeholder="对早期不确定性、现金流或长期投入的看法。"
-                          value={draft.projectMemo.riskAppetite}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </section>
-              ) : null}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-time">
-                    时间窗口
-                  </label>
-                  <input
-                    className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                    id="intent-time"
-                    onChange={(event) => updateDraft('timeWindow', event.target.value)}
-                    placeholder="例如：今晚 / 本周"
-                    value={draft.timeWindow}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-location">
-                    校内地点
-                  </label>
-                  <input
-                    className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                    id="intent-location"
-                    onChange={(event) => updateDraft('location', event.target.value)}
-                    placeholder="例如：紫荆 / 图书馆"
-                    value={draft.location}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-constraints">
-                  重要偏好
-                </label>
-                <input
-                  className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                  id="intent-constraints"
-                  onChange={(event) =>
-                    updateDraft('constraints', splitTags(event.target.value))
-                  }
-                  placeholder="用逗号分隔，例如：低压力，守时，每周可投入 10 小时"
-                  value={draft.constraints.join('，')}
-                />
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-deal-breakers">
-                  明确不合适的情况
-                  <input
-                    className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                    id="intent-deal-breakers"
-                    onChange={(event) =>
-                      updateDraft('dealBreakers', splitTags(event.target.value))
-                    }
-                    placeholder="用逗号分隔，可留空"
-                    value={draft.dealBreakers.join('，')}
-                  />
-                </label>
-                <label className="text-xs font-semibold text-[#5f5b55]" htmlFor="intent-next-step">
-                  希望的下一步
-                  <input
-                    className="mt-2 h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] px-3 text-sm outline-none focus:border-[#7a5a8e]"
-                    id="intent-next-step"
-                    maxLength={200}
-                    onChange={(event) =>
-                      updateDraft('desiredNextStep', event.target.value)
-                    }
-                    placeholder="例如：先聊 30 分钟"
-                    value={draft.desiredNextStep}
-                  />
-                </label>
-              </div>
-
-              <div>
-                <span className="text-xs font-semibold text-[#5f5b55]">谁可以看见</span>
-                <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                  {visibilityOptions.map((option) => {
-                    const Icon = option.icon
-                    const disabled =
-                      draft.category === 'romantic' && option.value !== 'candidates'
-                    return (
                       <button
-                        className={cn(
-                          'min-h-16 rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45',
-                          draft.visibility === option.value
-                            ? 'border-[#735087] bg-[#f1ebf4]'
-                            : 'border-[#dedad4] bg-[#fcfbf9] hover:border-[#bbaac5]',
-                        )}
-                        disabled={disabled}
-                        key={option.value}
-                        onClick={() => updateDraft('visibility', option.value)}
+                        className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#aebdb7] px-3 text-xs font-semibold text-[#315c4d] hover:bg-[#edf4f1] xl:hidden"
+                        onClick={() => setMobileReviewOpen(true)}
                         type="button"
                       >
-                        <span className="flex items-center gap-2 text-xs font-semibold text-[#4e4a45]">
-                          <Icon size={14} />
-                          {option.label}
-                        </span>
-                        <span className="mt-1 block text-[11px] text-[#817d76]">
-                          {option.description}
-                        </span>
+                        查看意图草稿
                       </button>
-                    )
-                  })}
-                </div>
-              </div>
+                    </AssistantMessage>
+                  ) : null}
 
-              {romanticNeedsOptIn ? (
-                <div className="rounded-md border border-[#e5cad3] bg-[#fff5f8] px-4 py-3">
-                  <p className="text-sm font-medium text-[#7e3d55]">认真关系匹配尚未开启</p>
-                  <p className="mt-1 text-xs leading-5 text-[#8e6473]">
-                    这是一个单独的私密选择。开启后，关系偏好仍不会出现在公开意图流。
-                  </p>
-                  <Link
-                    className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#7e3d55]"
-                    to="/profile"
+                  <div
+                    className={cn(
+                      'flex items-start gap-2 border-t pt-4 text-xs leading-5',
+                      interpretation.safety.level === 'review'
+                        ? 'border-[#ead9b2] text-[#7c642f]'
+                        : 'border-[#d7e3dd] text-[#65766f]',
+                    )}
                   >
-                    前往 AI 档案开启
-                    <ArrowRight size={13} />
-                  </Link>
+                    <ShieldCheck className="mt-0.5 shrink-0" size={14} />
+                    {interpretation.safety.notice}
+                  </div>
+                </>
+              ) : null}
+
+              {notice ? (
+                <div className="flex items-start gap-2 rounded-md border border-[#ead4ce] bg-[#fff6f3] px-4 py-3 text-sm text-[#8c463d]">
+                  <AlertCircle className="mt-0.5 shrink-0" size={16} />
+                  {notice}
                 </div>
               ) : null}
-            </div>
 
-            <footer className="flex flex-col-reverse gap-2 border-t border-[#e4e1dc] bg-[#fbfaf8] px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#d6d1ca] bg-white px-4 text-sm font-semibold text-[#605c56] hover:bg-[#f6f4f1] disabled:opacity-50"
-                disabled={!canSubmit || submitting !== null}
-                onClick={() => void handleSubmit('draft')}
-                type="button"
-              >
-                {submitting === 'draft' ? (
-                  <LoaderCircle className="animate-spin" size={16} />
-                ) : (
-                  <Save size={16} />
-                )}
-                保存草稿
-              </button>
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#5b3477] px-5 text-sm font-semibold text-white hover:bg-[#4c2b65] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!canSubmit || submitting !== null}
-                onClick={() => void handleSubmit('active')}
-                type="button"
-              >
-                {submitting === 'active' ? (
-                  <LoaderCircle className="animate-spin" size={16} />
-                ) : (
-                  <Send size={16} />
-                )}
-                发布并开始匹配
-              </button>
-            </footer>
-          </section>
+              <div ref={conversationEndRef} />
+            </div>
+          )}
         </div>
+
+        <footer className="shrink-0 border-t border-[#dfdcd6] bg-[rgba(247,246,243,0.96)] px-3 py-3 backdrop-blur-lg sm:px-6 sm:py-4">
+          <div className="mx-auto max-w-3xl">
+            {currentQuestion ? (
+              <div className="mb-2 flex items-center justify-between gap-3 px-1 text-[11px] text-[#77736c]">
+                <span>
+                  还差 {interpretation!.questions.length - answeredCount} 个问题
+                </span>
+                <button
+                  className="font-semibold text-[#477062] hover:text-[#315c4d]"
+                  onClick={() => setMobileReviewOpen(true)}
+                  type="button"
+                >
+                  先看草稿
+                </button>
+              </div>
+            ) : null}
+            <div className="flex items-end gap-2 rounded-lg border border-[#d6d2cb] bg-white p-2 shadow-[0_8px_24px_rgba(35,33,31,0.06)] focus-within:border-[#6f9185] focus-within:ring-3 focus-within:ring-[#55786c]/10">
+              <textarea
+                aria-label="给 SouLink 助手发消息"
+                autoFocus={!initialText}
+                className="max-h-28 min-h-10 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm leading-6 text-[#292724] outline-none placeholder:text-[#9a958d]"
+                maxLength={1200}
+                onChange={(event) => setComposerText(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={composerPlaceholder}
+                rows={1}
+                value={composerText}
+              />
+              <button
+                aria-label="发送"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#263b35] text-white transition-colors hover:bg-[#1d302a] disabled:cursor-not-allowed disabled:bg-[#cbc8c2]"
+                disabled={!composerText.trim() || interpreting}
+                onClick={handleComposerSubmit}
+                title="发送"
+                type="button"
+              >
+                {interpreting ? (
+                  <LoaderCircle className="animate-spin" size={17} />
+                ) : (
+                  <Send size={17} />
+                )}
+              </button>
+            </div>
+          </div>
+        </footer>
+      </section>
+
+      {interpretation ? (
+        <aside className="hidden min-h-0 border-l border-[#dfdcd6] xl:block">
+          <IntentReviewPanel
+            draft={draft}
+            onChange={updateDraft}
+            onProjectChange={updateProjectMemo}
+            onSubmit={(status) => void handleSubmit(status)}
+            profile={profile}
+            submitting={submitting}
+          />
+        </aside>
+      ) : (
+        <aside className="hidden border-l border-[#dfdcd6] bg-[#fbfaf8] px-6 py-8 xl:block">
+          <p className="text-[11px] font-semibold text-[#817d76]">意图草稿</p>
+          <div className="mt-16 border-y border-[#e2dfd9] py-6 text-sm leading-6 text-[#77736c]">
+            对话开始后，关键信息会出现在这里。
+          </div>
+        </aside>
       )}
+
+      {mobileReviewOpen && interpretation ? (
+        <div className="fixed inset-0 z-60 bg-black/30 xl:hidden">
+          <button
+            aria-label="关闭意图草稿"
+            className="absolute inset-0 h-full w-full cursor-default"
+            onClick={() => setMobileReviewOpen(false)}
+            type="button"
+          />
+          <div className="absolute inset-x-0 bottom-0 h-[92dvh] overflow-hidden rounded-t-lg border-t border-[#d8d5ce] bg-[#fbfaf8] shadow-[0_-18px_50px_rgba(35,33,31,0.16)]">
+            <button
+              aria-label="关闭意图草稿"
+              className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#efede9] text-[#625e58] hover:bg-[#e6e3de]"
+              onClick={() => setMobileReviewOpen(false)}
+              title="关闭"
+              type="button"
+            >
+              <X size={18} />
+            </button>
+            <IntentReviewPanel
+              draft={draft}
+              onChange={updateDraft}
+              onProjectChange={updateProjectMemo}
+              onSubmit={(status) => void handleSubmit(status)}
+              profile={profile}
+              submitting={submitting}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

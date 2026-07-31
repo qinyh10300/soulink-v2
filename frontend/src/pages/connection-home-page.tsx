@@ -1,16 +1,16 @@
 import {
   ArrowRight,
   CalendarCheck2,
+  ChevronRight,
   Clock3,
   MapPin,
-  Plus,
+  Send,
   Sparkles,
+  UsersRound,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import thuCampusUrl from '@/assets/optimized/heroes/thu.webp'
-import { IntentCard } from '@/components/connection/intent-card'
 import {
   IntentCategoryIcon,
   intentCategoryMeta,
@@ -28,17 +28,31 @@ import {
 } from '@/lib/connection-api'
 import { getStoredUserProfile } from '@/lib/user-profile-storage'
 
-const shortcuts: Array<{
+const starters: Array<{
   category: IntentCategory
+  label: string
   prompt: string
 }> = [
-  { category: 'meal', prompt: '今晚想在紫荆找个饭搭子' },
-  { category: 'study', prompt: '这周找一个安静高效的学习搭子' },
-  { category: 'sport', prompt: '找一个工作日晚上的跑步搭子' },
-  { category: 'conversation', prompt: '想找一个人散步认真聊聊' },
-  { category: 'project', prompt: '找一个能一起做产品的项目伙伴' },
-  { category: 'cofounder', prompt: '为我的 AI 项目找 CTO 或联合创始人' },
-  { category: 'romantic', prompt: '想认真认识一个有好奇心的人' },
+  {
+    category: 'meal',
+    label: '找饭搭子',
+    prompt: '今晚想在紫荆找个饭搭子，最好也在做 AI 产品',
+  },
+  {
+    category: 'study',
+    label: '找学习搭子',
+    prompt: '这周找一个安静高效的学习搭子，一起准备期末',
+  },
+  {
+    category: 'project',
+    label: '找项目伙伴',
+    prompt: '找一个能一起做产品的项目伙伴，先用两周做出原型',
+  },
+  {
+    category: 'cofounder',
+    label: '找 CTO / 联创',
+    prompt: '为我的 AI 项目找 CTO 或联合创始人，希望能长期投入',
+  },
 ]
 
 function formatCampusDate() {
@@ -51,7 +65,7 @@ function formatCampusDate() {
 
 function formatMeetingTime(value?: string) {
   if (!value) {
-    return '等待双方确认时间'
+    return '待确认时间'
   }
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'numeric',
@@ -110,8 +124,6 @@ export function ConnectionHomePage() {
             setRecommendations([])
           }
         }
-      } else {
-        setRecommendations([])
       }
 
       if (
@@ -130,15 +142,28 @@ export function ConnectionHomePage() {
     }
   }, [])
 
-  const startComposer = (value = query) => {
+  const startConversation = (value = query) => {
     const text = value.trim()
     navigate('/intents/new', {
       state: text ? { text } : undefined,
     })
   }
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault()
+      if (query.trim()) {
+        startConversation()
+      }
+    }
+  }
+
   const activeIntents = myIntents.filter((intent) => intent.status === 'active')
-  const upcomingRooms = rooms
+  const upcomingRoom = rooms
     .filter((room) => room.status === 'open')
     .sort((left, right) => {
       const leftTime = left.scheduledAt
@@ -148,265 +173,248 @@ export function ConnectionHomePage() {
         ? new Date(right.scheduledAt).getTime()
         : Number.MAX_SAFE_INTEGER
       return leftTime - rightTime
-    })
+    })[0]
 
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <header className="flex items-end justify-between gap-5 border-b border-[#dfdcd6] pb-5">
-        <div>
-          <p className="text-xs font-medium text-[#77736c]">{formatCampusDate()} · 清华园</p>
-          <h1 className="mt-1 text-2xl font-semibold text-[#23211f] sm:text-[28px]">
-            {profile.nickname ? `${profile.nickname}，今天想认识谁？` : '今天想认识谁？'}
-          </h1>
-        </div>
-        <img
-          alt="清华校园"
-          className="hidden h-16 w-40 rounded-md object-cover sm:block"
-          src={thuCampusUrl}
-        />
-      </header>
+    <div className="h-[calc(100dvh-8.75rem)] overflow-hidden bg-[#f7f6f3] lg:h-screen xl:grid xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="flex min-h-0 min-w-0 flex-col">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#dfdcd6] px-4 sm:px-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-semibold text-[#292724]">
+                SouLink 助手
+              </h1>
+              <span className="h-1.5 w-1.5 rounded-full bg-[#4f846f]" />
+            </div>
+            <p className="mt-0.5 text-[11px] text-[#817d76]">
+              {formatCampusDate()} · 清华园
+            </p>
+          </div>
 
-      <section className="border-b border-[#dfdcd6] py-6">
-        <div className="rounded-lg border border-[#d9d4cd] bg-white p-3 shadow-[0_10px_28px_rgba(35,33,31,0.05)] focus-within:border-[#7b5a91] focus-within:ring-3 focus-within:ring-[#5b3477]/10 sm:p-4">
-          <textarea
-            aria-label="描述你想认识的人"
-            autoFocus
-            className="min-h-24 w-full resize-none border-0 bg-transparent px-1 py-1 text-[17px] leading-7 text-[#292724] outline-none placeholder:text-[#9a958d]"
-            maxLength={1200}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                startComposer()
-              }
-            }}
-            placeholder="例如：今晚想在紫荆找个饭搭子，最好也在做 AI 产品"
-            value={query}
-          />
-          <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#eeebe7] pt-3">
-            <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-xs text-[#77736c]">
-              <Sparkles size={14} className="text-[#69447f]" />
-              SouLink 会先整理意图，再给你确认
+          <div className="flex items-center gap-3 text-[11px] text-[#77736c] xl:hidden">
+            <Link className="hover:text-[#315c4d]" to="/intents">
+              {activeIntents.length} 个意图
+            </Link>
+            <span className="h-3 w-px bg-[#d6d2cb]" />
+            <Link className="hover:text-[#315c4d]" to="/matches">
+              {rooms.filter((room) => room.status === 'open').length} 个连接
+            </Link>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center px-5 py-8 text-center sm:px-8">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#263b35] text-white">
+              <Sparkles size={19} strokeWidth={1.8} />
             </span>
-            <button
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-[#5b3477] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#4c2b65] disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!query.trim()}
-              onClick={() => startComposer()}
-              type="button"
-            >
-              开始整理
-              <ArrowRight size={16} />
-            </button>
+            <h2 className="mt-5 max-w-xl text-2xl font-semibold leading-tight text-[#262421] sm:text-[32px]">
+              {profile.nickname
+                ? `${profile.nickname}，今天想认识谁？`
+                : '今天想认识谁？'}
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-6 text-[#77736c]">
+              从一件具体的事开始，说一句就够了。
+            </p>
+
+            <div className="mt-8 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
+              {starters.map(({ category, label, prompt }) => {
+                const meta = intentCategoryMeta[category]
+                const Icon = meta.icon
+                return (
+                  <button
+                    className="group flex min-h-14 items-center gap-3 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-3 py-2.5 text-left transition-colors hover:border-[#9eaea8] hover:bg-white"
+                    key={category}
+                    onClick={() => startConversation(prompt)}
+                    type="button"
+                  >
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${meta.surfaceClassName}`}
+                    >
+                      <Icon className={meta.iconClassName} size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-[#45413d]">
+                        {label}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] text-[#817d76]">
+                        {prompt}
+                      </span>
+                    </span>
+                    <ArrowRight
+                      className="shrink-0 text-[#a19c94] transition-transform group-hover:translate-x-0.5 group-hover:text-[#477062]"
+                      size={15}
+                    />
+                  </button>
+                )
+              })}
+            </div>
+
+            {notice ? (
+              <p className="mt-5 text-xs text-[#8c463d]">{notice}</p>
+            ) : null}
           </div>
         </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {shortcuts.map(({ category, prompt }) => {
-            const meta = intentCategoryMeta[category]
-            return (
+        <footer className="shrink-0 border-t border-[#dfdcd6] bg-[rgba(247,246,243,0.96)] px-3 py-3 backdrop-blur-lg sm:px-6 sm:py-4">
+          <div className="mx-auto max-w-3xl">
+            <div className="flex items-end gap-2 rounded-lg border border-[#d6d2cb] bg-white p-2 shadow-[0_8px_24px_rgba(35,33,31,0.06)] focus-within:border-[#6f9185] focus-within:ring-3 focus-within:ring-[#55786c]/10">
+              <textarea
+                aria-label="描述你想认识的人"
+                autoFocus
+                className="max-h-28 min-h-10 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm leading-6 text-[#292724] outline-none placeholder:text-[#9a958d]"
+                maxLength={1200}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="描述你想找的人，以及想一起做什么"
+                rows={1}
+                value={query}
+              />
               <button
-                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-3 text-xs font-medium text-[#5f5b55] transition-colors hover:border-[#b9a8c4] hover:bg-white hover:text-[#4d2d66]"
-                key={category}
-                onClick={() => {
-                  setQuery(prompt)
-                  startComposer(prompt)
-                }}
+                aria-label="发送"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#263b35] text-white transition-colors hover:bg-[#1d302a] disabled:cursor-not-allowed disabled:bg-[#cbc8c2]"
+                disabled={!query.trim()}
+                onClick={() => startConversation()}
+                title="发送"
                 type="button"
               >
-                <meta.icon className={meta.iconClassName} size={15} />
-                {meta.label}
+                <Send size={17} />
               </button>
-            )
-          })}
-        </div>
+            </div>
+          </div>
+        </footer>
       </section>
 
-      {notice ? (
-        <div className="mt-5 rounded-md border border-[#ead6d1] bg-[#fff7f5] px-4 py-3 text-sm text-[#8e4941]">
-          {notice}
-        </div>
-      ) : null}
+      <aside className="hidden min-h-0 overflow-y-auto border-l border-[#dfdcd6] bg-[#fbfaf8] xl:block">
+        <header className="flex h-16 items-center justify-between border-b border-[#dfdcd6] px-5">
+          <h2 className="text-sm font-semibold text-[#302e2b]">你的上下文</h2>
+          <span className="text-[11px] text-[#817d76]">
+            {loading ? '同步中' : '刚刚同步'}
+          </span>
+        </header>
 
-      <div className="grid gap-7 py-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.75fr)]">
-        <div className="min-w-0 space-y-8">
-          <section>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-[#292724]">今天在校园里</h2>
-                <p className="mt-0.5 text-xs text-[#7b7770]">有限的、仍然有效的真实需求</p>
-              </div>
-              <Link
-                className="inline-flex items-center gap-1 text-sm font-medium text-[#5b3477] hover:text-[#45265e]"
-                to="/discover"
-              >
-                查看全部
-                <ArrowRight size={15} />
-              </Link>
+        <section className="border-b border-[#e2dfd9] px-5 py-5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold text-[#5f5b55]">进行中的意图</h3>
+            <Link className="text-[11px] font-medium text-[#477062]" to="/intents">
+              管理
+            </Link>
+          </div>
+          {activeIntents.length > 0 ? (
+            <div className="mt-3">
+              {activeIntents.slice(0, 2).map((intent) => (
+                <Link
+                  className="flex items-center gap-3 border-b border-[#ece9e4] py-3 last:border-b-0"
+                  key={intent.id}
+                  to={`/intents/${intent.id}`}
+                >
+                  <IntentCategoryIcon category={intent.category} size={14} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold text-[#45413d]">
+                      {intent.title}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-[#817d76]">
+                      {intent.interestCount} 个回应
+                    </span>
+                  </span>
+                  <ChevronRight className="text-[#a19c94]" size={14} />
+                </Link>
+              ))}
             </div>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-[#817d76]">暂无活跃意图</p>
+          )}
+        </section>
 
-            <div className="rounded-lg border border-[#dfdcd6] bg-[#fbfaf8] p-5">
-              {loading ? (
-                <p className="py-8 text-center text-sm text-[#817d76]">正在看看校园里发生什么...</p>
-              ) : feed.length > 0 ? (
-                feed.slice(0, 4).map((intent) => (
-                  <IntentCard compact intent={intent} key={intent.id} />
-                ))
-              ) : (
-                <div className="py-8 text-center">
-                  <p className="text-sm font-medium text-[#4f4b46]">今天的公开意图还很安静</p>
-                  <button
-                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[#5b3477]"
-                    onClick={() => startComposer()}
-                    type="button"
-                  >
-                    <Plus size={15} />
-                    发出第一个邀请
-                  </button>
-                </div>
-              )}
+        {recommendations.length > 0 ? (
+          <section className="border-b border-[#e2dfd9] px-5 py-5">
+            <h3 className="text-xs font-semibold text-[#5f5b55]">值得聊聊</h3>
+            <div className="mt-3 space-y-3">
+              {recommendations.slice(0, 2).map((recommendation) => (
+                <Link
+                  className="block border-l-2 border-[#b9cbc4] pl-3"
+                  key={recommendation.intent.id}
+                  to={`/intents/${recommendation.intent.id}`}
+                >
+                  <span className="block truncate text-xs font-semibold text-[#45413d]">
+                    {recommendation.intent.title}
+                  </span>
+                  <span className="mt-1 line-clamp-2 text-[11px] leading-4 text-[#817d76]">
+                    {recommendation.fitReason}
+                  </span>
+                </Link>
+              ))}
             </div>
           </section>
+        ) : null}
 
-          <section>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-[#292724]">可能值得聊聊</h2>
-                <p className="mt-0.5 text-xs text-[#7b7770]">基于你最近一个活跃意图的三条推荐</p>
+        <section className="border-b border-[#e2dfd9] px-5 py-5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold text-[#5f5b55]">下一次连接</h3>
+            <Link className="text-[11px] font-medium text-[#477062]" to="/matches">
+              全部
+            </Link>
+          </div>
+          {upcomingRoom ? (
+            <Link className="mt-3 block" to={`/matches/${upcomingRoom.id}`}>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f1ed] text-[#356653]">
+                  <CalendarCheck2 size={17} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-semibold text-[#45413d]">
+                    和 {upcomingRoom.other.nickname}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-[#817d76]">
+                    {upcomingRoom.intentTitle}
+                  </span>
+                </span>
               </div>
-              {activeIntents[0] ? (
-                <Link
-                  className="inline-flex items-center gap-1 text-sm font-medium text-[#5b3477]"
-                  to={`/intents/${activeIntents[0].id}`}
-                >
-                  查看解释
-                  <ArrowRight size={15} />
-                </Link>
-              ) : null}
-            </div>
-
-            {recommendations.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-3">
-                {recommendations.map((recommendation) => (
-                  <Link
-                    className="min-w-0 rounded-lg border border-[#dfdcd6] bg-white p-4 transition-colors hover:border-[#b9a8c4]"
-                    key={recommendation.intent.id}
-                    to={`/intents/${recommendation.intent.id}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <IntentCategoryIcon
-                        category={recommendation.intent.category}
-                        size={16}
-                      />
-                      <span className="text-xs font-semibold text-[#5b3477]">
-                        {recommendation.score}% 匹配线索
-                      </span>
-                    </div>
-                    <h3 className="mt-3 line-clamp-2 text-sm font-semibold leading-5 text-[#302e2b]">
-                      {recommendation.intent.title}
-                    </h3>
-                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-[#706c65]">
-                      {recommendation.fitReason}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-[#d8d3cc] px-5 py-7 text-center">
-                <p className="text-sm text-[#706c65]">
-                  {activeIntents.length > 0
-                    ? '还没有足够合适的候选，SouLink 不会为了凑数而推荐。'
-                    : '发布一个具体意图后，这里会出现最多三条推荐。'}
+              <div className="mt-3 space-y-1.5 text-[11px] text-[#706c65]">
+                <p className="flex items-center gap-2">
+                  <Clock3 size={13} />
+                  {formatMeetingTime(upcomingRoom.scheduledAt)}
+                </p>
+                <p className="flex items-center gap-2">
+                  <MapPin size={13} />
+                  {upcomingRoom.selectedPlace || '待确认地点'}
                 </p>
               </div>
-            )}
-          </section>
-        </div>
+            </Link>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-[#817d76]">暂无待安排的连接</p>
+          )}
+        </section>
 
-        <aside className="min-w-0 space-y-7">
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-[#302e2b]">你的进行中</h2>
-              <Link className="text-xs font-medium text-[#5b3477]" to="/intents">
-                管理
-              </Link>
-            </div>
-            <div className="rounded-lg border border-[#dfdcd6] bg-white">
-              {activeIntents.length > 0 ? (
-                activeIntents.slice(0, 3).map((intent) => (
-                  <Link
-                    className="flex items-center gap-3 border-b border-[#ebe8e3] px-4 py-3.5 last:border-b-0 hover:bg-[#faf9f7]"
-                    key={intent.id}
-                    to={`/intents/${intent.id}`}
-                  >
-                    <IntentCategoryIcon category={intent.category} size={15} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-[#36332f]">
-                        {intent.title}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[#817d76]">
-                        {intent.interestCount} 个回应
-                      </span>
-                    </span>
-                    <ArrowRight size={15} className="text-[#918d86]" />
-                  </Link>
-                ))
-              ) : (
-                <div className="px-4 py-6 text-center">
-                  <p className="text-sm text-[#77736c]">暂无活跃意图</p>
-                  <Link
-                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#5b3477]"
-                    to="/intents/new"
-                  >
-                    <Plus size={13} />
-                    新建意图
-                  </Link>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-[#302e2b]">即将见面</h2>
-              <Link className="text-xs font-medium text-[#5b3477]" to="/matches">
-                匹配房间
-              </Link>
-            </div>
-            <div className="rounded-lg border border-[#dfdcd6] bg-[#eef4f1] p-4">
-              {upcomingRooms.length > 0 ? (
-                <Link className="block" to={`/matches/${upcomingRooms[0].id}`}>
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-white text-[#29634f]">
-                      <CalendarCheck2 size={19} />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-[#2f4039]">
-                        和 {upcomingRooms[0].other.nickname}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-[#65766f]">
-                        {upcomingRooms[0].intentTitle}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="mt-4 space-y-2 border-t border-[#d7e3dd] pt-3 text-xs text-[#53665e]">
-                    <p className="flex items-center gap-2">
-                      <Clock3 size={14} />
-                      {formatMeetingTime(upcomingRooms[0].scheduledAt)}
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <MapPin size={14} />
-                      {upcomingRooms[0].selectedPlace || '等待双方选择地点'}
-                    </p>
-                  </div>
+        <section className="px-5 py-5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold text-[#5f5b55]">校园此刻</h3>
+            <Link className="text-[11px] font-medium text-[#477062]" to="/discover">
+              发现
+            </Link>
+          </div>
+          {feed.length > 0 ? (
+            <div className="mt-3">
+              {feed.slice(0, 3).map((intent) => (
+                <Link
+                  className="flex gap-2.5 border-b border-[#ece9e4] py-2.5 last:border-b-0"
+                  key={intent.id}
+                  to={`/intents/${intent.id}`}
+                >
+                  <UsersRound
+                    className="mt-0.5 shrink-0 text-[#817d76]"
+                    size={13}
+                  />
+                  <span className="line-clamp-2 text-xs leading-5 text-[#5f5b55]">
+                    {intent.title}
+                  </span>
                 </Link>
-              ) : (
-                <div className="py-3 text-center text-sm text-[#65766f]">
-                  双方都愿意后，见面安排会出现在这里。
-                </div>
-              )}
+              ))}
             </div>
-          </section>
-        </aside>
-      </div>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-[#817d76]">暂时没有公开意图</p>
+          )}
+        </section>
+      </aside>
     </div>
   )
 }
