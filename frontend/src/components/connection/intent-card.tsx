@@ -55,7 +55,7 @@ export function IntentCard({
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#77736c]">
-                <span className="font-medium text-[#4d3769]">{meta.label}</span>
+                <span className="font-medium text-[#3f6659]">{meta.label}</span>
                 <span>{formatRelativeDate(intent.publishedAt ?? intent.updatedAt)}</span>
                 {intent.author.verified ? (
                   <span className="inline-flex items-center gap-1">
@@ -65,7 +65,7 @@ export function IntentCard({
                 ) : null}
               </div>
               <Link
-                className="mt-1.5 block text-[17px] font-semibold leading-6 text-[#23211f] transition-colors hover:text-[#5b3477]"
+                className="mt-1.5 block text-[17px] font-semibold leading-6 text-[#23211f] transition-colors hover:text-[#315c4d]"
                 to={`/intents/${intent.id}`}
               >
                 {intent.title}

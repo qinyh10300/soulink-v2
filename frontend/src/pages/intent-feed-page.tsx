@@ -102,21 +102,24 @@ export function IntentFeedPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1040px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div className="mx-auto w-full max-w-[980px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <header className="flex flex-col gap-4 border-b border-[#dfdcd6] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6c4a80]">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#477062]">
             <Filter size={13} />
-            INTENT FEED
+            CAMPUS NOW
           </p>
-          <h1 className="mt-1 text-2xl font-semibold text-[#292724]">今天有人在找</h1>
-          <p className="mt-1 text-sm text-[#77736c]">这里只出现具体需求，不陈列人。</p>
+          <h1 className="mt-1 text-2xl font-semibold text-[#292724]">校园意图</h1>
+          <p className="mt-1 text-sm text-[#77736c]">
+            清华园里，正在发生的具体邀请。
+          </p>
         </div>
         <Link
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-md bg-[#5b3477] px-4 text-sm font-semibold text-white hover:bg-[#4c2b65]"
+          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-md bg-[#263b35] px-4 text-sm font-semibold text-white hover:bg-[#1d302a]"
           to="/intents/new"
         >
-          发出我的意图
+          <Sparkles size={16} />
+          让 AI 帮我找
           <ArrowRight size={16} />
         </Link>
       </header>
@@ -128,7 +131,7 @@ export function IntentFeedPage() {
               className={cn(
                 'h-8 rounded-md px-3 text-xs font-medium transition-colors',
                 category === filter.value
-                  ? 'bg-[#eae3ee] text-[#4d2d66]'
+                  ? 'bg-[#e8f1ed] text-[#315c4d]'
                   : 'text-[#706c65] hover:bg-[#ece9e5]',
               )}
               key={filter.value}
@@ -155,7 +158,7 @@ export function IntentFeedPage() {
             正在读取仍然有效的意图...
           </div>
         ) : intents.length > 0 ? (
-          <div className="rounded-lg border border-[#dfdcd6] bg-[#fbfaf8] px-5 py-1 sm:px-6">
+          <div className="border-y border-[#dfdcd6] bg-[#fbfaf8] px-4 py-1 sm:px-6">
             {intents.map((intent) => {
               const meta = intentCategoryMeta[intent.category]
               const interestOpen = interestId === intent.id
@@ -166,7 +169,7 @@ export function IntentFeedPage() {
                   footer={
                     <div>
                       {explanationOpen ? (
-                        <div className="mb-3 flex items-start gap-2 rounded-md bg-[#f0ebf3] px-3 py-2.5 text-xs leading-5 text-[#624b6e]">
+                        <div className="mb-3 flex items-start gap-2 rounded-md bg-[#eaf2ee] px-3 py-2.5 text-xs leading-5 text-[#426456]">
                           <Sparkles className="mt-0.5 shrink-0" size={14} />
                           <span>
                             这条来自公开意图流，不是个性化推荐。你可以先核对
@@ -203,7 +206,7 @@ export function IntentFeedPage() {
                           />
                           <div className="mt-2 flex justify-end">
                             <button
-                              className="inline-flex h-9 items-center gap-2 rounded-md bg-[#5b3477] px-3 text-xs font-semibold text-white disabled:opacity-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-md bg-[#263b35] px-3 text-xs font-semibold text-white disabled:opacity-50"
                               disabled={sendingInterest}
                               onClick={() => void handleInterest(intent.id)}
                               type="button"
@@ -230,7 +233,7 @@ export function IntentFeedPage() {
                           </span>
                         ) : (
                           <button
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#5b3477] px-3 text-xs font-semibold text-white hover:bg-[#4c2b65]"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#263b35] px-3 text-xs font-semibold text-white hover:bg-[#1d302a]"
                             onClick={() => {
                               setInterestId(intent.id)
                               setExplainedId(null)
@@ -267,7 +270,7 @@ export function IntentFeedPage() {
             <p className="text-sm font-medium text-[#55514c]">这个分类暂时没有活跃意图</p>
             <p className="mt-1 text-xs text-[#817d76]">过期需求会自动离开这里。</p>
             <button
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-[#d4c8db] px-3 text-xs font-semibold text-[#5b3477]"
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9cbc4] px-3 text-xs font-semibold text-[#315c4d]"
               onClick={() => void loadFeed()}
               type="button"
             >
