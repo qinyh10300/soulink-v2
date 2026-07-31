@@ -393,7 +393,7 @@ export function IntentComposerPage() {
 
   return (
     <div className="h-[calc(100dvh-8.75rem)] overflow-hidden bg-[#f7f6f3] lg:h-screen xl:grid xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="flex min-h-0 min-w-0 flex-col">
+      <section className="flex h-full min-h-0 min-w-0 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#dfdcd6] px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -654,11 +654,10 @@ export function IntentComposerPage() {
 
       {mobileReviewOpen && interpretation ? (
         <div className="fixed inset-0 z-60 bg-black/30 xl:hidden">
-          <button
-            aria-label="关闭意图草稿"
+          <div
+            aria-hidden="true"
             className="absolute inset-0 h-full w-full cursor-default"
             onClick={() => setMobileReviewOpen(false)}
-            type="button"
           />
           <div className="absolute inset-x-0 bottom-0 h-[92dvh] overflow-hidden rounded-t-lg border-t border-[#d8d5ce] bg-[#fbfaf8] shadow-[0_-18px_50px_rgba(35,33,31,0.16)]">
             <button

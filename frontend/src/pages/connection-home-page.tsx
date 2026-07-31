@@ -177,7 +177,7 @@ export function ConnectionHomePage() {
 
   return (
     <div className="h-[calc(100dvh-8.75rem)] overflow-hidden bg-[#f7f6f3] lg:h-screen xl:grid xl:grid-cols-[minmax(0,1fr)_320px]">
-      <section className="flex min-h-0 min-w-0 flex-col">
+      <section className="flex h-full min-h-0 min-w-0 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#dfdcd6] px-4 sm:px-6">
           <div>
             <div className="flex items-center gap-2">
