@@ -12,6 +12,7 @@ import (
 	"soulink-backend/internal/calendar"
 	"soulink-backend/internal/chat"
 	"soulink-backend/internal/connection"
+	"soulink-backend/internal/engagement"
 	"soulink-backend/internal/feedback"
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/httpapi"
@@ -43,6 +44,7 @@ type Dependencies struct {
 	ChatHandler          *chat.Handler
 	PlaygroundHandler    *playground.Handler
 	ConnectionHandler    *connection.Handler
+	EngagementHandler    *engagement.Handler
 	SafetyHandler        *safety.Handler
 	WSHandler            http.HandlerFunc
 }
@@ -110,6 +112,22 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			r.Post("/auth/logout", deps.AuthHandler.Logout)
 			r.Get("/auth/me", deps.AuthHandler.Me)
+
+			if deps.EngagementHandler != nil {
+				r.Get("/users/me/engagement", deps.EngagementHandler.GetPreferences)
+				r.Put("/users/me/notification-preferences", deps.EngagementHandler.UpdateNotificationPreferences)
+				r.Put("/users/me/onboarding", deps.EngagementHandler.CompleteOnboarding)
+				r.Get("/campus-themes", deps.EngagementHandler.ListThemes)
+				r.Put("/users/me/campus-themes", deps.EngagementHandler.ReplaceThemes)
+				r.Route("/notifications", func(r chi.Router) {
+					r.Get("/", deps.EngagementHandler.ListNotifications)
+					r.Post("/read-all", deps.EngagementHandler.MarkAllNotificationsRead)
+					r.Post("/{notificationId}/read", deps.EngagementHandler.MarkNotificationRead)
+					r.Post("/{notificationId}/delivered", deps.EngagementHandler.MarkNotificationDelivered)
+				})
+				r.Get("/admin/campus-themes/metrics", deps.EngagementHandler.ThemeMetrics)
+				r.Put("/admin/campus-themes/{themeKey}", deps.EngagementHandler.UpdateTheme)
+			}
 
 			r.Get("/users/me/profile", deps.ProfileHandler.GetProfile)
 			r.With(matchWriteGuard).Put("/users/me/profile", deps.ProfileHandler.UpdateProfile)

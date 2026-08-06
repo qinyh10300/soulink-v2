@@ -20,6 +20,7 @@ import (
 	"soulink-backend/internal/config"
 	"soulink-backend/internal/connection"
 	"soulink-backend/internal/demoseed"
+	"soulink-backend/internal/engagement"
 	"soulink-backend/internal/feedback"
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/gate"
@@ -162,6 +163,7 @@ func main() {
 	}
 	safetyService := safety.NewService(dataStore, adminEmails)
 	analyticsService := analytics.NewService(dataStore, adminEmails)
+	engagementService := engagement.NewService(dataStore, adminEmails)
 	connectionService.WithEventRecorder(analyticsService)
 	playgroundService.WithEventRecorder(analyticsService)
 	questionnaireService := questionnaire.NewService(
@@ -207,6 +209,7 @@ func main() {
 		ChatHandler:          chat.NewHandler(chatService, chatHub),
 		PlaygroundHandler:    playground.NewHandler(playgroundService),
 		ConnectionHandler:    connection.NewHandler(connectionService),
+		EngagementHandler:    engagement.NewHandler(engagementService),
 		SafetyHandler:        safety.NewHandler(safetyService),
 		WSHandler:            chat.ServeWS(chatHub, chatService, dataStore, tokenManager, logger),
 	})
