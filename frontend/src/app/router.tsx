@@ -19,6 +19,10 @@ const ChatPage = lazy(async () => {
   const module = await import('@/pages/chat-page')
   return { default: module.ChatPage }
 })
+const CalendarPage = lazy(async () => {
+  const module = await import('@/pages/calendar-page')
+  return { default: module.CalendarPage }
+})
 const FeedbackPage = lazy(async () => {
   const module = await import('@/pages/feedback-page')
   return { default: module.FeedbackPage }
@@ -148,6 +152,10 @@ export const router = createBrowserRouter([
           {
             path: '/plaza',
             element: withSuspense(<PlaygroundPage />),
+          },
+          {
+            path: '/calendar',
+            element: withSuspense(<CalendarPage />),
           },
           {
             path: '/playground',

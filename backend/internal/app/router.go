@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"soulink-backend/internal/auth"
+	"soulink-backend/internal/calendar"
 	"soulink-backend/internal/chat"
 	"soulink-backend/internal/connection"
 	"soulink-backend/internal/feedback"
@@ -27,6 +28,7 @@ type Dependencies struct {
 	AuthMiddleware       func(http.Handler) http.Handler
 	MatchWriteGuard      func(http.Handler) http.Handler
 	AuthHandler          *auth.Handler
+	CalendarHandler      *calendar.Handler
 	FeedbackHandler      *feedback.Handler
 	ProfileHandler       *profile.Handler
 	MetaHandler          *meta.Handler
@@ -101,6 +103,9 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/users/me/profile", deps.ProfileHandler.GetProfile)
 			r.With(matchWriteGuard).Put("/users/me/profile", deps.ProfileHandler.UpdateProfile)
 			r.Get("/users/{userId}/profile", deps.ProfileHandler.GetPublicProfile)
+			if deps.CalendarHandler != nil {
+				r.Get("/users/{userId}/calendar", deps.CalendarHandler.ListUserSchedule)
+			}
 			r.Get("/users/me/contacts", deps.ProfileHandler.GetContacts)
 			r.With(matchWriteGuard).Put("/users/me/contacts/{contactType}", deps.ProfileHandler.UpsertContact)
 			r.With(matchWriteGuard).Delete("/users/me/contacts/{contactType}", deps.ProfileHandler.DeleteContact)
@@ -150,6 +155,16 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Post("/safety/reports", deps.SafetyHandler.SubmitReport)
 				r.Get("/admin/safety-reports", deps.SafetyHandler.ListReports)
 				r.Put("/admin/safety-reports/{reportId}", deps.SafetyHandler.UpdateReport)
+			}
+
+			if deps.CalendarHandler != nil {
+				r.Route("/calendar/events", func(r chi.Router) {
+					r.Get("/", deps.CalendarHandler.ListEvents)
+					r.Post("/", deps.CalendarHandler.CreateEvent)
+					r.Put("/{eventId}", deps.CalendarHandler.UpdateEvent)
+					r.Delete("/{eventId}", deps.CalendarHandler.CancelEvent)
+					r.Put("/{eventId}/rsvp", deps.CalendarHandler.Respond)
+				})
 			}
 
 			r.Get("/questionnaires/current", deps.QuestionnaireHandler.GetCurrent)

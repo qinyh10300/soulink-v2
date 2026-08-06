@@ -1,10 +1,13 @@
 import {
   ClipboardList,
+  CalendarDays,
+  CircleDotDashed,
   Compass,
   Clock3,
   type LucideIcon,
   LogOut,
   Menu,
+  MessageCircleMore,
   MessagesSquare,
   Plus,
   ShieldCheck,
@@ -28,6 +31,7 @@ import {
   type ConnectionIntent,
 } from '@/lib/connection-api'
 import { cn } from '@/lib/utils'
+import { useChat } from '@/contexts/chat-context'
 import {
   clearAuthSession,
   clearUserProfile,
@@ -40,6 +44,7 @@ interface NavItem {
   to: string
   icon: LucideIcon
   match: (pathname: string) => boolean
+  mobile: boolean
 }
 
 const navItems: NavItem[] = [
@@ -48,6 +53,7 @@ const navItems: NavItem[] = [
     mobileLabel: '助手',
     to: '/home',
     icon: Sparkles,
+    mobile: true,
     match: (pathname) => pathname === '/home',
   },
   {
@@ -55,6 +61,7 @@ const navItems: NavItem[] = [
     mobileLabel: '发现',
     to: '/discover',
     icon: Compass,
+    mobile: true,
     match: (pathname) => pathname === '/discover',
   },
   {
@@ -62,6 +69,7 @@ const navItems: NavItem[] = [
     mobileLabel: '意图',
     to: '/intents',
     icon: ClipboardList,
+    mobile: false,
     match: (pathname) =>
       pathname === '/intents' || pathname.startsWith('/intents/'),
   },
@@ -70,13 +78,39 @@ const navItems: NavItem[] = [
     mobileLabel: '连接',
     to: '/matches',
     icon: MessagesSquare,
+    mobile: false,
     match: (pathname) => pathname.startsWith('/matches'),
+  },
+  {
+    label: '清华树洞',
+    mobileLabel: '树洞',
+    to: '/plaza',
+    icon: CircleDotDashed,
+    mobile: true,
+    match: (pathname) => pathname === '/plaza',
+  },
+  {
+    label: '消息',
+    mobileLabel: '消息',
+    to: '/chat',
+    icon: MessageCircleMore,
+    mobile: true,
+    match: (pathname) => pathname.startsWith('/chat'),
+  },
+  {
+    label: '时间表',
+    mobileLabel: '日程',
+    to: '/calendar',
+    icon: CalendarDays,
+    mobile: false,
+    match: (pathname) => pathname === '/calendar',
   },
   {
     label: 'AI 档案',
     mobileLabel: '档案',
     to: '/profile',
     icon: UserRound,
+    mobile: true,
     match: (pathname) => pathname === '/profile',
   },
 ]
@@ -107,6 +141,7 @@ export function ConnectionShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [recentIntents, setRecentIntents] = useState<ConnectionIntent[]>([])
+  const { totalUnread } = useChat()
   const profile = useMemo(() => getStoredUserProfile(), [])
 
   useEffect(() => {
@@ -183,6 +218,11 @@ export function ConnectionShell() {
               >
                 <Icon size={17} strokeWidth={1.8} />
                 {item.label}
+                {item.to === '/chat' && totalUnread > 0 ? (
+                  <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d95656] px-1 text-[10px] font-semibold text-white">
+                    {totalUnread > 99 ? '99+' : totalUnread}
+                  </span>
+                ) : null}
               </NavLink>
             )
           })}
@@ -284,6 +324,30 @@ export function ConnectionShell() {
           <Link
             className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
             onClick={() => setMobileMenuOpen(false)}
+            to="/calendar"
+          >
+            <CalendarDays size={17} />
+            时间表
+          </Link>
+          <Link
+            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+            onClick={() => setMobileMenuOpen(false)}
+            to="/intents"
+          >
+            <ClipboardList size={17} />
+            我的意图
+          </Link>
+          <Link
+            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+            onClick={() => setMobileMenuOpen(false)}
+            to="/matches"
+          >
+            <MessagesSquare size={17} />
+            连接房间
+          </Link>
+          <Link
+            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+            onClick={() => setMobileMenuOpen(false)}
             to="/account"
           >
             <UserRound size={17} />
@@ -309,13 +373,13 @@ export function ConnectionShell() {
         aria-label="移动端导航"
         className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
       >
-        {navItems.map((item) => {
+        {navItems.filter((item) => item.mobile).map((item) => {
           const Icon = item.icon
           return (
             <NavLink
               className={({ isActive }) =>
                 cn(
-                  'flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium',
+                  'relative flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium',
                   isActive ? 'text-[#315c4d]' : 'text-[#77736c]',
                 )
               }
@@ -324,6 +388,11 @@ export function ConnectionShell() {
             >
               <Icon size={18} strokeWidth={1.8} />
               <span className="truncate">{item.mobileLabel}</span>
+              {item.to === '/chat' && totalUnread > 0 ? (
+                <span className="absolute ml-5 mt-[-20px] inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#d95656] px-1 text-[9px] font-semibold text-white">
+                  {totalUnread > 9 ? '9+' : totalUnread}
+                </span>
+              ) : null}
             </NavLink>
           )
         })}

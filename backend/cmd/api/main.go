@@ -13,6 +13,7 @@ import (
 
 	"soulink-backend/internal/app"
 	"soulink-backend/internal/auth"
+	"soulink-backend/internal/calendar"
 	"soulink-backend/internal/chat"
 	"soulink-backend/internal/config"
 	"soulink-backend/internal/connection"
@@ -143,6 +144,7 @@ func main() {
 	)
 	chatHub := chat.NewHub(logger)
 	chatService := chat.NewService(dataStore)
+	calendarService := calendar.NewService(dataStore)
 
 	friendNotify := func(userID int64, eventType string, data any) {
 		raw, err := json.Marshal(data)
@@ -160,6 +162,7 @@ func main() {
 		AuthMiddleware:       auth.Middleware(dataStore, tokenManager),
 		MatchWriteGuard:      app.MatchWriteGuard(logger, gateService),
 		AuthHandler:          auth.NewHandler(authService),
+		CalendarHandler:      calendar.NewHandler(calendarService),
 		FeedbackHandler:      feedback.NewHandler(feedbackService),
 		ProfileHandler:       profile.NewHandler(profileService),
 		MetaHandler:          meta.NewHandler(metaService),
