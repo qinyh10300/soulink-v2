@@ -2,7 +2,6 @@ import {
   ClipboardList,
   CalendarDays,
   CircleDotDashed,
-  Compass,
   Clock3,
   type LucideIcon,
   LogOut,
@@ -28,8 +27,14 @@ import {
 } from "react-router-dom";
 
 import logoUrl from "@/assets/soulink-logo-icon.png";
+import { ConnectionJourneyNav } from "@/components/connection/connection-journey-nav";
 import { logout } from "@/lib/auth-api";
 import { fetchMyIntents, type ConnectionIntent } from "@/lib/connection-api";
+import {
+  connectionIntentPath,
+  connectionPaths,
+  isConnectionPath,
+} from "@/lib/connection-routes";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/contexts/chat-context";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -48,49 +53,21 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   match: (pathname: string) => boolean;
-  mobile: boolean;
 }
 
 const navItems: NavItem[] = [
   {
-    label: "SouLink 助手",
-    mobileLabel: "助手",
-    to: "/home",
+    label: "认识",
+    mobileLabel: "认识",
+    to: connectionPaths.root,
     icon: Sparkles,
-    mobile: true,
-    match: (pathname) => pathname === "/home",
+    match: isConnectionPath,
   },
   {
-    label: "校园发现",
-    mobileLabel: "发现",
-    to: "/discover",
-    icon: Compass,
-    mobile: true,
-    match: (pathname) => pathname === "/discover",
-  },
-  {
-    label: "我的意图",
-    mobileLabel: "意图",
-    to: "/intents",
-    icon: ClipboardList,
-    mobile: false,
-    match: (pathname) =>
-      pathname === "/intents" || pathname.startsWith("/intents/"),
-  },
-  {
-    label: "连接房间",
-    mobileLabel: "连接",
-    to: "/matches",
-    icon: MessagesSquare,
-    mobile: false,
-    match: (pathname) => pathname.startsWith("/matches"),
-  },
-  {
-    label: "清华树洞",
-    mobileLabel: "树洞",
+    label: "广场",
+    mobileLabel: "广场",
     to: "/plaza",
     icon: CircleDotDashed,
-    mobile: true,
     match: (pathname) => pathname === "/plaza",
   },
   {
@@ -98,30 +75,23 @@ const navItems: NavItem[] = [
     mobileLabel: "消息",
     to: "/chat",
     icon: MessageCircleMore,
-    mobile: true,
     match: (pathname) => pathname.startsWith("/chat"),
   },
   {
-    label: "时间表",
-    mobileLabel: "日程",
-    to: "/calendar",
-    icon: CalendarDays,
-    mobile: false,
-    match: (pathname) => pathname === "/calendar",
-  },
-  {
-    label: "AI 档案",
-    mobileLabel: "档案",
+    label: "我的",
+    mobileLabel: "我的",
     to: "/profile",
     icon: UserRound,
-    mobile: true,
-    match: (pathname) => pathname === "/profile",
+    match: (pathname) =>
+      pathname === "/profile" ||
+      pathname === "/account" ||
+      pathname === "/calendar",
   },
 ];
 
 function Brand() {
   return (
-    <Link className="flex min-w-0 items-center gap-2.5" to="/home">
+    <Link className="flex min-w-0 items-center gap-2.5" to={connectionPaths.root}>
       <img alt="" className="h-8 w-8 rounded-md object-cover" src={logoUrl} />
       <span className="min-w-0">
         <span className="block truncate text-[17px] font-semibold text-[#211f1d]">
@@ -160,6 +130,7 @@ export function ConnectionShell() {
   const [navigationCollapsed, setNavigationCollapsed] = useState(() =>
     navigationLayout.isInitiallyCollapsed("navigation"),
   );
+  const inConnectionJourney = isConnectionPath(location.pathname);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,7 +233,7 @@ export function ConnectionShell() {
 
                 <Link
                   className="mt-7 inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#263b35] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#1d302a]"
-                  to="/intents/new"
+                  to={connectionPaths.newIntent}
                 >
                   <Plus size={17} />
                   开始新对话
@@ -296,14 +267,21 @@ export function ConnectionShell() {
                   })}
                 </nav>
 
-                <section className="mt-6 min-h-0 border-t border-[#e4e1dc] pt-5">
+                <section className="mt-6 border-t border-[#e4e1dc] pt-5">
+                  <h2 className="px-2 text-[11px] font-semibold text-[#817d76]">
+                    连接旅程
+                  </h2>
+                  <ConnectionJourneyNav variant="sidebar" />
+                </section>
+
+                <section className="mt-5 min-h-0 border-t border-[#e4e1dc] pt-5">
                   <div className="flex items-center justify-between px-2">
                     <h2 className="text-[11px] font-semibold text-[#817d76]">
                       最近意图
                     </h2>
                     <Link
                       className="text-[11px] font-medium text-[#477062] hover:text-[#315c4d]"
-                      to="/intents"
+                      to={connectionPaths.intents}
                     >
                       全部
                     </Link>
@@ -314,7 +292,7 @@ export function ConnectionShell() {
                         <Link
                           className="group flex min-w-0 items-center gap-2.5 rounded-md px-2 py-2 text-xs text-[#6f6b65] hover:bg-[#f0eeea] hover:text-[#34312e]"
                           key={intent.id}
-                          to={`/intents/${intent.id}`}
+                          to={connectionIntentPath(intent.id)}
                         >
                           <span
                             className={cn(
@@ -395,7 +373,7 @@ export function ConnectionShell() {
                 aria-label="发布新意图"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#263b35] text-white"
                 title="开始新对话"
-                to="/intents/new"
+                to={connectionPaths.newIntent}
               >
                 <Plus size={18} />
               </Link>
@@ -430,7 +408,7 @@ export function ConnectionShell() {
               <Link
                 className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
-                to="/intents"
+                to={connectionPaths.intents}
               >
                 <ClipboardList size={17} />
                 我的意图
@@ -438,7 +416,7 @@ export function ConnectionShell() {
               <Link
                 className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
-                to="/matches"
+                to={connectionPaths.rooms}
               >
                 <MessagesSquare size={17} />
                 连接房间
@@ -464,17 +442,24 @@ export function ConnectionShell() {
             </>
           ) : null}
 
-          <main className="min-h-[calc(100dvh_-_3.75rem)] pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:h-screen lg:min-h-0 lg:pb-0">
+          {inConnectionJourney ? <ConnectionJourneyNav /> : null}
+
+          <main
+            className={cn(
+              "pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:h-screen lg:min-h-0 lg:pb-0",
+              inConnectionJourney
+                ? "min-h-[calc(100dvh_-_6.5rem)]"
+                : "min-h-[calc(100dvh_-_3.75rem)]",
+            )}
+          >
             <Outlet />
           </main>
 
           <nav
             aria-label="移动端导航"
-            className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem_+_env(safe-area-inset-bottom))] grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem_+_env(safe-area-inset-bottom))] grid-cols-4 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
           >
-            {navItems
-              .filter((item) => item.mobile)
-              .map((item) => {
+            {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <NavLink

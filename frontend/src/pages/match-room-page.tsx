@@ -29,6 +29,7 @@ import {
   type MatchRoom,
   type MatchRoomMessage,
 } from '@/lib/connection-api'
+import { connectionPaths } from '@/lib/connection-routes'
 import { cn } from '@/lib/utils'
 
 function formatMessageTime(value: string) {
@@ -166,7 +167,7 @@ export function MatchRoomPage() {
         <p className="mt-3 text-sm text-[#6f6b65]">{notice || '找不到这个房间'}</p>
         <Link
           className="mt-4 inline-flex h-9 items-center rounded-md border border-[#d8d3cc] px-3 text-xs font-semibold text-[#5b3477]"
-          to="/matches"
+          to={connectionPaths.rooms}
         >
           返回匹配房间
         </Link>

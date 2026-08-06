@@ -98,10 +98,38 @@ export interface IntentInput {
 }
 
 export interface IntentAuthor {
+  userId?: number
   nickname: string
   department: string
   grade: string
   verified: boolean
+}
+
+export interface ContextProfileIntent {
+  id: number
+  category: IntentCategory
+  title: string
+  goal: string
+  timeWindow: string
+  location: string
+  desiredNextStep: string
+}
+
+export interface ContextProfile {
+  userId: number
+  nickname: string
+  schoolName: string
+  department?: string
+  grade?: string
+  verified: boolean
+  bio?: string
+  skills?: string[]
+  interests?: string[]
+  availability?: string
+  preferredScenes?: string[]
+  collaborationStyle?: string
+  visibleFields: string[]
+  intent: ContextProfileIntent
 }
 
 export interface ConnectionIntent extends IntentInput {
@@ -256,6 +284,12 @@ export function fetchMyIntents() {
 
 export function fetchIntent(intentId: number) {
   return apiRequest<ConnectionIntent>(`/intents/${intentId}`, {
+    auth: true,
+  })
+}
+
+export function fetchContextProfile(intentId: number, userId: number) {
+  return apiRequest<ContextProfile>(`/intents/${intentId}/profiles/${userId}`, {
     auth: true,
   })
 }

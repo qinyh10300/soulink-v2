@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 
 import { IntentCategoryIcon, intentCategoryMeta } from '@/components/connection/intent-category'
 import type { ConnectionIntent } from '@/lib/connection-api'
+import { connectionIntentPath, contextProfilePath } from '@/lib/connection-routes'
 import { cn } from '@/lib/utils'
 
 interface IntentCardProps {
@@ -66,7 +67,7 @@ export function IntentCard({
               </div>
               <Link
                 className="mt-1.5 block text-[17px] font-semibold leading-6 text-[#23211f] transition-colors hover:text-[#315c4d]"
-                to={`/intents/${intent.id}`}
+                to={connectionIntentPath(intent.id)}
               >
                 {intent.title}
               </Link>
@@ -88,7 +89,7 @@ export function IntentCard({
                 aria-label="查看意图"
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[#8a867f] transition-colors hover:bg-[#f2efeb] hover:text-[#4d3769]"
                 title="查看详情"
-                to={`/intents/${intent.id}`}
+                to={connectionIntentPath(intent.id)}
               >
                 <ChevronRight size={18} />
               </Link>
@@ -114,10 +115,20 @@ export function IntentCard({
                 {intent.location}
               </span>
             ) : null}
-            <span className="inline-flex items-center gap-1.5">
-              <UsersRound size={14} />
-              {intent.author.nickname}
-            </span>
+            {intent.author.userId && !intent.isOwner ? (
+              <Link
+                className="inline-flex items-center gap-1.5 hover:text-[#315c4d]"
+                to={contextProfilePath(intent.author.userId, intent.id)}
+              >
+                <UsersRound size={14} />
+                {intent.author.nickname}
+              </Link>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <UsersRound size={14} />
+                {intent.author.nickname}
+              </span>
+            )}
           </div>
 
           {intent.constraints.length > 0 ? (

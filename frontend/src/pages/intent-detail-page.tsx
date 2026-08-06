@@ -34,6 +34,12 @@ import {
   type IntentInterest,
   type IntentRecommendation,
 } from '@/lib/connection-api'
+import {
+  connectionIntentPath,
+  connectionPaths,
+  connectionRoomPath,
+  contextProfilePath,
+} from '@/lib/connection-routes'
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -161,7 +167,7 @@ export function IntentDetailPage() {
         ),
       )
       if (result.room) {
-        navigate(`/matches/${result.room.id}`)
+        navigate(connectionRoomPath(result.room.id))
       }
     } catch (error) {
       setNotice(getErrorMessage(error, '这个回应暂时无法处理'))
@@ -217,7 +223,7 @@ export function IntentDetailPage() {
         <p className="mt-3 text-sm text-[#6f6b65]">{notice || '找不到这个意图'}</p>
         <Link
           className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-[#d8d3cc] px-3 text-xs font-semibold text-[#5b3477]"
-          to="/home"
+          to={connectionPaths.root}
         >
           返回首页
         </Link>
@@ -458,7 +464,7 @@ export function IntentDetailPage() {
                             <div className="min-w-0">
                               <Link
                                 className="font-semibold text-[#302e2b] hover:text-[#5b3477]"
-                                to={`/intents/${recommendation.intent.id}`}
+                                to={connectionIntentPath(recommendation.intent.id)}
                               >
                                 {recommendation.intent.title}
                               </Link>
@@ -494,7 +500,7 @@ export function IntentDetailPage() {
                             </div>
                             <Link
                               className="inline-flex items-center gap-1 text-xs font-semibold text-[#5b3477]"
-                              to={`/intents/${recommendation.intent.id}`}
+                              to={connectionIntentPath(recommendation.intent.id)}
                             >
                               查看
                               <ArrowRight size={13} />
@@ -531,9 +537,18 @@ export function IntentDetailPage() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-semibold text-[#37332f]">
-                                {interest.nickname}
-                              </h3>
+                              {interest.status !== 'declined' ? (
+                                <Link
+                                  className="text-sm font-semibold text-[#37332f] hover:text-[#5b3477]"
+                                  to={contextProfilePath(interest.userId, intent.id)}
+                                >
+                                  {interest.nickname}
+                                </Link>
+                              ) : (
+                                <h3 className="text-sm font-semibold text-[#37332f]">
+                                  {interest.nickname}
+                                </h3>
+                              )}
                               <span className="text-xs text-[#817d76]">
                                 {interest.department} · {interest.grade}
                               </span>
@@ -614,14 +629,28 @@ export function IntentDetailPage() {
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#e9f1ed] text-sm font-semibold text-[#2d6a53]">
                 {intent.author.nickname.slice(0, 1)}
               </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-[#37332f]">
-                  {intent.author.nickname}
+              {intent.author.userId && !intent.isOwner ? (
+                <Link
+                  className="min-w-0 hover:text-[#5b3477]"
+                  to={contextProfilePath(intent.author.userId, intent.id)}
+                >
+                  <span className="block truncate text-sm font-semibold">
+                    {intent.author.nickname}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-[#77736c]">
+                    {intent.author.department} · {intent.author.grade}
+                  </span>
+                </Link>
+              ) : (
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-[#37332f]">
+                    {intent.author.nickname}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-[#77736c]">
+                    {intent.author.department} · {intent.author.grade}
+                  </span>
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-[#77736c]">
-                  {intent.author.department} · {intent.author.grade}
-                </span>
-              </span>
+              )}
             </div>
           </section>
 
@@ -685,7 +714,7 @@ export function IntentDetailPage() {
                   ) : (
                     <Link
                       className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#5b3477]"
-                      to="/matches"
+                      to={connectionPaths.rooms}
                     >
                       打开匹配房间
                       <ArrowRight size={13} />

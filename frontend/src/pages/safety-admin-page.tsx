@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom'
 
 import { ProductMetricsPanel } from '@/components/admin/product-metrics-panel'
 import { getErrorMessage } from '@/lib/api'
+import { connectionIntentPath, connectionRoomPath } from '@/lib/connection-routes'
 import {
   fetchSafetyReports,
   updateSafetyReport,
@@ -252,8 +253,8 @@ export function SafetyAdminPage() {
                           className="font-medium text-[#5b3477]"
                           to={
                             report.contextType === 'match_room'
-                              ? `/matches/${report.contextId}`
-                              : `/intents/${report.contextId}`
+                              ? connectionRoomPath(report.contextId)
+                              : connectionIntentPath(report.contextId)
                           }
                         >
                           查看关联场景

@@ -20,6 +20,7 @@ import {
   type ConnectionIntent,
   type IntentStatus,
 } from '@/lib/connection-api'
+import { connectionIntentPath, connectionPaths } from '@/lib/connection-routes'
 import { cn } from '@/lib/utils'
 
 type IntentFilter = 'open' | 'draft' | 'closed'
@@ -134,7 +135,7 @@ export function MyIntentsPage() {
         </div>
         <Link
           className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-md bg-[#5b3477] px-4 text-sm font-semibold text-white hover:bg-[#4c2b65]"
-          to="/intents/new"
+          to={connectionPaths.newIntent}
         >
           <Plus size={16} />
           新建意图
@@ -206,7 +207,7 @@ export function MyIntentsPage() {
                         </div>
                         <Link
                           className="mt-2 block text-base font-semibold leading-6 text-[#302e2b] hover:text-[#5b3477]"
-                          to={`/intents/${intent.id}`}
+                          to={connectionIntentPath(intent.id)}
                         >
                           {intent.title}
                         </Link>
@@ -217,7 +218,7 @@ export function MyIntentsPage() {
                       <Link
                         aria-label="查看意图"
                         className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 self-start rounded-md border border-[#d8d3cc] px-3 text-xs font-semibold text-[#5f5b55] hover:border-[#bba9c5] hover:text-[#5b3477]"
-                        to={`/intents/${intent.id}`}
+                        to={connectionIntentPath(intent.id)}
                       >
                         查看
                         <ArrowRight size={14} />
@@ -281,7 +282,7 @@ export function MyIntentsPage() {
             {filter !== 'closed' ? (
               <Link
                 className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#5b3477] px-3 text-xs font-semibold text-white"
-                to="/intents/new"
+                to={connectionPaths.newIntent}
               >
                 <Plus size={14} />
                 新建意图

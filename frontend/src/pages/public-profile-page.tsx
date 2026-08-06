@@ -1,9 +1,12 @@
 import {
   ArrowLeft,
+  BriefcaseBusiness,
   CalendarDays,
   Clock3,
   MapPin,
   MessageCircle,
+  ShieldCheck,
+  Sparkles,
   UserCheck,
   UserPlus,
   UserRound,
@@ -18,12 +21,14 @@ import {
 } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { CalendarEventDialog } from '@/components/calendar/calendar-event-dialog'
+import { IntentCategoryIcon, intentCategoryMeta } from '@/components/connection/intent-category'
 import { getErrorMessage } from '@/lib/api'
 import { fetchUserSchedule, type CalendarEvent } from '@/lib/calendar-api'
 import { ensureConversation } from '@/lib/chat-api'
+import { fetchContextProfile, type ContextProfile } from '@/lib/connection-api'
 import {
   fetchFriends,
   fetchReceivedRequests,
@@ -78,11 +83,155 @@ function findSuggestedStart(events: CalendarEvent[]) {
   return addMinutes(now, 60)
 }
 
+function ContextProfileSection({ profile }: { profile: ContextProfile }) {
+  const meta = intentCategoryMeta[profile.intent.category]
+  const hasProfileDetails = Boolean(
+    profile.bio ||
+      profile.availability ||
+      profile.collaborationStyle ||
+      profile.skills?.length ||
+      profile.interests?.length ||
+      profile.preferredScenes?.length,
+  )
+
+  return (
+    <section className="mt-6 border-y border-[#d9dcd8] bg-white">
+      <div className="flex flex-col gap-3 border-b border-[#e3e5e1] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <div className="flex min-w-0 items-center gap-3">
+          <IntentCategoryIcon category={profile.intent.category} size={17} />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-[#5b3477]">当前连接</p>
+            <h2 className="truncate text-base font-semibold text-[#30332f]">
+              {profile.intent.title}
+            </h2>
+          </div>
+        </div>
+        <span className="inline-flex h-7 items-center gap-1.5 self-start rounded-md bg-[#eee8f2] px-2.5 text-[11px] font-semibold text-[#5b3477] sm:self-auto">
+          <Sparkles className="h-3.5 w-3.5" />
+          {meta.label}
+        </span>
+      </div>
+
+      <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:divide-x lg:divide-[#e3e5e1]">
+        <div className="px-5 py-5 sm:px-7">
+          <h3 className="text-xs font-semibold text-[#555a55]">这次想一起完成</h3>
+          <p className="mt-2 text-sm leading-6 text-[#5f645f]">
+            {profile.intent.goal || profile.intent.title}
+          </p>
+          <dl className="mt-4 space-y-3 border-t border-[#eceeeb] pt-4 text-xs">
+            <div className="flex items-start gap-2">
+              <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#758079]" />
+              <div>
+                <dt className="text-[#92968f]">时间</dt>
+                <dd className="mt-0.5 text-[#555a55]">
+                  {profile.intent.timeWindow || '待确认'}
+                </dd>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#758079]" />
+              <div>
+                <dt className="text-[#92968f]">地点</dt>
+                <dd className="mt-0.5 text-[#555a55]">
+                  {profile.intent.location || '校内待定'}
+                </dd>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <UserCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#758079]" />
+              <div>
+                <dt className="text-[#92968f]">下一步</dt>
+                <dd className="mt-0.5 text-[#555a55]">
+                  {profile.intent.desiredNextStep || '双方确认后再决定'}
+                </dd>
+              </div>
+            </div>
+          </dl>
+        </div>
+
+        <div className="border-t border-[#e3e5e1] px-5 py-5 sm:px-7 lg:border-t-0">
+          <div className="flex items-center gap-2">
+            <BriefcaseBusiness className="h-4 w-4 text-[#527164]" />
+            <h3 className="text-xs font-semibold text-[#555a55]">与这次连接相关</h3>
+          </div>
+          {hasProfileDetails ? (
+            <div className="mt-3 space-y-4">
+              {profile.bio ? (
+                <p className="text-sm leading-6 text-[#5f645f]">{profile.bio}</p>
+              ) : null}
+              {profile.skills?.length ? (
+                <div>
+                  <p className="text-[11px] text-[#92968f]">相关技能</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {profile.skills.map((skill) => (
+                      <span
+                        className="rounded-md bg-[#eaf1ed] px-2 py-1 text-[11px] text-[#426456]"
+                        key={skill}
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {profile.interests?.length ? (
+                <div>
+                  <p className="text-[11px] text-[#92968f]">共同话题</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {profile.interests.map((interest) => (
+                      <span
+                        className="rounded-md bg-[#f0edf2] px-2 py-1 text-[11px] text-[#66566f]"
+                        key={interest}
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {profile.preferredScenes?.length ? (
+                <p className="text-xs leading-5 text-[#696e69]">
+                  <span className="text-[#92968f]">常见场景：</span>
+                  {profile.preferredScenes.join('、')}
+                </p>
+              ) : null}
+              {profile.availability ? (
+                <p className="text-xs leading-5 text-[#696e69]">
+                  <span className="text-[#92968f]">通常有空：</span>
+                  {profile.availability}
+                </p>
+              ) : null}
+              {profile.collaborationStyle ? (
+                <p className="text-xs leading-5 text-[#696e69]">
+                  <span className="text-[#92968f]">协作方式：</span>
+                  {profile.collaborationStyle}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-[#8a8f89]">
+              对方还没有补充与这个场景相关的资料。
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 border-t border-[#e3e5e1] bg-[#f7f8f6] px-5 py-3 text-[11px] text-[#777c77] sm:px-7">
+        <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+        这里只显示当前意图需要的资料，联系方式仍由双方分别决定是否揭示。
+      </div>
+    </section>
+  )
+}
+
 export function PublicProfilePage() {
   const { userId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const numericUserId = Number(userId)
+  const contextIntentId = Number(searchParams.get('intentId'))
+  const hasContext = Number.isInteger(contextIntentId) && contextIntentId > 0
   const [profile, setProfile] = useState<PublicProfileDetails | null>(null)
+  const [contextProfile, setContextProfile] = useState<ContextProfile | null>(null)
   const [schedule, setSchedule] = useState<CalendarEvent[]>([])
   const [inviteOpen, setInviteOpen] = useState(false)
   const [relationshipStatus, setRelationshipStatus] = useState<RelationshipStatus>('unknown')
@@ -96,26 +245,32 @@ export function PublicProfilePage() {
       return
     }
     try {
-      const [profileData, events, relationship] = await Promise.all([
+      const [profileData, events, relationship, contextData] = await Promise.all([
         fetchPublicProfile(numericUserId),
         fetchUserSchedule(numericUserId, weekStart, addDays(weekStart, 7)),
         fetchRelationshipStatus(numericUserId),
+        hasContext
+          ? fetchContextProfile(contextIntentId, numericUserId)
+          : Promise.resolve(null),
       ])
       setProfile(profileData)
+      setContextProfile(contextData)
       setSchedule(events)
       setRelationshipStatus(relationship)
       setNotice('')
     } catch (error) {
       setNotice(getErrorMessage(error, '个人主页加载失败，请稍后重试'))
     }
-  }, [numericUserId, weekStart])
+  }, [contextIntentId, hasContext, numericUserId, weekStart])
 
   useEffect(() => {
     void loadProfile()
   }, [loadProfile])
 
+  const displayProfile = contextProfile ?? profile
+
   const handleMessage = async () => {
-    if (!profile) return
+    if (!displayProfile) return
     if (relationshipStatus !== 'friend') {
       setNotice('成为好友后才能发消息')
       return
@@ -129,9 +284,9 @@ export function PublicProfilePage() {
   }
 
   const handleFriendRequest = async () => {
-    if (!profile || relationshipStatus !== 'none') return
+    if (!displayProfile || relationshipStatus !== 'none') return
     try {
-      await sendFriendRequest(profile.nickname)
+      await sendFriendRequest(displayProfile.nickname)
       setRelationshipStatus('sent')
       setNotice('好友申请已发送')
     } catch (error) {
@@ -151,19 +306,36 @@ export function PublicProfilePage() {
           返回
         </button>
 
-        {profile ? (
+        {displayProfile ? (
           <section className="mt-4 border-y border-[#d9dcd8] bg-white">
-            <div className="h-24 bg-[linear-gradient(120deg,#dce8e1_0%,#e9e4dc_48%,#e4e5ef_100%)]" />
+            <div className="h-24 bg-[#dce8e1]" />
             <div className="flex flex-col gap-5 px-5 pb-5 sm:flex-row sm:items-end sm:px-7">
               <div className="-mt-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-4 border-white bg-[#cad9d1] text-3xl font-semibold text-[#315d4f] shadow-sm">
-                {profile.nickname.trim().slice(0, 1) || <UserRound className="h-7 w-7" />}
+                {displayProfile.nickname.trim().slice(0, 1) || <UserRound className="h-7 w-7" />}
               </div>
               <div className="min-w-0 flex-1 sm:pb-1">
-                <h1 className="text-2xl font-semibold text-[#292b28]">{profile.nickname}</h1>
+                <h1 className="text-2xl font-semibold text-[#292b28]">
+                  {displayProfile.nickname}
+                </h1>
                 <p className="mt-1 text-sm text-[#777c77]">
-                  {[profile.schoolName, profile.department, profile.grade].filter(Boolean).join(' · ')}
+                  {[
+                    displayProfile.schoolName,
+                    displayProfile.department,
+                    displayProfile.grade,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </p>
-                <p className="mt-1 text-xs text-[#959993]">加入于 {formatJoinedAt(profile.createdAt)}</p>
+                {contextProfile ? (
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs text-[#527164]">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    当前意图授权资料
+                  </p>
+                ) : profile ? (
+                  <p className="mt-1 text-xs text-[#959993]">
+                    加入于 {formatJoinedAt(profile.createdAt)}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2 sm:pb-1">
                 {relationshipStatus === 'none' ? (
@@ -225,7 +397,9 @@ export function PublicProfilePage() {
           </div>
         ) : null}
 
-        {profile ? (
+        {contextProfile ? <ContextProfileSection profile={contextProfile} /> : null}
+
+        {displayProfile ? (
           <section className="mt-6">
             <div className="flex items-end justify-between border-b border-[#d9dcd8] pb-3">
               <div>
@@ -279,10 +453,13 @@ export function PublicProfilePage() {
         ) : null}
       </div>
 
-      {inviteOpen && profile ? (
+      {inviteOpen && displayProfile ? (
         <CalendarEventDialog
           initialStart={findSuggestedStart(schedule)}
-          lockedInvitee={{ userId: numericUserId, nickname: profile.nickname }}
+          lockedInvitee={{
+            userId: numericUserId,
+            nickname: displayProfile.nickname,
+          }}
           onClose={() => setInviteOpen(false)}
           onSaved={() => {
             setInviteOpen(false)

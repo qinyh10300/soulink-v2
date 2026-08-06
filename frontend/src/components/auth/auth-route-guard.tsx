@@ -5,6 +5,7 @@ import { ScrollManager } from '@/components/shared/scroll-manager'
 import { ChatProvider } from '@/contexts/chat-context'
 import { ApiError } from '@/lib/api'
 import { fetchCurrentUser } from '@/lib/auth-api'
+import { connectionPaths } from '@/lib/connection-routes'
 import { clearSurveyDraft } from '@/lib/survey-storage'
 import {
   clearAuthSession,
@@ -183,7 +184,7 @@ export function RedirectIfAuthenticated() {
   }
 
   if (status === 'authenticated') {
-    return <Navigate replace to="/home" />
+    return <Navigate replace to={connectionPaths.root} />
   }
 
   return <Outlet />

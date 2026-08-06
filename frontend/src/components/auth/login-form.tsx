@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { getErrorMessage } from '@/lib/api'
 import { login } from '@/lib/auth-api'
 import { type LoginFormValues, loginSchema } from '@/lib/auth-schema'
+import { connectionPaths } from '@/lib/connection-routes'
 import { resetDashboardAnnouncementSeen } from '@/lib/survey-storage'
 import { saveAuthenticatedUser } from '@/lib/user-profile-storage'
 import { cn } from '@/lib/utils'
@@ -39,7 +40,7 @@ const configuredDemoAccounts = [
     label: '普通演示账号',
     email: import.meta.env.VITE_DEMO_EMAIL ?? '',
     password: import.meta.env.VITE_DEMO_PASSWORD ?? '',
-    redirectTo: '/home',
+    redirectTo: connectionPaths.root,
   },
   {
     id: 'admin',
@@ -94,7 +95,7 @@ export function LoginForm() {
     setToastNotice('')
 
     try {
-      await authenticate(values.email, values.password, '/home')
+      await authenticate(values.email, values.password, connectionPaths.root)
     } catch (error) {
       setToastNotice(getErrorMessage(error, '登录失败，请稍后重试'))
     }

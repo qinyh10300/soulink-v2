@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  CalendarDays,
   Check,
   ChevronRight,
   ClipboardCheck,
@@ -527,6 +528,19 @@ export function ConnectionProfilePage() {
           <RecommendationPreferencesCard />
 
           <section className="rounded-lg border border-[#dfdcd6] bg-[#f5f3ef]">
+            <Link
+              className="flex items-center gap-3 border-b border-[#e1ded8] px-4 py-3.5 hover:bg-white/60"
+              to="/calendar"
+            >
+              <CalendarDays size={16} className="text-[#527164]" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-[#4f4b46]">时间表与可约时间</span>
+                <span className="mt-0.5 block text-[10px] text-[#817d76]">
+                  管理日程、约见和对外可用状态
+                </span>
+              </span>
+              <ChevronRight size={15} className="text-[#8d8982]" />
+            </Link>
             <Link
               className="flex items-center gap-3 border-b border-[#e1ded8] px-4 py-3.5 hover:bg-white/60"
               to="/account"

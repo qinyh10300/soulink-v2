@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 import { IntentCategoryIcon } from '@/components/connection/intent-category'
 import { getErrorMessage } from '@/lib/api'
 import { fetchMatchRooms, type MatchRoom } from '@/lib/connection-api'
+import { connectionPaths, connectionRoomPath } from '@/lib/connection-routes'
 import { cn } from '@/lib/utils'
 
 function formatMeeting(value?: string) {
@@ -96,7 +97,7 @@ export function MatchRoomsPage() {
               <Link
                 className="group block rounded-lg border border-[#dfdcd6] bg-white p-4 transition-colors hover:border-[#b9a8c4] sm:p-5"
                 key={room.id}
-                to={`/matches/${room.id}`}
+                to={connectionRoomPath(room.id)}
               >
                 <div className="flex items-start gap-3">
                   <IntentCategoryIcon category={room.intentCategory} size={18} />
@@ -164,7 +165,7 @@ export function MatchRoomsPage() {
             </p>
             <Link
               className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#5b3477] px-3 text-xs font-semibold text-white"
-              to="/discover"
+              to={connectionPaths.discover}
             >
               去看看意图流
               <ArrowRight size={14} />

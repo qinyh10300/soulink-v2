@@ -1,11 +1,21 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import {
+  createBrowserRouter,
+  Navigate,
+  useLocation,
+  useParams,
+} from 'react-router-dom'
 
 import {
   RedirectIfAuthenticated,
   RequireAuth,
 } from '@/components/auth/auth-route-guard'
 import { ConnectionShell } from '@/components/connection/connection-shell'
+import {
+  connectionIntentPath,
+  connectionPaths,
+  connectionRoomPath,
+} from '@/lib/connection-routes'
 
 const ConnectionHomePage = lazy(async () => {
   const module = await import('@/pages/connection-home-page')
@@ -102,6 +112,17 @@ function withSuspense(element: ReactNode) {
   )
 }
 
+function LegacyParameterizedRedirect({ type }: { type: 'intent' | 'room' }) {
+  const params = useParams()
+  const location = useLocation()
+  const rawId = type === 'intent' ? params.intentId : params.roomId
+  const target =
+    type === 'intent'
+      ? connectionIntentPath(rawId ?? '')
+      : connectionRoomPath(rawId ?? '')
+  return <Navigate replace to={`${target}${location.search}${location.hash}`} />
+}
+
 export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
@@ -110,31 +131,31 @@ export const router = createBrowserRouter([
         element: <ConnectionShell />,
         children: [
           {
-            path: '/home',
+            path: connectionPaths.root,
             element: withSuspense(<ConnectionHomePage />),
           },
           {
-            path: '/discover',
+            path: connectionPaths.discover,
             element: withSuspense(<IntentFeedPage />),
           },
           {
-            path: '/intents',
+            path: connectionPaths.intents,
             element: withSuspense(<MyIntentsPage />),
           },
           {
-            path: '/intents/new',
+            path: connectionPaths.newIntent,
             element: withSuspense(<IntentComposerPage />),
           },
           {
-            path: '/intents/:intentId',
+            path: '/connect/intents/:intentId',
             element: withSuspense(<IntentDetailPage />),
           },
           {
-            path: '/matches',
+            path: connectionPaths.rooms,
             element: withSuspense(<MatchRoomsPage />),
           },
           {
-            path: '/matches/:roomId',
+            path: '/connect/rooms/:roomId',
             element: withSuspense(<MatchRoomPage />),
           },
           {
@@ -171,11 +192,11 @@ export const router = createBrowserRouter([
           },
           {
             path: '/dashboard',
-            element: <Navigate replace to="/home" />,
+            element: <Navigate replace to={connectionPaths.root} />,
           },
           {
             path: '/match',
-            element: <Navigate replace to="/intents" />,
+            element: <Navigate replace to={connectionPaths.intents} />,
           },
           {
             path: '/chat',
@@ -195,7 +216,35 @@ export const router = createBrowserRouter([
           },
           {
             path: '/friends',
-            element: <Navigate replace to="/discover" />,
+            element: <Navigate replace to={connectionPaths.discover} />,
+          },
+          {
+            path: '/home',
+            element: <Navigate replace to={connectionPaths.root} />,
+          },
+          {
+            path: '/discover',
+            element: <Navigate replace to={connectionPaths.discover} />,
+          },
+          {
+            path: '/intents',
+            element: <Navigate replace to={connectionPaths.intents} />,
+          },
+          {
+            path: '/intents/new',
+            element: <Navigate replace to={connectionPaths.newIntent} />,
+          },
+          {
+            path: '/intents/:intentId',
+            element: <LegacyParameterizedRedirect type="intent" />,
+          },
+          {
+            path: '/matches',
+            element: <Navigate replace to={connectionPaths.rooms} />,
+          },
+          {
+            path: '/matches/:roomId',
+            element: <LegacyParameterizedRedirect type="room" />,
           },
         ],
       },

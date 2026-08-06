@@ -23,6 +23,11 @@ import {
   type SafetyReportCategory,
 } from '@/lib/safety-api'
 import { getStoredUserProfile } from '@/lib/user-profile-storage'
+import {
+  connectionIntentPath,
+  connectionPaths,
+  connectionRoomPath,
+} from '@/lib/connection-routes'
 import { cn } from '@/lib/utils'
 
 type FeedbackCategory = 'match' | 'bug' | 'feature' | 'other'
@@ -85,10 +90,10 @@ export function FeedbackPage() {
 
   const returnTo =
     context?.type === 'match_room'
-      ? `/matches/${context.id}`
+      ? connectionRoomPath(context.id)
       : context?.type === 'intent'
-        ? `/intents/${context.id}`
-        : '/home'
+        ? connectionIntentPath(context.id)
+        : connectionPaths.root
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

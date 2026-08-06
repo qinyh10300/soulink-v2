@@ -19,6 +19,7 @@ import type {
 } from '@/lib/auth-schema'
 import { fetchGrades } from '@/lib/meta-api'
 import { resetDashboardAnnouncementSeen } from '@/lib/survey-storage'
+import { connectionPaths } from '@/lib/connection-routes'
 import { saveAuthenticatedUser } from '@/lib/user-profile-storage'
 import { VERIFICATION_CODE_COUNTDOWN_SECONDS } from '@/lib/verification-code'
 
@@ -155,7 +156,7 @@ export function RegisterPage() {
 
       saveAuthenticatedUser(result.token, result.user)
       resetDashboardAnnouncementSeen()
-      navigate('/home')
+      navigate(connectionPaths.root)
     } catch (error) {
       setErrorStatus(error, '注册失败，请稍后重试')
     }

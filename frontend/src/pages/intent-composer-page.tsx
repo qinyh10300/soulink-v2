@@ -45,6 +45,7 @@ import {
   type MatchingProfile,
   type ProjectMemo,
 } from "@/lib/connection-api";
+import { connectionIntentPath } from "@/lib/connection-routes";
 import { cn } from "@/lib/utils";
 
 const starterPrompts = [
@@ -394,7 +395,7 @@ export function IntentComposerPage() {
         visibility:
           draft.category === "romantic" ? "candidates" : draft.visibility,
       });
-      navigate(`/intents/${created.id}`, { replace: true });
+      navigate(connectionIntentPath(created.id), { replace: true });
     } catch (error) {
       setNotice(getErrorMessage(error, "意图暂时无法保存"));
     } finally {
