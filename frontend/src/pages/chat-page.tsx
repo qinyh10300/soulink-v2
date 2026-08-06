@@ -602,6 +602,7 @@ export function ChatPage() {
             </button>
             <div className="min-h-0 flex-1">
               <ChatWindow
+                key={`direct:${activeConversation.id}`}
                 onRead={handleThreadRead}
                 thread={{
                   id: activeConversation.id,
@@ -626,6 +627,7 @@ export function ChatPage() {
             </button>
             <div className="min-h-0 flex-1">
               <ChatWindow
+                key={`group:${activeGroup.id}`}
                 onOpenGroupInfo={() => setGroupInfoOpen(true)}
                 onRead={handleThreadRead}
                 thread={{

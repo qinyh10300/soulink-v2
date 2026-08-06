@@ -1,7 +1,8 @@
-import { CalendarClock, Users } from 'lucide-react'
+import { CalendarClock, Sparkles, Users } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChatInput } from '@/components/chat/chat-input'
+import { ChatAssistantPanel } from '@/components/chat/chat-assistant-panel'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { TimeSeparator } from '@/components/chat/time-separator'
 import { MeetupWorkflowDialog } from '@/components/meetup/meetup-context-panel'
@@ -13,8 +14,10 @@ import {
   markGroupRead,
   sendConversationMessage,
   sendGroupMessage,
+  type AssistantActionCard,
 } from '@/lib/chat-api'
 import { getAuthSession } from '@/lib/user-profile-storage'
+import { cn } from '@/lib/utils'
 
 const TIME_GAP_MS = 3 * 60 * 1000
 
@@ -48,6 +51,10 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [sendNotice, setSendNotice] = useState('')
   const [meetupsOpen, setMeetupsOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [composerDraft, setComposerDraft] = useState('')
+  const [composerRevision, setComposerRevision] = useState(0)
+  const [meetupDraftTitle, setMeetupDraftTitle] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
@@ -173,15 +180,27 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f2f3f1]">
+    <div className="relative flex h-full min-h-0 flex-col bg-[#f2f3f1]">
       <header className="flex h-15 shrink-0 items-center border-b border-[#dfe1de] bg-[#f7f8f6] px-4">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold text-[#292b28]">{thread.title}</h2>
           <p className="truncate text-xs text-[#81857f]">{thread.subtitle}</p>
         </div>
         <button
+          aria-label="聊天助手"
+          className={cn(
+            'ml-auto inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#e4e6e3]',
+            assistantOpen && 'bg-[#e2ebe6] text-[#315c4d]',
+          )}
+          onClick={() => setAssistantOpen((current) => !current)}
+          title="聊天助手"
+          type="button"
+        >
+          <Sparkles className="h-5 w-5" />
+        </button>
+        <button
           aria-label="约见与共同空闲"
-          className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#e4e6e3]"
+          className="inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#e4e6e3]"
           onClick={() => setMeetupsOpen(true)}
           title="约见"
           type="button"
@@ -230,16 +249,41 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
           {thread.statusMessage || sendNotice}
         </div>
       ) : null}
-      <ChatInput disabled={!thread.canSend} onSend={(content) => void handleSend(content)} />
+      <ChatInput
+        disabled={!thread.canSend}
+        initialText={composerDraft}
+        key={`${thread.kind}:${thread.id}:${composerRevision}`}
+        onSend={(content) => void handleSend(content)}
+      />
       {meetupsOpen ? (
         <MeetupWorkflowDialog
           context={{
             id: thread.id,
             type: thread.kind === 'group' ? 'group' : 'direct',
           }}
-          defaultTitle={thread.kind === 'group' ? thread.title : `和 ${thread.title} 见面`}
-          onClose={() => setMeetupsOpen(false)}
+          defaultTitle={meetupDraftTitle || (thread.kind === 'group' ? thread.title : `和 ${thread.title} 见面`)}
+          onClose={() => {
+            setMeetupsOpen(false)
+            setMeetupDraftTitle('')
+          }}
           title={thread.kind === 'group' ? `${thread.title} · 约见` : `和 ${thread.title} 约见`}
+        />
+      ) : null}
+      {assistantOpen ? (
+        <ChatAssistantPanel
+          contextId={thread.id}
+          contextType={thread.kind}
+          onClose={() => setAssistantOpen(false)}
+          onOpenMeetup={(card?: AssistantActionCard) => {
+            setMeetupDraftTitle(card?.detail ?? '')
+            setMeetupsOpen(true)
+            setAssistantOpen(false)
+          }}
+          onUseDraft={(draft) => {
+            setComposerDraft(draft)
+            setComposerRevision((current) => current + 1)
+            setAssistantOpen(false)
+          }}
         />
       ) : null}
     </div>

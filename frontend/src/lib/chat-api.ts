@@ -67,6 +67,68 @@ export interface GroupMessagesResult {
   hasMore: boolean
 }
 
+export interface AssistantPreferences {
+  enabled: boolean
+  memoryResetAt?: string
+}
+
+export interface AssistantStartersData {
+  starters: string[]
+}
+
+export interface AssistantSummaryData {
+  summary: string
+  keyPoints: string[]
+  openQuestions: string[]
+}
+
+export interface AssistantGroupSummaryData {
+  summary: string
+  agreements: string[]
+  openQuestions: string[]
+  nextSteps: string[]
+}
+
+export interface AssistantActionCard {
+  id: string
+  type: 'time' | 'location' | 'todo' | 'meetup'
+  title: string
+  detail: string
+  timeText?: string
+  location?: string
+  todoText?: string
+  confidence: number
+}
+
+export interface AssistantActionsData {
+  cards: AssistantActionCard[]
+}
+
+export type AssistantArtifactType = 'starters' | 'summary' | 'group_summary' | 'actions'
+
+export interface AssistantArtifact {
+  id: number
+  artifactType: AssistantArtifactType
+  data:
+    | AssistantStartersData
+    | AssistantSummaryData
+    | AssistantGroupSummaryData
+    | AssistantActionsData
+  messageCutoffId: number
+  inferenceSource: 'model' | 'deterministic'
+  inferenceModel?: string
+  confidence: number
+  promptVersion: string
+  createdAt: string
+}
+
+export interface AssistantWorkspace {
+  preferences: AssistantPreferences
+  contextType: 'direct' | 'group'
+  contextId: number
+  artifacts: AssistantArtifact[]
+}
+
 export function fetchConversations() {
   return apiRequest<ConversationItem[]>('/conversations', { auth: true })
 }
@@ -177,6 +239,57 @@ export function markGroupRead(groupId: number) {
 
 export function fetchUnreadCount() {
   return apiRequest<{ unreadCount: number }>('/conversations/unread-count', {
+    auth: true,
+  })
+}
+
+function assistantContextPath(kind: 'direct' | 'group', contextId: number) {
+  return kind === 'group'
+    ? `/chat-groups/${contextId}/assistant`
+    : `/conversations/${contextId}/assistant`
+}
+
+export function fetchAssistantWorkspace(kind: 'direct' | 'group', contextId: number) {
+  return apiRequest<AssistantWorkspace>(assistantContextPath(kind, contextId), { auth: true })
+}
+
+export function generateAssistantArtifact(
+  kind: 'direct' | 'group',
+  contextId: number,
+  artifactType: 'starters' | 'summary' | 'actions',
+) {
+  return apiRequest<AssistantArtifact>(
+    `${assistantContextPath(kind, contextId)}/${artifactType}`,
+    { method: 'POST', auth: true },
+  )
+}
+
+export function deleteAssistantArtifact(
+  kind: 'direct' | 'group',
+  contextId: number,
+  artifactId: number,
+) {
+  return apiRequest<null>(
+    `${assistantContextPath(kind, contextId)}/artifacts/${artifactId}`,
+    { method: 'DELETE', auth: true },
+  )
+}
+
+export function fetchAssistantPreferences() {
+  return apiRequest<AssistantPreferences>('/assistant/preferences', { auth: true })
+}
+
+export function updateAssistantPreferences(enabled: boolean) {
+  return apiRequest<AssistantPreferences>('/assistant/preferences', {
+    method: 'PUT',
+    auth: true,
+    body: { enabled },
+  })
+}
+
+export function resetAssistantMemory() {
+  return apiRequest<AssistantPreferences>('/assistant/reset', {
+    method: 'POST',
     auth: true,
   })
 }

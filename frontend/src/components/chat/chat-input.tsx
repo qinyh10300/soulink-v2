@@ -4,10 +4,11 @@ import { useState } from 'react'
 interface Props {
   onSend: (content: string) => void
   disabled?: boolean
+  initialText?: string
 }
 
-export function ChatInput({ onSend, disabled }: Props) {
-  const [text, setText] = useState('')
+export function ChatInput({ onSend, disabled, initialText = '' }: Props) {
+  const [text, setText] = useState(initialText)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
