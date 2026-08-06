@@ -70,8 +70,10 @@ type SafetyConfig struct {
 }
 
 type DemoConfig struct {
-	Enabled  bool
-	Password string
+	Enabled       bool
+	Password      string
+	AdminEmail    string
+	AdminPassword string
 }
 
 func Load() (Config, error) {
@@ -172,8 +174,10 @@ func Load() (Config, error) {
 			AdminEmails: normalizeEmails(splitCSV(envString("ADMIN_EMAILS", ""))),
 		},
 		Demo: DemoConfig{
-			Enabled:  demoEnabled,
-			Password: envString("DEMO_SEED_PASSWORD", "Soulink2026!"),
+			Enabled:       demoEnabled,
+			Password:      envString("DEMO_SEED_PASSWORD", "Soulink2026!"),
+			AdminEmail:    strings.ToLower(envString("DEMO_ADMIN_EMAIL", "")),
+			AdminPassword: envString("DEMO_ADMIN_PASSWORD", ""),
 		},
 	}, nil
 }

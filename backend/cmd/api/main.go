@@ -61,8 +61,10 @@ func main() {
 			os.Exit(1)
 		}
 		seedResult, err := demoseed.Ensure(ctx, dataStore, demoseed.Config{
-			Password:   cfg.Demo.Password,
-			BCryptCost: cfg.Auth.BCryptCost,
+			Password:      cfg.Demo.Password,
+			AdminEmail:    cfg.Demo.AdminEmail,
+			AdminPassword: cfg.Demo.AdminPassword,
+			BCryptCost:    cfg.Auth.BCryptCost,
 		})
 		if err != nil {
 			logger.Error("seed local demo workspace", "error", err)
@@ -71,6 +73,7 @@ func main() {
 		logger.Info(
 			"local demo workspace ready",
 			"email", demoseed.DemoEmail,
+			"admin_email", cfg.Demo.AdminEmail,
 			"users_created", seedResult.UsersCreated,
 			"intents_created", seedResult.IntentsCreated,
 			"rooms_created", seedResult.RoomsCreated,
@@ -124,7 +127,11 @@ func main() {
 	profileService := profile.NewService(dataStore)
 	playgroundService := playground.NewService(dataStore)
 	connectionService := connection.NewService(dataStore, connection.NewInterpreter())
-	safetyService := safety.NewService(dataStore, cfg.Safety.AdminEmails)
+	adminEmails := append([]string(nil), cfg.Safety.AdminEmails...)
+	if cfg.Demo.Enabled && cfg.Demo.AdminEmail != "" {
+		adminEmails = append(adminEmails, cfg.Demo.AdminEmail)
+	}
+	safetyService := safety.NewService(dataStore, adminEmails)
 	questionnaireService := questionnaire.NewService(
 		dataStore,
 		questionnaireCatalog,

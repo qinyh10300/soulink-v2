@@ -5,18 +5,22 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"soulink-backend/internal/school"
 	"soulink-backend/internal/store"
 )
 
 const DemoEmail = "demo@mails.tsinghua.edu.cn"
 
 type Config struct {
-	Password   string
-	BCryptCost int
+	Password      string
+	AdminEmail    string
+	AdminPassword string
+	BCryptCost    int
 }
 
 type Result struct {
@@ -137,6 +141,24 @@ var demoUsers = []userSeed{
 		Boundaries:         "运动节奏以安全和双方状态为先。",
 		AIPortrait:         "自驱、守时，适合有固定节奏的共同活动或边做边聊的技术协作。",
 	},
+}
+
+func demoAdminUser(email string) userSeed {
+	return userSeed{
+		Email:              email,
+		Nickname:           "Hack 管理员",
+		Department:         "SouLink 运营",
+		Grade:              "本地演示账号",
+		ContactValue:       "soulink_hack_admin",
+		Bio:                "用于本地验收、内容安全审核和完整产品流程测试的 SouLink 管理员账号。",
+		Skills:             []string{"产品运营", "内容安全", "用户研究"},
+		Interests:          []string{"校园连接", "AI 社交", "社区治理"},
+		Availability:       "本地验收期间",
+		PreferredScenes:    []string{"清华校内"},
+		CollaborationStyle: "以可复现的用户流程和明确的验收结果推进产品迭代。",
+		Boundaries:         "仅用于本地演示环境，不应出现在生产部署。",
+		AIPortrait:         "负责检查产品流程和社区安全状态的本地演示管理员。",
+	}
 }
 
 var demoIntents = []intentSeed{
@@ -303,6 +325,22 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 	if len(cfg.Password) < 8 || len(cfg.Password) > 72 {
 		return Result{}, errors.New("demo password must contain 8 to 72 bytes")
 	}
+	adminEmail := strings.ToLower(strings.TrimSpace(cfg.AdminEmail))
+	adminPassword := cfg.AdminPassword
+	if (adminEmail == "") != (adminPassword == "") {
+		return Result{}, errors.New("demo admin email and password must be configured together")
+	}
+	if adminEmail != "" {
+		if !school.SupportsEmail(adminEmail) {
+			return Result{}, errors.New("demo admin email must use a supported Tsinghua domain")
+		}
+		if adminEmail == DemoEmail {
+			return Result{}, errors.New("demo admin email must differ from the standard demo email")
+		}
+		if len(adminPassword) < 8 || len(adminPassword) > 72 {
+			return Result{}, errors.New("demo admin password must contain 8 to 72 bytes")
+		}
+	}
 	if dataStore == nil {
 		return Result{}, errors.New("demo seed store is nil")
 	}
@@ -313,12 +351,38 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 	if err != nil {
 		return Result{}, fmt.Errorf("hash demo password: %w", err)
 	}
+	adminPasswordHash := ""
+	if adminEmail != "" {
+		hash, hashErr := bcrypt.GenerateFromPassword(
+			[]byte(adminPassword),
+			cfg.BCryptCost,
+		)
+		if hashErr != nil {
+			return Result{}, fmt.Errorf("hash demo admin password: %w", hashErr)
+		}
+		adminPasswordHash = string(hash)
+	}
 
 	now := time.Now().UTC()
 	result := Result{}
-	users := make(map[string]store.User, len(demoUsers))
+	users := make(map[string]store.User, len(demoUsers)+1)
 	for _, seed := range demoUsers {
 		user, created, err := ensureUser(ctx, dataStore, seed, string(passwordHash), now)
+		if err != nil {
+			return Result{}, err
+		}
+		if created {
+			result.UsersCreated++
+		}
+		users[seed.Email] = user
+
+		if err := ensureMatchingProfile(ctx, dataStore, user.ID, seed, now); err != nil {
+			return Result{}, err
+		}
+	}
+	if adminEmail != "" {
+		seed := demoAdminUser(adminEmail)
+		user, created, err := ensureUser(ctx, dataStore, seed, adminPasswordHash, now)
 		if err != nil {
 			return Result{}, err
 		}

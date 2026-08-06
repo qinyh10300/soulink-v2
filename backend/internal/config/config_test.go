@@ -198,7 +198,7 @@ func TestLoadReadsSafetyAdminEmails(t *testing.T) {
 func TestLoadReadsDemoConfig(t *testing.T) {
 	dir := t.TempDir()
 	envPath := filepath.Join(dir, ".env")
-	contents := "DEMO_SEED_ENABLED=true\nDEMO_SEED_PASSWORD=local-password\n"
+	contents := "DEMO_SEED_ENABLED=true\nDEMO_SEED_PASSWORD=local-password\nDEMO_ADMIN_EMAIL=Hack@Mails.Tsinghua.Edu.Cn\nDEMO_ADMIN_PASSWORD=local-admin-password\n"
 	if err := os.WriteFile(envPath, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write .env: %v", err)
 	}
@@ -220,5 +220,11 @@ func TestLoadReadsDemoConfig(t *testing.T) {
 	}
 	if cfg.Demo.Password != "local-password" {
 		t.Fatalf("Demo.Password = %q", cfg.Demo.Password)
+	}
+	if cfg.Demo.AdminEmail != "hack@mails.tsinghua.edu.cn" {
+		t.Fatalf("Demo.AdminEmail = %q", cfg.Demo.AdminEmail)
+	}
+	if cfg.Demo.AdminPassword != "local-admin-password" {
+		t.Fatalf("Demo.AdminPassword = %q", cfg.Demo.AdminPassword)
 	}
 }

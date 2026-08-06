@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AnimatePresence, motion } from 'framer-motion'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, ShieldCheck, UserRound } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -24,14 +24,44 @@ const panelTransition = {
 }
 
 const demoMode = import.meta.env.VITE_DEMO_MODE === 'true'
-const demoEmail = 'demo@mails.tsinghua.edu.cn'
-const demoPassword = 'Soulink2026!'
+
+interface DemoAccount {
+  id: 'member' | 'admin'
+  label: string
+  email: string
+  password: string
+  redirectTo: string
+}
+
+const configuredDemoAccounts = [
+  {
+    id: 'member',
+    label: '普通演示账号',
+    email: import.meta.env.VITE_DEMO_EMAIL ?? '',
+    password: import.meta.env.VITE_DEMO_PASSWORD ?? '',
+    redirectTo: '/home',
+  },
+  {
+    id: 'admin',
+    label: 'Hack 管理员',
+    email: import.meta.env.VITE_DEMO_ADMIN_EMAIL ?? '',
+    password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD ?? '',
+    redirectTo: '/admin/safety',
+  },
+] satisfies DemoAccount[]
+
+const demoAccounts = configuredDemoAccounts.filter(
+  (account) => account.email && account.password,
+)
 
 export function LoginForm() {
   const navigate = useNavigate()
   const [toastNotice, setToastNotice] = useState('')
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false)
   const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false)
+  const [quickLoginAccount, setQuickLoginAccount] = useState<DemoAccount['id'] | null>(
+    null,
+  )
 
   const {
     control,
@@ -52,15 +82,19 @@ export function LoginForm() {
     resolver: zodResolver(loginSchema),
   })
 
+  const authenticate = async (email: string, password: string, redirectTo: string) => {
+    const result = await login(email, password)
+
+    saveAuthenticatedUser(result.token, result.user)
+    resetDashboardAnnouncementSeen()
+    navigate(redirectTo)
+  }
+
   const onSubmit = async (values: LoginFormValues) => {
     setToastNotice('')
 
     try {
-      const result = await login(values.email, values.password)
-
-      saveAuthenticatedUser(result.token, result.user)
-      resetDashboardAnnouncementSeen()
-      navigate('/home')
+      await authenticate(values.email, values.password, '/home')
     } catch (error) {
       setToastNotice(getErrorMessage(error, '登录失败，请稍后重试'))
     }
@@ -88,13 +122,13 @@ export function LoginForm() {
     setIsAgreementModalOpen(false)
   }
 
-  const fillDemoAccount = () => {
-    setValue('email', demoEmail, {
+  const fillDemoAccount = (account: DemoAccount) => {
+    setValue('email', account.email, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     })
-    setValue('password', demoPassword, {
+    setValue('password', account.password, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
@@ -105,6 +139,19 @@ export function LoginForm() {
       shouldValidate: true,
     })
     clearErrors()
+  }
+
+  const handleQuickLogin = async (account: DemoAccount) => {
+    setToastNotice('')
+    setQuickLoginAccount(account.id)
+    fillDemoAccount(account)
+
+    try {
+      await authenticate(account.email, account.password, account.redirectTo)
+    } catch (error) {
+      setToastNotice(getErrorMessage(error, '快捷登录失败，请稍后重试'))
+      setQuickLoginAccount(null)
+    }
   }
 
   const currentEmail = watch('email')
@@ -138,26 +185,42 @@ export function LoginForm() {
           </div>
         </div>
 
-        {demoMode ? (
-          <section className="flex items-center gap-3 rounded-lg border border-[#cbd8ff] bg-[#f4f7ff] p-3">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#1447e6]">
-              <KeyRound size={17} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-semibold text-[#243a75]">
-                本地演示账号
-              </span>
-              <span className="mt-0.5 block truncate font-mono text-[10px] text-[#66729a]">
-                {demoEmail} · {demoPassword}
-              </span>
-            </span>
-            <button
-              className="h-8 shrink-0 rounded-md border border-[#b8c8f5] bg-white px-3 text-[11px] font-semibold text-[#1447e6] hover:bg-[#eff4ff]"
-              onClick={fillDemoAccount}
-              type="button"
-            >
-              填入账号
-            </button>
+        {demoMode && demoAccounts.length > 0 ? (
+          <section className="rounded-lg border border-[#cbd8ff] bg-[#f4f7ff] p-3">
+            <div className="mb-2 flex items-center gap-2 text-[#243a75]">
+              <KeyRound size={15} />
+              <span className="text-xs font-semibold">本地快捷登录</span>
+            </div>
+            <div className="divide-y divide-[#dbe3f8]">
+              {demoAccounts.map((account) => {
+                const AccountIcon = account.id === 'admin' ? ShieldCheck : UserRound
+                const isLoggingIn = quickLoginAccount === account.id
+
+                return (
+                  <div className="flex min-w-0 items-center gap-3 py-2.5" key={account.id}>
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-[#1447e6]">
+                      <AccountIcon size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-[#243a75]">
+                        {account.label}
+                      </span>
+                      <span className="mt-0.5 block break-all font-mono text-[10px] leading-4 text-[#66729a]">
+                        {account.email} · {account.password}
+                      </span>
+                    </span>
+                    <button
+                      className="h-8 w-[76px] shrink-0 rounded-md border border-[#b8c8f5] bg-white text-[11px] font-semibold text-[#1447e6] hover:bg-[#eff4ff] disabled:cursor-wait disabled:opacity-60"
+                      disabled={quickLoginAccount !== null || isSubmitting}
+                      onClick={() => void handleQuickLogin(account)}
+                      type="button"
+                    >
+                      {isLoggingIn ? '登录中...' : '一键登录'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           </section>
         ) : null}
 
@@ -214,7 +277,7 @@ export function LoginForm() {
               >
                 <div className="overflow-hidden">
                   <ForgotPasswordPanel
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || quickLoginAccount !== null}
                     email={currentEmail}
                     onEmailInvalid={handleForgotPasswordEmailInvalid}
                     onEmailValid={handleForgotPasswordEmailValid}
@@ -260,7 +323,7 @@ export function LoginForm() {
               buttonVariants({ size: 'lg' }),
               'mt-2 w-full rounded-md bg-[#1447e6] text-white hover:bg-[#103bc4]',
             )}
-            disabled={!isValid || isSubmitting}
+            disabled={!isValid || isSubmitting || quickLoginAccount !== null}
             type="submit"
           >
             {isSubmitting ? '登录中...' : '登录'}
