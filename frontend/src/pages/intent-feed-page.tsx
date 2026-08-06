@@ -27,6 +27,7 @@ import {
   type ConnectionIntent,
   type IntentCategory,
 } from '@/lib/connection-api'
+import { connectionPaths } from '@/lib/connection-routes'
 import { cn } from '@/lib/utils'
 
 const filters: Array<{ value: IntentCategory | ''; label: string }> = [
@@ -139,14 +140,14 @@ export function IntentFeedPage() {
             <Filter size={13} />
             CAMPUS NOW
           </p>
-          <h1 className="mt-1 text-2xl font-semibold text-[#292724]">校园意图</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-[#292724]">校园邀请</h1>
           <p className="mt-1 text-sm text-[#77736c]">
             清华园里，正在发生的具体邀请。
           </p>
         </div>
         <Link
           className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-md bg-[#263b35] px-4 text-sm font-semibold text-white hover:bg-[#1d302a]"
-          to="/intents/new"
+          to={connectionPaths.newIntent}
         >
           <Sparkles size={16} />
           让 AI 帮我找
@@ -198,6 +199,9 @@ export function IntentFeedPage() {
               {filter.label}
             </button>
           ))}
+          <span className="ml-1 inline-flex h-8 items-center px-2 text-[11px] text-[#8a867f]">
+            本轮 {intents.length} 条
+          </span>
         </div>
       </div>
 
@@ -337,6 +341,14 @@ export function IntentFeedPage() {
                 />
               )
             })}
+            {mode === 'campus' ? (
+              <div className="flex flex-col items-center justify-center border-t border-[#e6e2dc] py-6 text-center">
+                <p className="text-xs font-semibold text-[#55514c]">本轮邀请已看完</p>
+                <p className="mt-1 text-[11px] text-[#817d76]">
+                  下一步留给表达兴趣、收藏，或发起自己的邀请。
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-[#d7d2cb] px-6 text-center">

@@ -20,6 +20,7 @@ const (
 	maxIntentShortTextLength   = 200
 	maxInterestMessageLength   = 500
 	maxRoomMessageLength       = 1000
+	connectionFeedSessionLimit = 12
 )
 
 type Service struct {
@@ -310,7 +311,7 @@ func (s *Service) ListFeed(ctx context.Context, userID int64, category string) (
 	if category != "" && !validCategory(category) {
 		return nil, invalidParams("未知的意图类别")
 	}
-	intents, err := s.store.ListFeedConnectionIntents(ctx, nil, userID, category, 24)
+	intents, err := s.store.ListFeedConnectionIntents(ctx, nil, userID, category, connectionFeedSessionLimit)
 	if err != nil {
 		return nil, httpapi.InternalError(err)
 	}

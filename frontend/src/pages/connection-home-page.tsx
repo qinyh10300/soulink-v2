@@ -3,10 +3,12 @@ import {
   CalendarCheck2,
   ChevronRight,
   Clock3,
+  MessageSquareReply,
   MapPin,
   PanelLeftClose,
   PanelRightClose,
   RotateCcw,
+  RefreshCw,
   Send,
   Sparkles,
   UsersRound,
@@ -35,6 +37,12 @@ import {
   type IntentCategory,
   type MatchRoom,
 } from "@/lib/connection-api";
+import {
+  connectionIntentPath,
+  connectionPaths,
+  connectionRoomPath,
+} from "@/lib/connection-routes";
+import { fetchMeetups, type Meetup } from "@/lib/meetup-api";
 import { getStoredUserProfile } from "@/lib/user-profile-storage";
 
 const starters: Array<{
@@ -96,41 +104,38 @@ function formatRefreshTime(value?: string) {
   }).format(new Date(value));
 }
 
-function DailyRecommendationList({
-  daily,
-  mobile = false,
-}: {
-  daily: DailyRecommendations;
-  mobile?: boolean;
-}) {
+function meetupPath(meetup: Meetup) {
+  if (meetup.context.type === "match_room") {
+    return connectionRoomPath(meetup.context.id);
+  }
+  if (meetup.context.type === "group") {
+    return `/chat/group/${meetup.context.id}`;
+  }
+  return `/chat/direct/${meetup.context.id}`;
+}
+
+function DailyRecommendationList({ daily }: { daily: DailyRecommendations }) {
   if (daily.items.length === 0) {
     return null;
   }
 
   return (
-    <section
-      className={
-        mobile
-          ? "mt-8 w-full max-w-2xl border-t border-[#dedad4] pt-5 text-left xl:hidden"
-          : "border-b border-[#e2dfd9] px-5 py-5"
-      }
-    >
+    <section className="border-t border-[#dedad4] pt-6 text-left">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold text-[#5f5b55]">今日精选</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-[#34312e]">每日精选</h3>
+          <p className="mt-0.5 text-[11px] text-[#817d76]">今天只看这 3 个连接机会</p>
+        </div>
         {daily.refreshAt ? (
           <span className="text-[10px] text-[#8a867f]">
             {formatRefreshTime(daily.refreshAt)} 更新
           </span>
         ) : null}
       </div>
-      <div className={mobile ? "mt-3 grid gap-2 sm:grid-cols-3" : "mt-3 space-y-4"}>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
         {daily.items.map((recommendation, index) => (
           <article
-            className={
-              mobile
-                ? "min-w-0 rounded-md border border-[#dedad4] bg-[#fbfaf8] p-3"
-                : "min-w-0 border-l-2 border-[#b9cbc4] pl-3"
-            }
+            className="min-w-0 rounded-md border border-[#dedad4] bg-[#fbfaf8] p-3 transition-colors hover:border-[#aebdb7] hover:bg-white"
             key={recommendation.intent.id}
           >
             <div className="flex items-start gap-2">
@@ -139,7 +144,7 @@ function DailyRecommendationList({
               </span>
               <Link
                 className="min-w-0 flex-1 truncate text-xs font-semibold text-[#45413d] hover:text-[#315c4d]"
-                to={`/intents/${recommendation.intent.id}`}
+                to={connectionIntentPath(recommendation.intent.id)}
               >
                 {recommendation.intent.title}
               </Link>
@@ -170,8 +175,11 @@ export function ConnectionHomePage() {
   const [feed, setFeed] = useState<ConnectionIntent[]>([]);
   const [myIntents, setMyIntents] = useState<ConnectionIntent[]>([]);
   const [rooms, setRooms] = useState<MatchRoom[]>([]);
+  const [meetups, setMeetups] = useState<Meetup[]>([]);
   const [dailyRecommendations, setDailyRecommendations] =
     useState<DailyRecommendations | null>(null);
+  const [dailyUnavailable, setDailyUnavailable] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const isWideWorkspace = useMediaQuery("(min-width: 1280px)");
@@ -201,12 +209,16 @@ export function ConnectionHomePage() {
     const load = async () => {
       setLoading(true);
       setNotice("");
-      const [feedResult, intentsResult, roomsResult, dailyResult] =
+      setDailyUnavailable(false);
+      const now = new Date();
+      const meetupEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const [feedResult, intentsResult, roomsResult, dailyResult, meetupResult] =
         await Promise.allSettled([
           fetchIntentFeed(),
           fetchMyIntents(),
           fetchMatchRooms(),
           fetchDailyRecommendations(),
+          fetchMeetups(undefined, now, meetupEnd),
         ]);
 
       if (cancelled) {
@@ -223,15 +235,20 @@ export function ConnectionHomePage() {
       setFeed(nextFeed);
       setMyIntents(nextIntents);
       setRooms(nextRooms);
+      setMeetups(
+        meetupResult.status === "fulfilled" ? meetupResult.value : [],
+      );
       setDailyRecommendations(
         dailyResult.status === "fulfilled" ? dailyResult.value : null,
       );
+      setDailyUnavailable(dailyResult.status === "rejected");
 
       if (
         feedResult.status === "rejected" &&
         intentsResult.status === "rejected" &&
         roomsResult.status === "rejected" &&
-        dailyResult.status === "rejected"
+        dailyResult.status === "rejected" &&
+        meetupResult.status === "rejected"
       ) {
         setNotice(getErrorMessage(feedResult.reason, "首页暂时无法加载"));
       }
@@ -242,11 +259,11 @@ export function ConnectionHomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const startConversation = (value = query) => {
     const text = value.trim();
-    navigate("/intents/new", {
+    navigate(connectionPaths.newIntent, {
       state: text ? { text } : undefined,
     });
   };
@@ -267,6 +284,16 @@ export function ConnectionHomePage() {
   const activeIntents = myIntents.filter(
     (intent) => intent.status === "active",
   );
+  const pendingMeetups = meetups
+    .filter((meetup) =>
+      ["proposed", "confirmed", "reschedule_requested"].includes(
+        meetup.status,
+      ),
+    )
+    .sort(
+      (left, right) =>
+        new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime(),
+    );
   const upcomingRoom = rooms
     .filter((room) => room.status === "open")
     .sort((left, right) => {
@@ -278,6 +305,57 @@ export function ConnectionHomePage() {
         : Number.MAX_SAFE_INTEGER;
       return leftTime - rightTime;
     })[0];
+  const responseMeetup = pendingMeetups.find((meetup) => meetup.canRespond);
+  const intentWithResponses = [...activeIntents]
+    .filter((intent) => intent.interestCount > 0)
+    .sort((left, right) => right.interestCount - left.interestCount)[0];
+  const roomNeedsPlan = rooms.find(
+    (room) => room.status === "open" && (!room.scheduledAt || !room.selectedPlace),
+  );
+  const currentTask = responseMeetup
+    ? {
+        kind: "meetup" as const,
+        eyebrow: "等待你的回应",
+        title: responseMeetup.title,
+        description: responseMeetup.reminder.text,
+        action: "查看约见",
+        to: meetupPath(responseMeetup),
+      }
+    : intentWithResponses
+      ? {
+          kind: "response" as const,
+          eyebrow: `${intentWithResponses.interestCount} 个新回应`,
+          title: intentWithResponses.title,
+          description: "先看附言和相关资料，再决定是否愿意认识。",
+          action: "处理回应",
+          to: connectionIntentPath(intentWithResponses.id),
+        }
+      : roomNeedsPlan
+        ? {
+            kind: "room" as const,
+            eyebrow: "双方已经同意",
+            title: `和 ${roomNeedsPlan.other.nickname} 确认见面安排`,
+            description: roomNeedsPlan.intentTitle,
+            action: "进入房间",
+            to: connectionRoomPath(roomNeedsPlan.id),
+          }
+        : activeIntents[0]
+          ? {
+              kind: "intent" as const,
+              eyebrow: "正在寻找",
+              title: activeIntents[0].title,
+              description: "查看本轮推荐，或补充更具体的时间与地点。",
+              action: "查看进展",
+              to: connectionIntentPath(activeIntents[0].id),
+            }
+          : {
+              kind: "start" as const,
+              eyebrow: "开始一次具体连接",
+              title: "今天想认识谁？",
+              description: "从一起吃饭、学习、运动或做项目开始。",
+              action: "开始描述",
+              to: connectionPaths.newIntent,
+            };
 
   const resetHomeLayout = () => {
     homeLayout.reset();
@@ -306,7 +384,7 @@ export function ConnectionHomePage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold text-[#292724]">
-              SouLink 助手
+              认识
             </h1>
             <span className="h-1.5 w-1.5 rounded-full bg-[#4f846f]" />
           </div>
@@ -316,11 +394,11 @@ export function ConnectionHomePage() {
         </div>
 
         <div className="flex items-center gap-3 text-[11px] text-[#77736c] xl:hidden">
-          <Link className="hover:text-[#315c4d]" to="/intents">
+          <Link className="hover:text-[#315c4d]" to={connectionPaths.intents}>
             {activeIntents.length} 个意图
           </Link>
           <span className="h-3 w-px bg-[#d6d2cb]" />
-          <Link className="hover:text-[#315c4d]" to="/matches">
+          <Link className="hover:text-[#315c4d]" to={connectionPaths.rooms}>
             {rooms.filter((room) => room.status === "open").length} 个连接
           </Link>
         </div>
@@ -350,59 +428,166 @@ export function ConnectionHomePage() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center px-5 py-8 text-center sm:px-8">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#263b35] text-white">
-            <Sparkles size={19} strokeWidth={1.8} />
-          </span>
-          <h2 className="mt-5 max-w-xl text-2xl font-semibold leading-tight text-[#262421] sm:text-[32px]">
-            {profile.nickname
-              ? `${profile.nickname}，今天想认识谁？`
-              : "今天想认识谁？"}
-          </h2>
-          <p className="mt-3 max-w-md text-sm leading-6 text-[#77736c]">
-            从一件具体的事开始，说一句就够了。
-          </p>
-
-          <div className="mt-8 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
-            {starters.map(({ category, label, prompt }) => {
-              const meta = intentCategoryMeta[category];
-              const Icon = meta.icon;
-              return (
-                <button
-                  className="group flex min-h-14 items-center gap-3 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-3 py-2.5 text-left transition-colors hover:border-[#9eaea8] hover:bg-white"
-                  key={category}
-                  onClick={() => startConversation(prompt)}
-                  type="button"
-                >
-                  <span
-                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${meta.surfaceClassName}`}
-                  >
-                    <Icon className={meta.iconClassName} size={15} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-semibold text-[#45413d]">
-                      {label}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-[#817d76]">
-                      {prompt}
-                    </span>
-                  </span>
-                  <ArrowRight
-                    className="shrink-0 text-[#a19c94] transition-transform group-hover:translate-x-0.5 group-hover:text-[#477062]"
-                    size={15}
-                  />
-                </button>
-              );
-            })}
+        <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-8 sm:py-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium text-[#527164]">
+                {formatCampusDate()} · 清华园
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold leading-tight text-[#262421]">
+                {profile.nickname ? `${profile.nickname}，今天先做这一件事` : "今天先做这一件事"}
+              </h2>
+            </div>
+            <Link
+              aria-label="开始新的寻找"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#cfd7d3] text-[#315c4d] hover:bg-[#eaf1ed]"
+              title="开始新的寻找"
+              to={connectionPaths.newIntent}
+            >
+              <Sparkles size={16} />
+            </Link>
           </div>
 
+          {loading ? (
+            <div className="mt-5 flex min-h-32 items-center justify-center border-y border-[#dedad4] text-sm text-[#77736c]">
+              正在整理今天的连接进度...
+            </div>
+          ) : (
+            <Link
+              className="group mt-5 flex min-h-32 items-start gap-4 border-y border-[#ccd5d1] bg-[#f0f5f2] px-4 py-5 transition-colors hover:bg-[#eaf2ee] sm:px-5"
+              to={currentTask.to}
+            >
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#315c4d] text-white">
+                {currentTask.kind === "meetup" ? (
+                  <CalendarCheck2 size={18} />
+                ) : currentTask.kind === "response" ? (
+                  <MessageSquareReply size={18} />
+                ) : (
+                  <Sparkles size={18} />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="text-[11px] font-semibold text-[#527164]">
+                  {currentTask.eyebrow}
+                </span>
+                <span className="mt-1 block text-base font-semibold leading-6 text-[#303b36]">
+                  {currentTask.title}
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-[#67736d]">
+                  {currentTask.description}
+                </span>
+              </span>
+              <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#315c4d]">
+                {currentTask.action}
+                <ArrowRight
+                  className="transition-transform group-hover:translate-x-0.5"
+                  size={14}
+                />
+              </span>
+            </Link>
+          )}
+
           {dailyRecommendations ? (
-            <DailyRecommendationList daily={dailyRecommendations} mobile />
+            <div className="mt-7">
+              <DailyRecommendationList daily={dailyRecommendations} />
+            </div>
+          ) : dailyUnavailable && !loading ? (
+            <div className="mt-7 flex items-center justify-between gap-3 border-t border-[#dedad4] py-5">
+              <p className="text-xs text-[#80665c]">每日精选暂时没有同步</p>
+              <button
+                aria-label="重新加载每日精选"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#527164] hover:bg-[#eaf1ed]"
+                onClick={() => setReloadKey((value) => value + 1)}
+                title="重新加载"
+                type="button"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           ) : null}
 
-          {notice ? (
-            <p className="mt-5 text-xs text-[#8c463d]">{notice}</p>
+          {pendingMeetups.length > 0 ? (
+            <section className="mt-7 border-t border-[#dedad4] pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#34312e]">待确认约见</h3>
+                  <p className="mt-0.5 text-[11px] text-[#817d76]">
+                    {pendingMeetups.length} 个安排仍在进行中
+                  </p>
+                </div>
+                <Link
+                  className="text-xs font-semibold text-[#477062]"
+                  to="/calendar"
+                >
+                  时间表
+                </Link>
+              </div>
+              <div className="mt-3 divide-y divide-[#e4e1dc] border-y border-[#e4e1dc]">
+                {pendingMeetups.slice(0, 3).map((meetup) => (
+                  <Link
+                    className="flex items-center gap-3 py-3.5"
+                    key={meetup.id}
+                    to={meetupPath(meetup)}
+                  >
+                    <CalendarCheck2 className="shrink-0 text-[#5b3477]" size={16} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-semibold text-[#45413d]">
+                        {meetup.title}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] text-[#817d76]">
+                        {formatMeetingTime(meetup.startsAt)} · {meetup.location}
+                      </span>
+                    </span>
+                    {meetup.canRespond ? (
+                      <span className="shrink-0 rounded-md bg-[#f1eaf4] px-2 py-1 text-[10px] font-semibold text-[#5b3477]">
+                        待回应
+                      </span>
+                    ) : (
+                      <ChevronRight className="shrink-0 text-[#a19c94]" size={14} />
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </section>
           ) : null}
+
+          <section className="mt-7 border-t border-[#dedad4] pt-6">
+            <h3 className="text-sm font-semibold text-[#34312e]">开始新的寻找</h3>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {starters.map(({ category, label, prompt }) => {
+                const meta = intentCategoryMeta[category];
+                const Icon = meta.icon;
+                return (
+                  <button
+                    className="group flex min-h-14 items-center gap-3 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-3 py-2.5 text-left transition-colors hover:border-[#9eaea8] hover:bg-white"
+                    key={category}
+                    onClick={() => startConversation(prompt)}
+                    type="button"
+                  >
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${meta.surfaceClassName}`}
+                    >
+                      <Icon className={meta.iconClassName} size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-[#45413d]">
+                        {label}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] text-[#817d76]">
+                        {prompt}
+                      </span>
+                    </span>
+                    <ArrowRight
+                      className="shrink-0 text-[#a19c94] transition-transform group-hover:translate-x-0.5 group-hover:text-[#477062]"
+                      size={15}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {notice ? <p className="mt-5 text-xs text-[#8c463d]">{notice}</p> : null}
         </div>
       </div>
 
@@ -461,7 +646,7 @@ export function ConnectionHomePage() {
           <h3 className="text-xs font-semibold text-[#5f5b55]">进行中的意图</h3>
           <Link
             className="text-[11px] font-medium text-[#477062]"
-            to="/intents"
+            to={connectionPaths.intents}
           >
             管理
           </Link>
@@ -472,7 +657,7 @@ export function ConnectionHomePage() {
               <Link
                 className="flex items-center gap-3 border-b border-[#ece9e4] py-3 last:border-b-0"
                 key={intent.id}
-                to={`/intents/${intent.id}`}
+                to={connectionIntentPath(intent.id)}
               >
                 <IntentCategoryIcon category={intent.category} size={14} />
                 <span className="min-w-0 flex-1">
@@ -492,22 +677,18 @@ export function ConnectionHomePage() {
         )}
       </section>
 
-      {dailyRecommendations ? (
-        <DailyRecommendationList daily={dailyRecommendations} />
-      ) : null}
-
       <section className="border-b border-[#e2dfd9] px-5 py-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xs font-semibold text-[#5f5b55]">下一次连接</h3>
           <Link
             className="text-[11px] font-medium text-[#477062]"
-            to="/matches"
+            to={connectionPaths.rooms}
           >
             全部
           </Link>
         </div>
         {upcomingRoom ? (
-          <Link className="mt-3 block" to={`/matches/${upcomingRoom.id}`}>
+          <Link className="mt-3 block" to={connectionRoomPath(upcomingRoom.id)}>
             <div className="flex items-center gap-3">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f1ed] text-[#356653]">
                 <CalendarCheck2 size={17} />
@@ -544,7 +725,7 @@ export function ConnectionHomePage() {
           <h3 className="text-xs font-semibold text-[#5f5b55]">校园此刻</h3>
           <Link
             className="text-[11px] font-medium text-[#477062]"
-            to="/discover"
+            to={connectionPaths.discover}
           >
             发现
           </Link>
@@ -555,7 +736,7 @@ export function ConnectionHomePage() {
               <Link
                 className="flex gap-2.5 border-b border-[#ece9e4] py-2.5 last:border-b-0"
                 key={intent.id}
-                to={`/intents/${intent.id}`}
+                to={connectionIntentPath(intent.id)}
               >
                 <UsersRound
                   className="mt-0.5 shrink-0 text-[#817d76]"
@@ -577,7 +758,7 @@ export function ConnectionHomePage() {
   );
 
   return (
-    <div className="h-[calc(100dvh_-_7.75rem_-_env(safe-area-inset-bottom))] overflow-hidden bg-[#f7f6f3] lg:h-screen">
+    <div className="h-[calc(100dvh_-_10.5rem_-_env(safe-area-inset-bottom))] overflow-hidden bg-[#f7f6f3] lg:h-screen">
       {isWideWorkspace ? (
         <Group
           className="h-full w-full"
