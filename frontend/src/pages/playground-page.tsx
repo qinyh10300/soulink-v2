@@ -1,4 +1,5 @@
 import {
+  CalendarPlus,
   ChevronDown,
   Heart,
   ImagePlus,
@@ -13,8 +14,14 @@ import {
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
+import {
+  CreatePlazaGroupInviteDialog,
+  PlazaGroupInviteDialog,
+  PlazaGroupInviteStrip,
+} from '@/components/playground/plaza-group-invite'
 import { getErrorMessage } from '@/lib/api'
 import {
+  applyToPlazaGroupInvite,
   createPlaygroundComment,
   createPlaygroundPost,
   fetchPlaygroundPosts,
@@ -207,6 +214,9 @@ export function PlaygroundPage() {
   const [notice, setNotice] = useState('正在加载树洞...')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [createInvitePostId, setCreateInvitePostId] = useState<number | null>(null)
+  const [activeInviteId, setActiveInviteId] = useState<number | null>(null)
+  const [inviteActionId, setInviteActionId] = useState<number | null>(null)
 
   const loadPosts = useCallback(async () => {
     try {
@@ -325,6 +335,20 @@ export function PlaygroundPage() {
       await loadPosts()
     } catch (error) {
       setNotice(getErrorMessage(error, '回复失败，请稍后重试'))
+    }
+  }
+
+  const handleApplyToInvite = async (inviteId: number) => {
+    try {
+      setInviteActionId(inviteId)
+      setNotice('')
+      await applyToPlazaGroupInvite(inviteId)
+      await loadPosts()
+      setActiveInviteId(inviteId)
+    } catch (error) {
+      setNotice(getErrorMessage(error, '申请失败，请稍后重试'))
+    } finally {
+      setInviteActionId(null)
     }
   }
 
@@ -527,6 +551,15 @@ export function PlaygroundPage() {
                     ) : null}
                   </div>
 
+                  {post.groupInvite ? (
+                    <PlazaGroupInviteStrip
+                      busy={inviteActionId === post.groupInvite.id}
+                      invite={post.groupInvite}
+                      onApply={() => void handleApplyToInvite(post.groupInvite!.id)}
+                      onOpen={() => setActiveInviteId(post.groupInvite!.id)}
+                    />
+                  ) : null}
+
                   <div className="flex items-center gap-1 border-t border-[#e0dfdb] px-3 py-2 text-sm text-[#666963]">
                     <button
                       aria-label={post.likedByMe ? '取消赞同' : '赞同树洞'}
@@ -545,6 +578,16 @@ export function PlaygroundPage() {
                       <MessageCircle className="h-4 w-4" />
                       {post.commentCount}
                     </span>
+                    {post.author.isMe && !post.groupInvite ? (
+                      <button
+                        className="ml-auto inline-flex h-8 items-center gap-1.5 rounded px-2 text-xs font-medium text-[#42675a] hover:bg-[#e5ebe7]"
+                        onClick={() => setCreateInvitePostId(post.id)}
+                        type="button"
+                      >
+                        <CalendarPlus className="h-4 w-4" />
+                        转为连接
+                      </button>
+                    ) : null}
                   </div>
 
                   <div className="border-t border-[#e0dfdb] bg-[#f5f5f2] px-4 py-3">
@@ -649,6 +692,25 @@ export function PlaygroundPage() {
           </div>
         </aside>
       </main>
+      {createInvitePostId ? (
+        <CreatePlazaGroupInviteDialog
+          onClose={() => setCreateInvitePostId(null)}
+          onCreated={(invite) => {
+            setCreateInvitePostId(null)
+            setActiveInviteId(invite.id)
+            void loadPosts()
+          }}
+          postId={createInvitePostId}
+        />
+      ) : null}
+      {activeInviteId ? (
+        <PlazaGroupInviteDialog
+          inviteId={activeInviteId}
+          key={activeInviteId}
+          onChanged={() => void loadPosts()}
+          onClose={() => setActiveInviteId(null)}
+        />
+      ) : null}
     </div>
   )
 }

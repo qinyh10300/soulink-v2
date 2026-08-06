@@ -40,6 +40,73 @@ export interface PlaygroundPost {
   likedByMe: boolean
   createdAt: string
   comments: PlaygroundComment[]
+  groupInvite?: PlazaGroupInviteSummary
+}
+
+export type PlazaGroupInviteType = 'event' | 'group'
+export type PlazaGroupRevealStrategy = 'on_accept' | 'on_form'
+export type PlazaGroupInviteStatus =
+  | 'open'
+  | 'formed'
+  | 'expired'
+  | 'archived'
+  | 'kept'
+  | 'cancelled'
+export type PlazaGroupApplicationStatus =
+  | 'applied'
+  | 'accepted'
+  | 'declined'
+  | 'waitlisted'
+  | 'left'
+
+export interface PlazaGroupIdentity {
+  alias: string
+  revealed: boolean
+  userId?: number
+  nickname?: string
+  department?: string
+  grade?: string
+}
+
+export interface PlazaGroupApplication {
+  id: number
+  status: PlazaGroupApplicationStatus
+  identity: PlazaGroupIdentity
+  createdAt: string
+}
+
+export interface PlazaGroupInviteSummary {
+  id: number
+  postId: number
+  inviteType: PlazaGroupInviteType
+  title: string
+  summary: string
+  extractedTime: string
+  extractedLocation: string
+  minMembers: number
+  maxMembers: number
+  memberCount: number
+  applicationCount: number
+  revealStrategy: PlazaGroupRevealStrategy
+  deadline: string
+  groupExpiresAt: string
+  status: PlazaGroupInviteStatus
+  isOwner: boolean
+  canApply: boolean
+  viewerApplicationStatus?: PlazaGroupApplicationStatus
+  inferenceSource: 'model' | 'deterministic'
+  inferenceConfidence: number
+  promptVersion: string
+}
+
+export interface PlazaGroupInvite extends PlazaGroupInviteSummary {
+  owner: PlazaGroupIdentity
+  applications: PlazaGroupApplication[]
+  chatGroupId?: number
+  canForm: boolean
+  canKeep: boolean
+  keepVotes: number
+  requiredKeepVotes: number
 }
 
 export interface PlaygroundLikeResult {
@@ -111,6 +178,73 @@ export function likePlaygroundComment(commentId: number) {
 export function unlikePlaygroundComment(commentId: number) {
   return apiRequest<PlaygroundLikeResult>(`/playground/comments/${commentId}/likes`, {
     method: 'DELETE',
+    auth: true,
+  })
+}
+
+export function createPlazaGroupInvite(input: {
+  postId: number
+  inviteType: PlazaGroupInviteType
+  title?: string
+  summary?: string
+  minMembers: number
+  maxMembers: number
+  revealStrategy: PlazaGroupRevealStrategy
+  deadline: string
+  groupExpiresAt: string
+}) {
+  return apiRequest<PlazaGroupInvite>(`/playground/posts/${input.postId}/group-invite`, {
+    method: 'POST',
+    auth: true,
+    body: {
+      inviteType: input.inviteType,
+      title: input.title ?? '',
+      summary: input.summary ?? '',
+      minMembers: input.minMembers,
+      maxMembers: input.maxMembers,
+      revealStrategy: input.revealStrategy,
+      deadline: input.deadline,
+      groupExpiresAt: input.groupExpiresAt,
+    },
+  })
+}
+
+export function fetchMyPlazaGroupInvites() {
+  return apiRequest<PlazaGroupInvite[]>('/playground/group-invites/mine', { auth: true })
+}
+
+export function fetchPlazaGroupInvite(inviteId: number) {
+  return apiRequest<PlazaGroupInvite>(`/playground/group-invites/${inviteId}`, { auth: true })
+}
+
+export function applyToPlazaGroupInvite(inviteId: number) {
+  return apiRequest<PlazaGroupInvite>(`/playground/group-invites/${inviteId}/applications`, {
+    method: 'POST',
+    auth: true,
+  })
+}
+
+export function respondToPlazaGroupApplication(
+  inviteId: number,
+  applicationId: number,
+  status: 'accepted' | 'declined',
+) {
+  return apiRequest<PlazaGroupInvite>(
+    `/playground/group-invites/${inviteId}/applications/${applicationId}`,
+    { method: 'PUT', auth: true, body: { status } },
+  )
+}
+
+export function formPlazaGroupInvite(inviteId: number) {
+  return apiRequest<PlazaGroupInvite>(`/playground/group-invites/${inviteId}/form`, {
+    method: 'POST',
+    auth: true,
+  })
+}
+
+export function keepPlazaGroupInvite(inviteId: number) {
+  return apiRequest<PlazaGroupInvite>(`/playground/group-invites/${inviteId}/keep`, {
+    method: 'POST',
     auth: true,
   })
 }
