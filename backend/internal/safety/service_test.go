@@ -111,6 +111,10 @@ func TestReportRiskSignalsAndSnapshotRemainStructured(t *testing.T) {
 			t.Fatalf("signals = %#v, missing %q", signals, expected)
 		}
 	}
+	coercionSignals := deriveReportRiskSignals("你必须单独见我，而且不许告诉别人")
+	if len(coercionSignals) != 1 || coercionSignals[0] != "coercion" {
+		t.Fatalf("coercion synonyms were not detected: %#v", coercionSignals)
+	}
 
 	record := store.SafetyReport{
 		ID: 8, ConversationID: sql.NullInt64{Int64: 12, Valid: true},

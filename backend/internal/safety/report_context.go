@@ -222,7 +222,7 @@ func deriveReportRiskSignals(values ...string) []string {
 		{name: "harassment", keywords: []string{"骚扰", "傻逼", "废物", "滚开", "恶心", "垃圾人"}},
 		{name: "threat", keywords: []string{"威胁", "打死", "弄死", "杀了", "报复", "你等着"}},
 		{name: "privacy", keywords: []string{"身份证", "住址", "宿舍号", "曝光", "人肉", "照片发出去"}},
-		{name: "coercion", keywords: []string{"不许拒绝", "必须来", "不来就", "别告诉别人", "强迫", "胁迫"}},
+		{name: "coercion", keywords: []string{"不许拒绝", "必须来", "必须单独", "不来就", "别告诉别人", "不许告诉", "强迫", "胁迫"}},
 	}
 	result := make([]string, 0, len(patterns))
 	for _, pattern := range patterns {
