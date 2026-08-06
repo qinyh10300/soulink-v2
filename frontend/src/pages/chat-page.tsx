@@ -1,7 +1,9 @@
 import {
   ArrowLeft,
   Check,
+  Columns3,
   MessageSquarePlus,
+  PanelLeftClose,
   Search,
   Trash2,
   UserPlus,
@@ -9,6 +11,12 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Group,
+  Panel,
+  useDefaultLayout,
+  usePanelRef,
+} from 'react-resizable-panels'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { ChatWindow } from '@/components/chat/chat-window'
@@ -16,7 +24,10 @@ import {
   ConversationList,
   type ChatThreadItem,
 } from '@/components/chat/conversation-list'
+import { WorkspaceEdgeButton } from '@/components/workspace/workspace-edge-button'
+import { WorkspaceResizeHandle } from '@/components/workspace/workspace-resize-handle'
 import { useChat } from '@/contexts/chat-context'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { getErrorMessage } from '@/lib/api'
 import {
   addGroupMembers,
@@ -360,6 +371,15 @@ export function ChatPage() {
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [groupInfoOpen, setGroupInfoOpen] = useState(false)
   const [notice, setNotice] = useState('')
+  const isSplitWorkspace = useMediaQuery('(min-width: 768px)')
+  const threadListPanelRef = usePanelRef()
+  const messagePanelRef = usePanelRef()
+  const [threadListCollapsed, setThreadListCollapsed] = useState(false)
+  const [messagePanelCollapsed, setMessagePanelCollapsed] = useState(false)
+  const chatLayout = useDefaultLayout({
+    id: 'soulink-chat-workbench-v1',
+    panelIds: ['thread-list', 'message'],
+  })
 
   const activeConversationId = conversationId ? Number(conversationId) : undefined
   const activeGroupId = groupId ? Number(groupId) : undefined
@@ -436,8 +456,20 @@ export function ChatPage() {
 
   const showList = !activeKey
 
-  return (
-    <div className="relative flex h-[calc(100dvh_-_7.75rem_-_env(safe-area-inset-bottom))] min-h-[520px] overflow-hidden bg-[#f2f3f1] lg:h-screen">
+  const resetChatLayout = () => {
+    threadListPanelRef.current?.expand()
+    messagePanelRef.current?.expand()
+    threadListPanelRef.current?.resize(330)
+  }
+
+  const collapseThreadList = () => {
+    if (messagePanelCollapsed) {
+      messagePanelRef.current?.expand()
+    }
+    threadListPanelRef.current?.collapse()
+  }
+
+  const threadListPanel = (
       <aside
         className={cn(
           'h-full w-full shrink-0 border-r border-[#d5d8d4] bg-[#f7f8f6] md:w-[330px]',
@@ -446,9 +478,34 @@ export function ChatPage() {
       >
         <header className="flex h-15 items-center border-b border-[#dfe1de] px-3">
           <h1 className="text-lg font-semibold text-[#292b28]">消息</h1>
+          {isSplitWorkspace ? (
+            <div className="ml-auto flex items-center gap-0.5">
+              <button
+                aria-label="恢复默认消息布局"
+                className="inline-flex h-8 w-8 items-center justify-center rounded text-[#777b76] hover:bg-[#e3e6e2] hover:text-[#315d4f] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#527b6d]"
+                onClick={resetChatLayout}
+                title="恢复默认消息布局"
+                type="button"
+              >
+                <Columns3 className="h-4 w-4" />
+              </button>
+              <button
+                aria-label="隐藏会话列表"
+                className="inline-flex h-8 w-8 items-center justify-center rounded text-[#777b76] hover:bg-[#e3e6e2] hover:text-[#315d4f] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#527b6d]"
+                onClick={collapseThreadList}
+                title="隐藏会话列表"
+                type="button"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
           <button
             aria-label="发起群聊"
-            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded text-[#555a55] hover:bg-[#e3e6e2]"
+            className={cn(
+              'inline-flex h-9 w-9 items-center justify-center rounded text-[#555a55] hover:bg-[#e3e6e2]',
+              isSplitWorkspace ? 'ml-0.5' : 'ml-auto',
+            )}
             onClick={() => setNewGroupOpen(true)}
             title="发起群聊"
             type="button"
@@ -521,8 +578,10 @@ export function ChatPage() {
           )}
         </div>
       </aside>
+  )
 
-      <section className={cn('min-w-0 flex-1', activeKey ? 'block' : 'hidden md:block')}>
+  const messagePanel = (
+      <section className={cn('h-full min-w-0 flex-1', activeKey ? 'block' : 'hidden md:block')}>
         {activeConversation ? (
           <div className="flex h-full flex-col">
             <button
@@ -580,6 +639,68 @@ export function ChatPage() {
           </div>
         )}
       </section>
+  )
+
+  return (
+    <div className="relative flex h-[calc(100dvh_-_7.75rem_-_env(safe-area-inset-bottom))] min-h-[520px] overflow-hidden bg-[#f2f3f1] lg:h-screen">
+      {isSplitWorkspace ? (
+        <Group
+          className="h-full w-full"
+          defaultLayout={chatLayout.defaultLayout}
+          id="soulink-chat-workbench"
+          onLayoutChanged={chatLayout.onLayoutChanged}
+          orientation="horizontal"
+          resizeTargetMinimumSize={{ coarse: 24, fine: 11 }}
+        >
+          <Panel
+            className="relative min-w-0"
+            collapsedSize={0}
+            collapsible
+            defaultSize={330}
+            groupResizeBehavior="preserve-pixel-size"
+            id="thread-list"
+            minSize={280}
+            onResize={({ inPixels }) => setThreadListCollapsed(inPixels < 1)}
+            panelRef={threadListPanelRef}
+          >
+            {threadListPanel}
+            {messagePanelCollapsed ? (
+              <WorkspaceEdgeButton
+                label="显示聊天内容"
+                onClick={() => messagePanelRef.current?.expand()}
+                side="right"
+              />
+            ) : null}
+          </Panel>
+
+          <WorkspaceResizeHandle label="调整会话列表与聊天内容宽度" />
+
+          <Panel
+            className="relative min-w-0"
+            collapsedSize={0}
+            collapsible
+            groupResizeBehavior="preserve-relative-size"
+            id="message"
+            minSize={360}
+            onResize={({ inPixels }) => setMessagePanelCollapsed(inPixels < 1)}
+            panelRef={messagePanelRef}
+          >
+            {messagePanel}
+            {threadListCollapsed ? (
+              <WorkspaceEdgeButton
+                label="显示会话列表"
+                onClick={() => threadListPanelRef.current?.expand()}
+                side="left"
+              />
+            ) : null}
+          </Panel>
+        </Group>
+      ) : (
+        <>
+          {threadListPanel}
+          {messagePanel}
+        </>
+      )}
 
       {notice ? (
         <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded bg-[#303330] px-4 py-2 text-sm text-white shadow-lg">
