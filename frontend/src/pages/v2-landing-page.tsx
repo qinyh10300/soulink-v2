@@ -455,7 +455,7 @@ export function V2LandingPage() {
                 <MessageCircle size={18} />
               </span>
               <p className="mt-6 text-xs font-semibold text-[#1447e6]">01 · 说出真实意图</p>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">从一句人话开始，而不是一堆标签</h2>
+              <h2 className="text-balance mt-3 text-3xl font-semibold leading-tight sm:text-4xl">从一句人话开始，而不是一堆标签</h2>
               <p className="mt-5 max-w-[520px] text-sm leading-7 text-[#71717a] sm:text-base sm:leading-8">
                 告诉 SouLink 你此刻为什么想认识一个人。AI 只追问真正影响结果的问题，并把模糊想法整理成清晰、可调整的连接意图。
               </p>
@@ -481,7 +481,7 @@ export function V2LandingPage() {
                 <Search size={18} />
               </span>
               <p className="mt-6 text-xs font-semibold text-[#1447e6]">02 · 理解每次推荐</p>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">少一点人选，多一点判断依据</h2>
+              <h2 className="text-balance mt-3 text-3xl font-semibold leading-tight sm:text-4xl">少一点人选，多一点判断依据</h2>
               <p className="mt-5 max-w-[520px] text-sm leading-7 text-[#71717a] sm:text-base sm:leading-8">
                 SouLink 不制造无限刷人的焦虑。每次最多给出三位候选，并说明共同目标、时间条件、匹配依据和仍需确认的地方。
               </p>
@@ -507,7 +507,7 @@ export function V2LandingPage() {
                 <ShieldCheck size={18} />
               </span>
               <p className="mt-6 text-xs font-semibold text-[#087a4d]">03 · 双方决定是否靠近</p>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">AI 做媒介，人做决定</h2>
+              <h2 className="text-balance mt-3 text-3xl font-semibold leading-tight sm:text-4xl">AI 做媒介，人做决定</h2>
               <p className="mt-5 max-w-[520px] text-sm leading-7 text-[#71717a] sm:text-base sm:leading-8">
                 连接邀请、进入房间、交换联系方式，每一步都需要明确同意。双方愿意后，AI 再协助把见面变成一个具体、自然的校园计划。
               </p>
