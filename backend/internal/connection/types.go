@@ -82,10 +82,38 @@ type IntentInput struct {
 }
 
 type AuthorPreview struct {
+	UserID     int64  `json:"userId,omitempty"`
 	Nickname   string `json:"nickname"`
 	Department string `json:"department"`
 	Grade      string `json:"grade"`
 	Verified   bool   `json:"verified"`
+}
+
+type ContextProfileIntent struct {
+	ID              int64  `json:"id"`
+	Category        string `json:"category"`
+	Title           string `json:"title"`
+	Goal            string `json:"goal"`
+	TimeWindow      string `json:"timeWindow"`
+	Location        string `json:"location"`
+	DesiredNextStep string `json:"desiredNextStep"`
+}
+
+type ContextProfileView struct {
+	UserID             int64                `json:"userId"`
+	Nickname           string               `json:"nickname"`
+	SchoolName         string               `json:"schoolName"`
+	Department         string               `json:"department,omitempty"`
+	Grade              string               `json:"grade,omitempty"`
+	Verified           bool                 `json:"verified"`
+	Bio                string               `json:"bio,omitempty"`
+	Skills             []string             `json:"skills,omitempty"`
+	Interests          []string             `json:"interests,omitempty"`
+	Availability       string               `json:"availability,omitempty"`
+	PreferredScenes    []string             `json:"preferredScenes,omitempty"`
+	CollaborationStyle string               `json:"collaborationStyle,omitempty"`
+	VisibleFields      []string             `json:"visibleFields"`
+	Intent             ContextProfileIntent `json:"intent"`
 }
 
 type IntentView struct {

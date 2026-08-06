@@ -143,8 +143,18 @@ func TestRomanticIntentPreviewHidesIdentityBeforeConsent(t *testing.T) {
 	if preview.Author.Nickname != "一位同学" {
 		t.Fatalf("preview nickname = %q, want anonymized label", preview.Author.Nickname)
 	}
+	if preview.Author.UserID != 0 {
+		t.Fatalf("preview author id = %d, want hidden", preview.Author.UserID)
+	}
 	if len(preview.DealBreakers) != 0 {
 		t.Fatalf("preview deal breakers = %#v, want hidden", preview.DealBreakers)
+	}
+
+	accepted := record
+	accepted.InterestState = "accepted"
+	acceptedView := toIntentView(accepted, 99)
+	if acceptedView.Author.UserID != 42 || acceptedView.Author.Nickname != "真实昵称" {
+		t.Fatalf("accepted author = %#v, want consented identity", acceptedView.Author)
 	}
 
 	ownerView := toIntentView(record, 42)
@@ -153,6 +163,52 @@ func TestRomanticIntentPreviewHidesIdentityBeforeConsent(t *testing.T) {
 	}
 	if len(ownerView.DealBreakers) != 1 {
 		t.Fatalf("owner deal breakers = %#v, want visible", ownerView.DealBreakers)
+	}
+}
+
+func TestContextualProfileOnlyIncludesCategoryRelevantFields(t *testing.T) {
+	t.Parallel()
+
+	user := store.User{
+		ID:         42,
+		Nickname:   "项目同学",
+		Department: "计算机系",
+		Grade:      "博士二年级",
+	}
+	profile := store.MatchingProfile{
+		Bio:                "做 AI 产品",
+		Skills:             []string{"Go", "React"},
+		Interests:          []string{"跑步", "电影"},
+		Availability:       "工作日晚间",
+		PreferredScenes:    []string{"紫荆", "图书馆"},
+		CollaborationStyle: "先对齐目标再动手",
+	}
+	projectIntent := store.ConnectionIntent{
+		ID:              7,
+		Category:        CategoryProject,
+		Title:           "一起做校园 AI 产品",
+		Goal:            "两周完成原型",
+		TimeWindow:      "本月",
+		Location:        "FIT 楼",
+		DesiredNextStep: "先聊 30 分钟",
+	}
+
+	projectView := contextualProfileView(user, profile, projectIntent)
+	if len(projectView.Skills) != 2 || projectView.CollaborationStyle == "" {
+		t.Fatalf("project context missing relevant fields: %#v", projectView)
+	}
+	if len(projectView.Interests) != 0 || len(projectView.PreferredScenes) != 0 {
+		t.Fatalf("project context leaked unrelated fields: %#v", projectView)
+	}
+
+	mealIntent := projectIntent
+	mealIntent.Category = CategoryMeal
+	mealView := contextualProfileView(user, profile, mealIntent)
+	if len(mealView.Interests) != 2 || len(mealView.PreferredScenes) != 2 {
+		t.Fatalf("meal context missing relevant fields: %#v", mealView)
+	}
+	if len(mealView.Skills) != 0 || mealView.CollaborationStyle != "" {
+		t.Fatalf("meal context leaked project fields: %#v", mealView)
 	}
 }
 

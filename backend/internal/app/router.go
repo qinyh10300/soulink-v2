@@ -158,6 +158,7 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/mine", deps.ConnectionHandler.ListMine)
 					r.With(track(analytics.EventIntentCreated, "", "")).Post("/", deps.ConnectionHandler.CreateIntent)
 					r.Get("/{intentId}", deps.ConnectionHandler.GetIntent)
+					r.Get("/{intentId}/profiles/{userId}", deps.ConnectionHandler.GetContextProfile)
 					r.Put("/{intentId}", deps.ConnectionHandler.UpdateIntent)
 					r.Delete("/{intentId}", deps.ConnectionHandler.ExpireIntent)
 					r.Post("/{intentId}/save", deps.ConnectionHandler.SaveIntent)

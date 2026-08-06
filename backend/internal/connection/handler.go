@@ -163,6 +163,24 @@ func (h *Handler) GetIntent(w http.ResponseWriter, r *http.Request) {
 	httpapi.OK(w, result)
 }
 
+func (h *Handler) GetContextProfile(w http.ResponseWriter, r *http.Request) {
+	userID, intentID, ok := currentUserAndRouteID(w, r, "intentId")
+	if !ok {
+		return
+	}
+	subjectID, err := strconv.ParseInt(chi.URLParam(r, "userId"), 10, 64)
+	if err != nil || subjectID <= 0 {
+		httpapi.Error(w, invalidParams("用户参数无效"))
+		return
+	}
+	result, err := h.service.GetContextProfile(r.Context(), userID, intentID, subjectID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
 func (h *Handler) UpdateIntent(w http.ResponseWriter, r *http.Request) {
 	userID, intentID, ok := currentUserAndRouteID(w, r, "intentId")
 	if !ok {

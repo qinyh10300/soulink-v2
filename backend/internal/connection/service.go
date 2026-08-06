@@ -229,6 +229,68 @@ func (s *Service) GetIntent(ctx context.Context, viewerID, intentID int64) (Inte
 	return toIntentView(intent, viewerID), nil
 }
 
+func (s *Service) GetContextProfile(
+	ctx context.Context,
+	viewerID,
+	intentID,
+	subjectID int64,
+) (ContextProfileView, error) {
+	if err := s.ensureReady(); err != nil {
+		return ContextProfileView{}, err
+	}
+
+	intent, err := s.store.GetConnectionIntent(ctx, nil, viewerID, intentID)
+	if err != nil {
+		return ContextProfileView{}, mapStoreError(err, "找不到这个意图")
+	}
+	if intent.AuthorID != viewerID {
+		if _, err := s.GetIntent(ctx, viewerID, intentID); err != nil {
+			return ContextProfileView{}, err
+		}
+	}
+
+	if subjectID == intent.AuthorID {
+		if intent.Category == CategoryRomantic && viewerID != intent.AuthorID && intent.InterestState != "accepted" {
+			return ContextProfileView{}, forbidden("双方同意前不会揭示身份资料")
+		}
+	} else {
+		if viewerID != intent.AuthorID {
+			return ContextProfileView{}, forbidden("只能查看当前连接对象的资料")
+		}
+		status, statusErr := s.store.GetIntentInterestStatus(ctx, nil, intentID, subjectID)
+		if statusErr != nil || (status != "interested" && status != "accepted") {
+			return ContextProfileView{}, forbidden("这个回应者的资料当前不可见")
+		}
+	}
+
+	if viewerID != subjectID {
+		blocked, blockErr := s.store.UsersBlocked(ctx, nil, viewerID, subjectID)
+		if blockErr != nil {
+			return ContextProfileView{}, httpapi.InternalError(blockErr)
+		}
+		reported, reportErr := s.store.UsersHaveActiveSafetyReport(ctx, nil, viewerID, subjectID)
+		if reportErr != nil {
+			return ContextProfileView{}, httpapi.InternalError(reportErr)
+		}
+		if blocked || reported {
+			return ContextProfileView{}, forbidden("这个用户的资料当前不可见")
+		}
+	}
+
+	user, err := s.store.GetUserByID(ctx, nil, subjectID)
+	if err != nil {
+		return ContextProfileView{}, mapStoreError(err, "找不到这个用户")
+	}
+	profile, err := s.store.GetMatchingProfile(ctx, nil, subjectID)
+	if errors.Is(err, store.ErrNotFound) {
+		profile = store.MatchingProfile{UserID: subjectID}
+	} else if err != nil {
+		return ContextProfileView{}, httpapi.InternalError(err)
+	}
+
+	return contextualProfileView(user, profile, intent), nil
+}
+
 func (s *Service) ListMyIntents(ctx context.Context, userID int64) ([]IntentView, error) {
 	if err := s.ensureReady(); err != nil {
 		return nil, err
@@ -1022,15 +1084,95 @@ func toMatchingProfileView(profile store.MatchingProfile) MatchingProfileView {
 	}
 }
 
+func contextualProfileView(
+	user store.User,
+	profile store.MatchingProfile,
+	intent store.ConnectionIntent,
+) ContextProfileView {
+	view := ContextProfileView{
+		UserID:        user.ID,
+		Nickname:      user.Nickname,
+		SchoolName:    "清华大学",
+		Department:    user.Department,
+		Grade:         user.Grade,
+		Verified:      true,
+		Bio:           strings.TrimSpace(profile.Bio),
+		Availability:  strings.TrimSpace(profile.Availability),
+		VisibleFields: []string{},
+		Intent: ContextProfileIntent{
+			ID:              intent.ID,
+			Category:        intent.Category,
+			Title:           intent.Title,
+			Goal:            intent.Goal,
+			TimeWindow:      intent.TimeWindow,
+			Location:        intent.Location,
+			DesiredNextStep: intent.DesiredNextStep,
+		},
+	}
+	if view.Department != "" {
+		view.VisibleFields = append(view.VisibleFields, "department")
+	}
+	if view.Grade != "" {
+		view.VisibleFields = append(view.VisibleFields, "grade")
+	}
+	if view.Bio != "" {
+		view.VisibleFields = append(view.VisibleFields, "bio")
+	}
+	if view.Availability != "" {
+		view.VisibleFields = append(view.VisibleFields, "availability")
+	}
+
+	switch intent.Category {
+	case CategoryProject, CategoryCofounder:
+		view.Skills = nonNilStrings(profile.Skills)
+		view.CollaborationStyle = strings.TrimSpace(profile.CollaborationStyle)
+		if len(view.Skills) > 0 {
+			view.VisibleFields = append(view.VisibleFields, "skills")
+		}
+		if view.CollaborationStyle != "" {
+			view.VisibleFields = append(view.VisibleFields, "collaborationStyle")
+		}
+	case CategoryStudy:
+		view.Skills = nonNilStrings(profile.Skills)
+		view.Interests = nonNilStrings(profile.Interests)
+		view.PreferredScenes = nonNilStrings(profile.PreferredScenes)
+		view.CollaborationStyle = strings.TrimSpace(profile.CollaborationStyle)
+		if len(view.Skills) > 0 {
+			view.VisibleFields = append(view.VisibleFields, "skills")
+		}
+		if len(view.Interests) > 0 {
+			view.VisibleFields = append(view.VisibleFields, "interests")
+		}
+		if len(view.PreferredScenes) > 0 {
+			view.VisibleFields = append(view.VisibleFields, "preferredScenes")
+		}
+		if view.CollaborationStyle != "" {
+			view.VisibleFields = append(view.VisibleFields, "collaborationStyle")
+		}
+	default:
+		view.Interests = nonNilStrings(profile.Interests)
+		view.PreferredScenes = nonNilStrings(profile.PreferredScenes)
+		if len(view.Interests) > 0 {
+			view.VisibleFields = append(view.VisibleFields, "interests")
+		}
+		if len(view.PreferredScenes) > 0 {
+			view.VisibleFields = append(view.VisibleFields, "preferredScenes")
+		}
+	}
+
+	return view
+}
+
 func toIntentView(intent store.ConnectionIntent, viewerID int64) IntentView {
 	isOwner := intent.AuthorID == viewerID
 	author := AuthorPreview{
+		UserID:     intent.AuthorID,
 		Nickname:   intent.AuthorNickname,
 		Department: intent.AuthorDepartment,
 		Grade:      intent.AuthorGrade,
 		Verified:   true,
 	}
-	if intent.Category == CategoryRomantic && !isOwner {
+	if intent.Category == CategoryRomantic && !isOwner && intent.InterestState != "accepted" {
 		author = AuthorPreview{
 			Nickname:   "一位同学",
 			Department: "清华大学",
