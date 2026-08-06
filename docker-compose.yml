@@ -113,6 +113,7 @@ services:
       context: ./frontend
       args:
         NGINX_CONF: nginx.local/default.conf
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         VITE_DEMO_MODE: "true"
         VITE_DEMO_EMAIL: "demo@mails.tsinghua.edu.cn"
         VITE_DEMO_PASSWORD: "Soulink2026!"
