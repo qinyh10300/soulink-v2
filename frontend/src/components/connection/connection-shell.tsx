@@ -18,12 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Group,
-  Panel,
-  useDefaultLayout,
-  usePanelRef,
-} from "react-resizable-panels";
+import { Group, Panel, usePanelRef } from "react-resizable-panels";
 import {
   Link,
   NavLink,
@@ -38,6 +33,7 @@ import { fetchMyIntents, type ConnectionIntent } from "@/lib/connection-api";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/contexts/chat-context";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { usePersistentPanelLayout } from "@/hooks/use-persistent-panel-layout";
 import {
   clearAuthSession,
   clearUserProfile,
@@ -149,11 +145,21 @@ export function ConnectionShell() {
   const profile = useMemo(() => getStoredUserProfile(), []);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const navigationPanelRef = usePanelRef();
-  const [navigationCollapsed, setNavigationCollapsed] = useState(false);
-  const navigationLayout = useDefaultLayout({
-    id: "soulink-primary-workbench-v1",
-    panelIds: ["navigation", "content"],
-  });
+  const navigationLayout = usePersistentPanelLayout(
+    "soulink-primary-workbench-pixels-v2",
+    {
+      navigation: {
+        defaultSize: 244,
+        minSize: 208,
+        maxSize: 336,
+        rememberSize: true,
+      },
+      content: {},
+    },
+  );
+  const [navigationCollapsed, setNavigationCollapsed] = useState(() =>
+    navigationLayout.isInitiallyCollapsed("navigation"),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +205,7 @@ export function ConnectionShell() {
   };
 
   const resetNavigationWidth = () => {
+    navigationLayout.reset();
     navigationPanelRef.current?.expand();
     navigationPanelRef.current?.resize(244);
   };
@@ -207,7 +214,7 @@ export function ConnectionShell() {
     <div className="min-h-screen bg-[#f7f6f3] text-[#23211f]">
       <Group
         className="min-h-screen w-full"
-        defaultLayout={isDesktop ? navigationLayout.defaultLayout : undefined}
+        elementRef={navigationLayout.groupElementRef}
         id="soulink-primary-workbench"
         onLayoutChanged={
           isDesktop ? navigationLayout.onLayoutChanged : undefined
@@ -220,7 +227,7 @@ export function ConnectionShell() {
             <Panel
               collapsedSize={0}
               collapsible
-              defaultSize={244}
+              defaultSize={navigationLayout.getDefaultSize("navigation")}
               groupResizeBehavior="preserve-pixel-size"
               id="navigation"
               maxSize={336}

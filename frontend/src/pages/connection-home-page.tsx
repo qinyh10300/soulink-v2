@@ -12,12 +12,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import {
-  Group,
-  Panel,
-  useDefaultLayout,
-  usePanelRef,
-} from "react-resizable-panels";
+import { Group, Panel, usePanelRef } from "react-resizable-panels";
 import { Link, useNavigate } from "react-router-dom";
 
 import {
@@ -27,6 +22,7 @@ import {
 import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
 import { WorkspaceResizeHandle } from "@/components/workspace/workspace-resize-handle";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { usePersistentPanelLayout } from "@/hooks/use-persistent-panel-layout";
 import { getErrorMessage } from "@/lib/api";
 import {
   fetchIntentFeed,
@@ -103,12 +99,23 @@ export function ConnectionHomePage() {
   const isWideWorkspace = useMediaQuery("(min-width: 1280px)");
   const assistantPanelRef = usePanelRef();
   const contextPanelRef = usePanelRef();
-  const [assistantCollapsed, setAssistantCollapsed] = useState(false);
-  const [contextCollapsed, setContextCollapsed] = useState(false);
-  const homeLayout = useDefaultLayout({
-    id: "soulink-home-workbench-v1",
-    panelIds: ["assistant", "context"],
-  });
+  const homeLayout = usePersistentPanelLayout(
+    "soulink-home-workbench-pixels-v2",
+    {
+      assistant: {},
+      context: {
+        defaultSize: 320,
+        minSize: 280,
+        rememberSize: true,
+      },
+    },
+  );
+  const [assistantCollapsed, setAssistantCollapsed] = useState(() =>
+    homeLayout.isInitiallyCollapsed("assistant"),
+  );
+  const [contextCollapsed, setContextCollapsed] = useState(() =>
+    homeLayout.isInitiallyCollapsed("context"),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -203,6 +210,7 @@ export function ConnectionHomePage() {
     })[0];
 
   const resetHomeLayout = () => {
+    homeLayout.reset();
     assistantPanelRef.current?.expand();
     contextPanelRef.current?.expand();
     contextPanelRef.current?.resize(320);
@@ -517,7 +525,7 @@ export function ConnectionHomePage() {
       {isWideWorkspace ? (
         <Group
           className="h-full w-full"
-          defaultLayout={homeLayout.defaultLayout}
+          elementRef={homeLayout.groupElementRef}
           id="soulink-home-workbench"
           onLayoutChanged={homeLayout.onLayoutChanged}
           orientation="horizontal"
@@ -527,6 +535,7 @@ export function ConnectionHomePage() {
             className="relative min-w-0"
             collapsedSize={0}
             collapsible
+            defaultSize={homeLayout.getDefaultSize("assistant")}
             groupResizeBehavior="preserve-relative-size"
             id="assistant"
             minSize={520}
@@ -549,7 +558,7 @@ export function ConnectionHomePage() {
             className="relative min-w-0"
             collapsedSize={0}
             collapsible
-            defaultSize={320}
+            defaultSize={homeLayout.getDefaultSize("context")}
             groupResizeBehavior="preserve-pixel-size"
             id="context"
             minSize={280}

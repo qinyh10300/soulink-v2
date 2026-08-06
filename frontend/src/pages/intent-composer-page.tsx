@@ -20,12 +20,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import {
-  Group,
-  Panel,
-  useDefaultLayout,
-  usePanelRef,
-} from "react-resizable-panels";
+import { Group, Panel, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -36,6 +31,7 @@ import { IntentReviewPanel } from "@/components/connection/intent-review-panel";
 import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
 import { WorkspaceResizeHandle } from "@/components/workspace/workspace-resize-handle";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { usePersistentPanelLayout } from "@/hooks/use-persistent-panel-layout";
 import { getErrorMessage } from "@/lib/api";
 import {
   createIntent,
@@ -206,12 +202,23 @@ export function IntentComposerPage() {
   const isWideWorkspace = useMediaQuery("(min-width: 1280px)");
   const conversationPanelRef = usePanelRef();
   const reviewPanelRef = usePanelRef();
-  const [conversationCollapsed, setConversationCollapsed] = useState(false);
-  const [reviewCollapsed, setReviewCollapsed] = useState(false);
-  const composerLayout = useDefaultLayout({
-    id: "soulink-composer-workbench-v1",
-    panelIds: ["conversation", "review"],
-  });
+  const composerLayout = usePersistentPanelLayout(
+    "soulink-composer-workbench-pixels-v2",
+    {
+      conversation: {},
+      review: {
+        defaultSize: 360,
+        minSize: 320,
+        rememberSize: true,
+      },
+    },
+  );
+  const [conversationCollapsed, setConversationCollapsed] = useState(() =>
+    composerLayout.isInitiallyCollapsed("conversation"),
+  );
+  const [reviewCollapsed, setReviewCollapsed] = useState(() =>
+    composerLayout.isInitiallyCollapsed("review"),
+  );
 
   const currentQuestion = useMemo(
     () =>
@@ -411,6 +418,7 @@ export function IntentComposerPage() {
       : "描述你想找的人，以及想一起做什么";
 
   const resetComposerLayout = () => {
+    composerLayout.reset();
     conversationPanelRef.current?.expand();
     reviewPanelRef.current?.expand();
     reviewPanelRef.current?.resize(360);
@@ -747,7 +755,7 @@ export function IntentComposerPage() {
       {isWideWorkspace ? (
         <Group
           className="h-full w-full"
-          defaultLayout={composerLayout.defaultLayout}
+          elementRef={composerLayout.groupElementRef}
           id="soulink-composer-workbench"
           onLayoutChanged={composerLayout.onLayoutChanged}
           orientation="horizontal"
@@ -757,6 +765,7 @@ export function IntentComposerPage() {
             className="relative min-w-0"
             collapsedSize={0}
             collapsible
+            defaultSize={composerLayout.getDefaultSize("conversation")}
             groupResizeBehavior="preserve-relative-size"
             id="conversation"
             minSize={520}
@@ -779,7 +788,7 @@ export function IntentComposerPage() {
             className="relative min-w-0"
             collapsedSize={0}
             collapsible
-            defaultSize={360}
+            defaultSize={composerLayout.getDefaultSize("review")}
             groupResizeBehavior="preserve-pixel-size"
             id="review"
             minSize={320}

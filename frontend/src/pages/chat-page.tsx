@@ -11,12 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Group,
-  Panel,
-  useDefaultLayout,
-  usePanelRef,
-} from 'react-resizable-panels'
+import { Group, Panel, usePanelRef } from 'react-resizable-panels'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { ChatWindow } from '@/components/chat/chat-window'
@@ -28,6 +23,7 @@ import { WorkspaceEdgeButton } from '@/components/workspace/workspace-edge-butto
 import { WorkspaceResizeHandle } from '@/components/workspace/workspace-resize-handle'
 import { useChat } from '@/contexts/chat-context'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { usePersistentPanelLayout } from '@/hooks/use-persistent-panel-layout'
 import { getErrorMessage } from '@/lib/api'
 import {
   addGroupMembers,
@@ -374,12 +370,23 @@ export function ChatPage() {
   const isSplitWorkspace = useMediaQuery('(min-width: 768px)')
   const threadListPanelRef = usePanelRef()
   const messagePanelRef = usePanelRef()
-  const [threadListCollapsed, setThreadListCollapsed] = useState(false)
-  const [messagePanelCollapsed, setMessagePanelCollapsed] = useState(false)
-  const chatLayout = useDefaultLayout({
-    id: 'soulink-chat-workbench-v1',
-    panelIds: ['thread-list', 'message'],
-  })
+  const chatLayout = usePersistentPanelLayout(
+    'soulink-chat-workbench-pixels-v2',
+    {
+      'thread-list': {
+        defaultSize: 330,
+        minSize: 280,
+        rememberSize: true,
+      },
+      message: {},
+    },
+  )
+  const [threadListCollapsed, setThreadListCollapsed] = useState(() =>
+    chatLayout.isInitiallyCollapsed('thread-list'),
+  )
+  const [messagePanelCollapsed, setMessagePanelCollapsed] = useState(() =>
+    chatLayout.isInitiallyCollapsed('message'),
+  )
 
   const activeConversationId = conversationId ? Number(conversationId) : undefined
   const activeGroupId = groupId ? Number(groupId) : undefined
@@ -457,6 +464,7 @@ export function ChatPage() {
   const showList = !activeKey
 
   const resetChatLayout = () => {
+    chatLayout.reset()
     threadListPanelRef.current?.expand()
     messagePanelRef.current?.expand()
     threadListPanelRef.current?.resize(330)
@@ -646,7 +654,7 @@ export function ChatPage() {
       {isSplitWorkspace ? (
         <Group
           className="h-full w-full"
-          defaultLayout={chatLayout.defaultLayout}
+          elementRef={chatLayout.groupElementRef}
           id="soulink-chat-workbench"
           onLayoutChanged={chatLayout.onLayoutChanged}
           orientation="horizontal"
@@ -656,7 +664,7 @@ export function ChatPage() {
             className="relative min-w-0"
             collapsedSize={0}
             collapsible
-            defaultSize={330}
+            defaultSize={chatLayout.getDefaultSize('thread-list')}
             groupResizeBehavior="preserve-pixel-size"
             id="thread-list"
             minSize={280}
@@ -679,6 +687,7 @@ export function ChatPage() {
             className="relative min-w-0"
             collapsedSize={0}
             collapsible
+            defaultSize={chatLayout.getDefaultSize('message')}
             groupResizeBehavior="preserve-relative-size"
             id="message"
             minSize={360}
