@@ -11,86 +11,87 @@ import {
   Save,
   Send,
   ShieldCheck,
-} from 'lucide-react'
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+} from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import {
   IntentCategoryIcon,
   intentCategoryMeta,
   intentCategoryOrder,
-} from '@/components/connection/intent-category'
+} from "@/components/connection/intent-category";
 import type {
   IntentInput,
   IntentVisibility,
   MatchingProfile,
   ProjectMemo,
-} from '@/lib/connection-api'
-import { cn } from '@/lib/utils'
+} from "@/lib/connection-api";
+import { cn } from "@/lib/utils";
 
 const visibilityOptions: Array<{
-  value: IntentVisibility
-  label: string
-  description: string
-  icon: typeof Eye
+  value: IntentVisibility;
+  label: string;
+  description: string;
+  icon: typeof Eye;
 }> = [
   {
-    value: 'private',
-    label: '仅 AI 搜索',
-    description: '不进入公开流',
+    value: "private",
+    label: "仅 AI 搜索",
+    description: "不进入公开流",
     icon: EyeOff,
   },
   {
-    value: 'candidates',
-    label: '仅候选可见',
-    description: '只向推荐的人展示',
+    value: "candidates",
+    label: "仅候选可见",
+    description: "只向推荐的人展示",
     icon: LockKeyhole,
   },
   {
-    value: 'feed',
-    label: '进入意图流',
-    description: '校内同学可发现',
+    value: "feed",
+    label: "进入意图流",
+    description: "校内同学可发现",
     icon: Eye,
   },
-]
+];
 
 const fieldClassName =
-  'mt-1.5 w-full rounded-md border border-[#d8d5ce] bg-white px-3 text-sm text-[#2b2926] outline-none transition-colors placeholder:text-[#9b968e] focus:border-[#55786c] focus:ring-3 focus:ring-[#55786c]/10'
+  "mt-1.5 w-full rounded-md border border-[#d8d5ce] bg-white px-3 text-sm text-[#2b2926] outline-none transition-colors placeholder:text-[#9b968e] focus:border-[#55786c] focus:ring-3 focus:ring-[#55786c]/10";
 
 function emptyProjectMemo(): ProjectMemo {
   return {
-    building: '',
-    stage: '',
-    weeklyTime: '',
-    compensation: '',
+    building: "",
+    stage: "",
+    weeklyTime: "",
+    compensation: "",
     requiredSkills: [],
     niceToHaveSkills: [],
-    workingStyle: '',
-    riskAppetite: '',
-  }
+    workingStyle: "",
+    riskAppetite: "",
+  };
 }
 
 function splitTags(value: string) {
   return value
     .split(/[,，、\n]/)
     .map((item) => item.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 }
 
 interface IntentReviewPanelProps {
-  draft: IntentInput
-  profile: MatchingProfile | null
-  submitting: 'draft' | 'active' | null
+  draft: IntentInput;
+  profile: MatchingProfile | null;
+  submitting: "draft" | "active" | null;
   onChange: <K extends keyof IntentInput>(
     key: K,
     value: IntentInput[K],
-  ) => void
+  ) => void;
   onProjectChange: <K extends keyof ProjectMemo>(
     key: K,
     value: ProjectMemo[K],
-  ) => void
-  onSubmit: (status: 'draft' | 'active') => void
-  className?: string
+  ) => void;
+  onSubmit: (status: "draft" | "active") => void;
+  className?: string;
+  headerActions?: ReactNode;
 }
 
 export function IntentReviewPanel({
@@ -101,30 +102,31 @@ export function IntentReviewPanel({
   onProjectChange,
   onSubmit,
   className,
+  headerActions,
 }: IntentReviewPanelProps) {
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  const meta = intentCategoryMeta[draft.category]
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const meta = intentCategoryMeta[draft.category];
   const romanticNeedsOptIn =
-    draft.category === 'romantic' && profile && !profile.romanticOptIn
+    draft.category === "romantic" && profile && !profile.romanticOptIn;
   const canSubmit =
     Boolean(draft.title.trim() && draft.description.trim()) &&
-    !romanticNeedsOptIn
+    !romanticNeedsOptIn;
 
-  const changeCategory = (category: IntentInput['category']) => {
-    onChange('category', category)
-    if (category === 'romantic') {
-      onChange('visibility', 'candidates')
+  const changeCategory = (category: IntentInput["category"]) => {
+    onChange("category", category);
+    if (category === "romantic") {
+      onChange("visibility", "candidates");
     }
     onChange(
-      'projectMemo',
-      category === 'project' || category === 'cofounder'
-        ? draft.projectMemo ?? emptyProjectMemo()
+      "projectMemo",
+      category === "project" || category === "cofounder"
+        ? (draft.projectMemo ?? emptyProjectMemo())
         : null,
-    )
-  }
+    );
+  };
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col bg-[#fbfaf8]', className)}>
+    <div className={cn("flex h-full min-h-0 flex-col bg-[#fbfaf8]", className)}>
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#dfdcd6] px-5">
         <div>
           <p className="text-[11px] font-semibold text-[#817d76]">意图草稿</p>
@@ -132,10 +134,13 @@ export function IntentReviewPanel({
             发布前确认
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#477062]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#4f846f]" />
-          实时更新
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#477062]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#4f846f]" />
+            实时更新
+          </span>
+          {headerActions}
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -147,13 +152,13 @@ export function IntentReviewPanel({
                 {meta.label}
               </span>
               <h2 className="mt-1 text-[17px] font-semibold leading-6 text-[#282623]">
-                {draft.title || '尚未命名的意图'}
+                {draft.title || "尚未命名的意图"}
               </h2>
             </div>
           </div>
 
           <p className="mt-4 text-sm leading-6 text-[#65615b]">
-            {draft.description || '继续对话后，这里会形成一段清晰的需求描述。'}
+            {draft.description || "继续对话后，这里会形成一段清晰的需求描述。"}
           </p>
 
           {(draft.timeWindow || draft.location) && (
@@ -191,14 +196,12 @@ export function IntentReviewPanel({
           <div className="space-y-2 text-xs text-[#66625c]">
             <p className="flex items-start gap-2">
               <Check className="mt-0.5 shrink-0 text-[#477062]" size={14} />
-              <span>
-                目标：{draft.goal || '认识一个适合继续交流的人'}
-              </span>
+              <span>目标：{draft.goal || "认识一个适合继续交流的人"}</span>
             </p>
             <p className="flex items-start gap-2">
               <Check className="mt-0.5 shrink-0 text-[#477062]" size={14} />
               <span>
-                下一步：{draft.desiredNextStep || '先进行一次低压力沟通'}
+                下一步：{draft.desiredNextStep || "先进行一次低压力沟通"}
               </span>
             </p>
           </div>
@@ -217,8 +220,8 @@ export function IntentReviewPanel({
             </span>
             <ChevronDown
               className={cn(
-                'text-[#817d76] transition-transform',
-                detailsOpen && 'rotate-180',
+                "text-[#817d76] transition-transform",
+                detailsOpen && "rotate-180",
               )}
               size={17}
             />
@@ -229,9 +232,9 @@ export function IntentReviewPanel({
               <label className="block text-xs font-semibold text-[#5f5b55]">
                 标题
                 <input
-                  className={cn(fieldClassName, 'h-10')}
+                  className={cn(fieldClassName, "h-10")}
                   maxLength={80}
-                  onChange={(event) => onChange('title', event.target.value)}
+                  onChange={(event) => onChange("title", event.target.value)}
                   value={draft.title}
                 />
               </label>
@@ -239,10 +242,13 @@ export function IntentReviewPanel({
               <label className="block text-xs font-semibold text-[#5f5b55]">
                 具体描述
                 <textarea
-                  className={cn(fieldClassName, 'min-h-28 resize-y py-2.5 leading-6')}
+                  className={cn(
+                    fieldClassName,
+                    "min-h-28 resize-y py-2.5 leading-6",
+                  )}
                   maxLength={1200}
                   onChange={(event) =>
-                    onChange('description', event.target.value)
+                    onChange("description", event.target.value)
                   }
                   value={draft.description}
                 />
@@ -251,9 +257,9 @@ export function IntentReviewPanel({
               <label className="block text-xs font-semibold text-[#5f5b55]">
                 连接目标
                 <input
-                  className={cn(fieldClassName, 'h-10')}
+                  className={cn(fieldClassName, "h-10")}
                   maxLength={200}
-                  onChange={(event) => onChange('goal', event.target.value)}
+                  onChange={(event) => onChange("goal", event.target.value)}
                   value={draft.goal}
                 />
               </label>
@@ -264,24 +270,27 @@ export function IntentReviewPanel({
                 </span>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {intentCategoryOrder.map((category) => {
-                    const categoryMeta = intentCategoryMeta[category]
-                    const Icon = categoryMeta.icon
+                    const categoryMeta = intentCategoryMeta[category];
+                    const Icon = categoryMeta.icon;
                     return (
                       <button
                         className={cn(
-                          'flex min-h-14 flex-col items-center justify-center gap-1 rounded-md border px-1.5 py-2 text-[11px] font-medium transition-colors',
+                          "flex min-h-14 flex-col items-center justify-center gap-1 rounded-md border px-1.5 py-2 text-[11px] font-medium transition-colors",
                           draft.category === category
-                            ? 'border-[#68887d] bg-[#eaf2ee] text-[#315c4d]'
-                            : 'border-[#dedad4] bg-white text-[#6f6b65] hover:border-[#aebdb7]',
+                            ? "border-[#68887d] bg-[#eaf2ee] text-[#315c4d]"
+                            : "border-[#dedad4] bg-white text-[#6f6b65] hover:border-[#aebdb7]",
                         )}
                         key={category}
                         onClick={() => changeCategory(category)}
                         type="button"
                       >
-                        <Icon className={categoryMeta.iconClassName} size={15} />
+                        <Icon
+                          className={categoryMeta.iconClassName}
+                          size={15}
+                        />
                         {categoryMeta.shortLabel}
                       </button>
-                    )
+                    );
                   })}
                 </div>
               </div>
@@ -290,9 +299,9 @@ export function IntentReviewPanel({
                 <label className="block text-xs font-semibold text-[#5f5b55]">
                   时间窗口
                   <input
-                    className={cn(fieldClassName, 'h-10')}
+                    className={cn(fieldClassName, "h-10")}
                     onChange={(event) =>
-                      onChange('timeWindow', event.target.value)
+                      onChange("timeWindow", event.target.value)
                     }
                     placeholder="今晚 / 本周"
                     value={draft.timeWindow}
@@ -301,9 +310,9 @@ export function IntentReviewPanel({
                 <label className="block text-xs font-semibold text-[#5f5b55]">
                   校内地点
                   <input
-                    className={cn(fieldClassName, 'h-10')}
+                    className={cn(fieldClassName, "h-10")}
                     onChange={(event) =>
-                      onChange('location', event.target.value)
+                      onChange("location", event.target.value)
                     }
                     placeholder="紫荆 / 图书馆"
                     value={draft.location}
@@ -314,41 +323,41 @@ export function IntentReviewPanel({
               <label className="block text-xs font-semibold text-[#5f5b55]">
                 重要偏好
                 <input
-                  className={cn(fieldClassName, 'h-10')}
+                  className={cn(fieldClassName, "h-10")}
                   onChange={(event) =>
-                    onChange('constraints', splitTags(event.target.value))
+                    onChange("constraints", splitTags(event.target.value))
                   }
                   placeholder="用逗号分隔"
-                  value={draft.constraints.join('，')}
+                  value={draft.constraints.join("，")}
                 />
               </label>
 
               <label className="block text-xs font-semibold text-[#5f5b55]">
                 明确不合适的情况
                 <input
-                  className={cn(fieldClassName, 'h-10')}
+                  className={cn(fieldClassName, "h-10")}
                   onChange={(event) =>
-                    onChange('dealBreakers', splitTags(event.target.value))
+                    onChange("dealBreakers", splitTags(event.target.value))
                   }
                   placeholder="可留空"
-                  value={draft.dealBreakers.join('，')}
+                  value={draft.dealBreakers.join("，")}
                 />
               </label>
 
               <label className="block text-xs font-semibold text-[#5f5b55]">
                 希望的下一步
                 <input
-                  className={cn(fieldClassName, 'h-10')}
+                  className={cn(fieldClassName, "h-10")}
                   maxLength={200}
                   onChange={(event) =>
-                    onChange('desiredNextStep', event.target.value)
+                    onChange("desiredNextStep", event.target.value)
                   }
                   value={draft.desiredNextStep}
                 />
               </label>
 
-              {(draft.category === 'project' ||
-                draft.category === 'cofounder') &&
+              {(draft.category === "project" ||
+                draft.category === "cofounder") &&
               draft.projectMemo ? (
                 <div className="space-y-4 border-y border-[#dedbd5] py-5">
                   <div>
@@ -363,9 +372,9 @@ export function IntentReviewPanel({
                   <label className="block text-xs font-semibold text-[#5f5b55]">
                     正在做什么
                     <textarea
-                      className={cn(fieldClassName, 'min-h-20 resize-y py-2.5')}
+                      className={cn(fieldClassName, "min-h-20 resize-y py-2.5")}
                       onChange={(event) =>
-                        onProjectChange('building', event.target.value)
+                        onProjectChange("building", event.target.value)
                       }
                       value={draft.projectMemo.building}
                     />
@@ -375,9 +384,9 @@ export function IntentReviewPanel({
                     <label className="block text-xs font-semibold text-[#5f5b55]">
                       当前阶段
                       <input
-                        className={cn(fieldClassName, 'h-10')}
+                        className={cn(fieldClassName, "h-10")}
                         onChange={(event) =>
-                          onProjectChange('stage', event.target.value)
+                          onProjectChange("stage", event.target.value)
                         }
                         value={draft.projectMemo.stage}
                       />
@@ -385,9 +394,9 @@ export function IntentReviewPanel({
                     <label className="block text-xs font-semibold text-[#5f5b55]">
                       每周投入
                       <input
-                        className={cn(fieldClassName, 'h-10')}
+                        className={cn(fieldClassName, "h-10")}
                         onChange={(event) =>
-                          onProjectChange('weeklyTime', event.target.value)
+                          onProjectChange("weeklyTime", event.target.value)
                         }
                         value={draft.projectMemo.weeklyTime}
                       />
@@ -397,9 +406,9 @@ export function IntentReviewPanel({
                   <label className="block text-xs font-semibold text-[#5f5b55]">
                     权益或补偿预期
                     <input
-                      className={cn(fieldClassName, 'h-10')}
+                      className={cn(fieldClassName, "h-10")}
                       onChange={(event) =>
-                        onProjectChange('compensation', event.target.value)
+                        onProjectChange("compensation", event.target.value)
                       }
                       value={draft.projectMemo.compensation}
                     />
@@ -409,27 +418,27 @@ export function IntentReviewPanel({
                     <label className="block text-xs font-semibold text-[#5f5b55]">
                       必备技能
                       <input
-                        className={cn(fieldClassName, 'h-10')}
+                        className={cn(fieldClassName, "h-10")}
                         onChange={(event) =>
                           onProjectChange(
-                            'requiredSkills',
+                            "requiredSkills",
                             splitTags(event.target.value),
                           )
                         }
-                        value={draft.projectMemo.requiredSkills.join('，')}
+                        value={draft.projectMemo.requiredSkills.join("，")}
                       />
                     </label>
                     <label className="block text-xs font-semibold text-[#5f5b55]">
                       加分技能
                       <input
-                        className={cn(fieldClassName, 'h-10')}
+                        className={cn(fieldClassName, "h-10")}
                         onChange={(event) =>
                           onProjectChange(
-                            'niceToHaveSkills',
+                            "niceToHaveSkills",
                             splitTags(event.target.value),
                           )
                         }
-                        value={draft.projectMemo.niceToHaveSkills.join('，')}
+                        value={draft.projectMemo.niceToHaveSkills.join("，")}
                       />
                     </label>
                   </div>
@@ -437,9 +446,9 @@ export function IntentReviewPanel({
                   <label className="block text-xs font-semibold text-[#5f5b55]">
                     协作方式
                     <textarea
-                      className={cn(fieldClassName, 'min-h-20 resize-y py-2.5')}
+                      className={cn(fieldClassName, "min-h-20 resize-y py-2.5")}
                       onChange={(event) =>
-                        onProjectChange('workingStyle', event.target.value)
+                        onProjectChange("workingStyle", event.target.value)
                       }
                       value={draft.projectMemo.workingStyle}
                     />
@@ -448,9 +457,9 @@ export function IntentReviewPanel({
                   <label className="block text-xs font-semibold text-[#5f5b55]">
                     风险偏好
                     <textarea
-                      className={cn(fieldClassName, 'min-h-20 resize-y py-2.5')}
+                      className={cn(fieldClassName, "min-h-20 resize-y py-2.5")}
                       onChange={(event) =>
-                        onProjectChange('riskAppetite', event.target.value)
+                        onProjectChange("riskAppetite", event.target.value)
                       }
                       value={draft.projectMemo.riskAppetite}
                     />
@@ -464,21 +473,21 @@ export function IntentReviewPanel({
                 </span>
                 <div className="mt-2 space-y-2">
                   {visibilityOptions.map((option) => {
-                    const Icon = option.icon
+                    const Icon = option.icon;
                     const disabled =
-                      draft.category === 'romantic' &&
-                      option.value !== 'candidates'
+                      draft.category === "romantic" &&
+                      option.value !== "candidates";
                     return (
                       <button
                         className={cn(
-                          'flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+                          "flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45",
                           draft.visibility === option.value
-                            ? 'border-[#68887d] bg-[#eaf2ee]'
-                            : 'border-[#dedad4] bg-white hover:border-[#aebdb7]',
+                            ? "border-[#68887d] bg-[#eaf2ee]"
+                            : "border-[#dedad4] bg-white hover:border-[#aebdb7]",
                         )}
                         disabled={disabled}
                         key={option.value}
-                        onClick={() => onChange('visibility', option.value)}
+                        onClick={() => onChange("visibility", option.value)}
                         type="button"
                       >
                         <Icon className="shrink-0 text-[#5f6f69]" size={15} />
@@ -491,7 +500,7 @@ export function IntentReviewPanel({
                           </span>
                         </span>
                       </button>
-                    )
+                    );
                   })}
                 </div>
               </div>
@@ -526,10 +535,10 @@ export function IntentReviewPanel({
         <button
           className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#263b35] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#1d302a] disabled:cursor-not-allowed disabled:opacity-45"
           disabled={!canSubmit || submitting !== null}
-          onClick={() => onSubmit('active')}
+          onClick={() => onSubmit("active")}
           type="button"
         >
-          {submitting === 'active' ? (
+          {submitting === "active" ? (
             <LoaderCircle className="animate-spin" size={16} />
           ) : (
             <Send size={16} />
@@ -539,10 +548,10 @@ export function IntentReviewPanel({
         <button
           className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md text-xs font-semibold text-[#625e58] hover:bg-[#efede9] disabled:opacity-45"
           disabled={!canSubmit || submitting !== null}
-          onClick={() => onSubmit('draft')}
+          onClick={() => onSubmit("draft")}
           type="button"
         >
-          {submitting === 'draft' ? (
+          {submitting === "draft" ? (
             <LoaderCircle className="animate-spin" size={14} />
           ) : (
             <Save size={14} />
@@ -551,5 +560,5 @@ export function IntentReviewPanel({
         </button>
       </footer>
     </div>
-  )
+  );
 }
