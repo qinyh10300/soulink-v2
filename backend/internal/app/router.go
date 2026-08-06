@@ -27,11 +27,13 @@ import (
 
 type Dependencies struct {
 	Logger               *slog.Logger
+	RequestObserver      RequestObserver
 	AllowedOrigins       []string
 	AuthMiddleware       func(http.Handler) http.Handler
 	MatchWriteGuard      func(http.Handler) http.Handler
 	EventRecorder        analytics.EventRecorder
 	AnalyticsHandler     *analytics.Handler
+	OperationsHandler    http.HandlerFunc
 	AuthHandler          *auth.Handler
 	CalendarHandler      *calendar.Handler
 	FeedbackHandler      *feedback.Handler
@@ -67,7 +69,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(CORS(deps.AllowedOrigins))
-	r.Use(RequestLogger(deps.Logger))
+	r.Use(RequestLogger(deps.Logger, deps.RequestObserver))
 	r.Use(Recoverer(deps.Logger))
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +108,9 @@ func NewRouter(deps Dependencies) http.Handler {
 
 		api.Group(func(r chi.Router) {
 			r.Use(authMiddleware)
+			if deps.OperationsHandler != nil {
+				r.Get("/admin/operational-metrics", deps.OperationsHandler)
+			}
 			if deps.AnalyticsHandler != nil {
 				r.Get("/admin/product-metrics", deps.AnalyticsHandler.Dashboard)
 			}

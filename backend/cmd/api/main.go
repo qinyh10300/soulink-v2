@@ -29,6 +29,7 @@ import (
 	"soulink-backend/internal/meetup"
 	"soulink-backend/internal/meta"
 	"soulink-backend/internal/migrate"
+	"soulink-backend/internal/operations"
 	platformcache "soulink-backend/internal/platform/cache"
 	"soulink-backend/internal/platform/database"
 	"soulink-backend/internal/playground"
@@ -39,21 +40,28 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
+	operationalMetrics := operations.NewCollector(logger)
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("load config", "error", err)
 		os.Exit(1)
 	}
 	ctx := context.Background()
+	databaseStartedAt := time.Now()
 	db, err := database.Open(ctx, cfg.Database)
+	operationalMetrics.ObserveTask(ctx, "database.open", time.Since(databaseStartedAt), err)
 	if err != nil {
 		logger.Error("open database", "error", err)
 		os.Exit(1)
 	}
 	defer db.Close()
 	if cfg.Database.AutoMigrate {
-		if err := migrate.Up(ctx, db); err != nil {
+		migrationStartedAt := time.Now()
+		err := migrate.Up(ctx, db)
+		operationalMetrics.ObserveTask(ctx, "database.migrate", time.Since(migrationStartedAt), err)
+		if err != nil {
 			logger.Error("run migrations", "error", err)
 			os.Exit(1)
 		}
@@ -65,12 +73,14 @@ func main() {
 			logger.Error("demo seed cannot be enabled in production")
 			os.Exit(1)
 		}
+		seedStartedAt := time.Now()
 		seedResult, err := demoseed.Ensure(ctx, dataStore, demoseed.Config{
 			Password:      cfg.Demo.Password,
 			AdminEmail:    cfg.Demo.AdminEmail,
 			AdminPassword: cfg.Demo.AdminPassword,
 			BCryptCost:    cfg.Auth.BCryptCost,
 		})
+		operationalMetrics.ObserveTask(ctx, "demo.seed", time.Since(seedStartedAt), err)
 		if err != nil {
 			logger.Error("seed local demo workspace", "error", err)
 			os.Exit(1)
@@ -145,7 +155,7 @@ func main() {
 			MaxRetries: cfg.AI.MaxRetries,
 		})
 		if provider.Enabled() {
-			modelGenerator = provider
+			modelGenerator = operations.InstrumentGenerator(provider, operationalMetrics)
 			logger.Info("AI provider enabled", "provider", cfg.AI.Provider, "model", cfg.AI.Model)
 		} else {
 			logger.Info("AI provider incomplete; deterministic fallback enabled")
@@ -163,7 +173,8 @@ func main() {
 	}
 	safetyService := safety.NewService(dataStore, adminEmails)
 	analyticsService := analytics.NewService(dataStore, adminEmails)
-	engagementService := engagement.NewService(dataStore, adminEmails)
+	engagementService := engagement.NewService(dataStore, adminEmails).WithTaskObserver(operationalMetrics)
+	operationsHandler := operations.NewHandler(operationalMetrics, adminEmails)
 	connectionService.WithEventRecorder(analyticsService)
 	playgroundService.WithEventRecorder(analyticsService)
 	questionnaireService := questionnaire.NewService(
@@ -192,11 +203,13 @@ func main() {
 
 	router := app.NewRouter(app.Dependencies{
 		Logger:               logger,
+		RequestObserver:      operationalMetrics,
 		AllowedOrigins:       cfg.AllowedOrigins,
 		AuthMiddleware:       auth.Middleware(dataStore, tokenManager),
 		MatchWriteGuard:      app.MatchWriteGuard(logger, gateService),
 		EventRecorder:        analyticsService,
 		AnalyticsHandler:     analytics.NewHandler(analyticsService),
+		OperationsHandler:    operationsHandler.Metrics,
 		AuthHandler:          auth.NewHandler(authService),
 		CalendarHandler:      calendar.NewHandler(calendarService),
 		FeedbackHandler:      feedback.NewHandler(feedbackService),

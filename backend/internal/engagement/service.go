@@ -30,10 +30,15 @@ type DataStore interface {
 	GetCampusThemeMetrics(context.Context, *sql.Tx, time.Time, time.Time) ([]store.CampusThemeMetric, error)
 }
 
+type TaskObserver interface {
+	ObserveTask(context.Context, string, time.Duration, error)
+}
+
 type Service struct {
 	store       DataStore
 	adminEmails map[string]struct{}
 	nowFunc     func() time.Time
+	tasks       TaskObserver
 }
 
 var supportedScenes = map[string]struct{}{
@@ -57,6 +62,11 @@ func NewService(dataStore DataStore, adminEmails []string) *Service {
 		}
 	}
 	return &Service{store: dataStore, adminEmails: admins, nowFunc: time.Now}
+}
+
+func (s *Service) WithTaskObserver(observer TaskObserver) *Service {
+	s.tasks = observer
+	return s
 }
 
 func (s *Service) GetPreferences(ctx context.Context, userID int64) (PreferencesView, error) {
@@ -202,10 +212,15 @@ func (s *Service) ListNotifications(
 			location, _ = time.LoadLocation(defaultTimezone)
 		}
 		now := s.now()
-		if err := s.store.MaterializeUserNotifications(
+		startedAt := time.Now()
+		materializeErr := s.store.MaterializeUserNotifications(
 			ctx, nil, userID, now.In(location).Format("2006-01-02"), now,
-		); err != nil {
-			return NotificationPage{}, httpapi.InternalError(err)
+		)
+		if s.tasks != nil {
+			s.tasks.ObserveTask(ctx, "notifications.materialize", time.Since(startedAt), materializeErr)
+		}
+		if materializeErr != nil {
+			return NotificationPage{}, httpapi.InternalError(materializeErr)
 		}
 	}
 
