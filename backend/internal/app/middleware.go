@@ -26,6 +26,7 @@ func RequestLogger(logger *slog.Logger, observer RequestObserver) func(http.Hand
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
+			isWebSocket := strings.EqualFold(strings.TrimSpace(r.Header.Get("Upgrade")), "websocket")
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			requestID := middleware.GetReqID(r.Context())
 			if requestID != "" {
@@ -43,7 +44,7 @@ func RequestLogger(logger *slog.Logger, observer RequestObserver) func(http.Hand
 			if route == "" {
 				route = "unmatched"
 			}
-			if observer != nil {
+			if observer != nil && !isWebSocket {
 				observer.ObserveRequest(r.Method, route, status, duration)
 			}
 
@@ -53,7 +54,11 @@ func RequestLogger(logger *slog.Logger, observer RequestObserver) func(http.Hand
 			} else if status >= 400 {
 				level = slog.LevelWarn
 			}
-			logger.Log(r.Context(), level, "http request",
+			message := "http request"
+			if isWebSocket {
+				message = "websocket connection closed"
+			}
+			logger.Log(r.Context(), level, message,
 				"request_id", requestID,
 				"method", r.Method,
 				"route", route,

@@ -21,11 +21,13 @@ type requestObservation struct {
 }
 
 type requestObserverStub struct {
-	last requestObservation
+	last  requestObservation
+	calls int
 }
 
 func (observer *requestObserverStub) ObserveRequest(method, route string, status int, duration time.Duration) {
 	observer.last = requestObservation{method: method, route: route, status: status, duration: duration}
+	observer.calls++
 }
 
 func TestRequestLoggerReturnsCorrelationIDAndUsesRoutePattern(t *testing.T) {
@@ -57,5 +59,24 @@ func TestRequestLoggerReturnsCorrelationIDAndUsesRoutePattern(t *testing.T) {
 	}
 	if _, leaked := entry["path"]; leaked {
 		t.Fatalf("log entry contains raw path: %+v", entry)
+	}
+}
+
+func TestRequestLoggerExcludesWebSocketLifetimeFromRequestMetrics(t *testing.T) {
+	observer := &requestObserverStub{}
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(RequestLogger(slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), observer))
+	router.Get("/ws", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	request.Header.Set("Connection", "Upgrade")
+	request.Header.Set("Upgrade", "websocket")
+	router.ServeHTTP(httptest.NewRecorder(), request)
+
+	if observer.calls != 0 {
+		t.Fatalf("observer calls = %d, want 0", observer.calls)
 	}
 }
