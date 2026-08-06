@@ -78,6 +78,9 @@ func main() {
 			"users_created", seedResult.UsersCreated,
 			"intents_created", seedResult.IntentsCreated,
 			"rooms_created", seedResult.RoomsCreated,
+			"posts_created", seedResult.PostsCreated,
+			"groups_created", seedResult.GroupsCreated,
+			"events_created", seedResult.EventsCreated,
 		)
 	}
 

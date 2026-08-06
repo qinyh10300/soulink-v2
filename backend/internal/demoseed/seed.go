@@ -27,6 +27,9 @@ type Result struct {
 	UsersCreated   int
 	IntentsCreated int
 	RoomsCreated   int
+	PostsCreated   int
+	GroupsCreated  int
+	EventsCreated  int
 }
 
 type userSeed struct {
@@ -440,6 +443,14 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 	if roomCreated {
 		result.RoomsCreated++
 	}
+
+	featureResult, err := ensureDemoProductFeatures(ctx, dataStore, users, adminEmail, now)
+	if err != nil {
+		return Result{}, err
+	}
+	result.PostsCreated = featureResult.PostsCreated
+	result.GroupsCreated = featureResult.GroupsCreated
+	result.EventsCreated = featureResult.EventsCreated
 
 	return result, nil
 }

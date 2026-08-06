@@ -84,6 +84,16 @@ func (s *Store) GetCalendarEvent(ctx context.Context, tx *sql.Tx, viewerID, even
 	return scanCalendarEvent(row)
 }
 
+func (s *Store) FindCalendarEvent(ctx context.Context, tx *sql.Tx, organizerID int64, title string) (CalendarEvent, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, calendarEventSelect+`
+		WHERE e.organizer_id = $1 AND e.title = $2 AND e.status = 'active'
+		  AND organizer.deleted_at IS NULL
+		ORDER BY e.id
+		LIMIT 1
+	`, organizerID, title)
+	return scanCalendarEvent(row)
+}
+
 func (s *Store) ListCalendarEvents(ctx context.Context, tx *sql.Tx, userID int64, from, to time.Time) ([]CalendarEvent, error) {
 	rows, err := executor(s.db, tx).(interface {
 		QueryContext(context.Context, string, ...any) (*sql.Rows, error)

@@ -62,6 +62,17 @@ func (s *Store) GetChatGroup(ctx context.Context, tx *sql.Tx, groupID int64) (Ch
 	return scanChatGroup(row)
 }
 
+func (s *Store) FindChatGroup(ctx context.Context, tx *sql.Tx, ownerID int64, name string) (ChatGroup, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, `
+		SELECT id, name, owner_id, created_at, updated_at
+		FROM chat_groups
+		WHERE owner_id = $1 AND name = $2 AND deleted_at IS NULL
+		ORDER BY id
+		LIMIT 1
+	`, ownerID, name)
+	return scanChatGroup(row)
+}
+
 func (s *Store) UpdateChatGroupName(ctx context.Context, tx *sql.Tx, groupID int64, name string, now time.Time) error {
 	result, err := executor(s.db, tx).ExecContext(ctx, `
 		UPDATE chat_groups

@@ -84,6 +84,24 @@ func (s *Store) CreatePlaygroundPost(ctx context.Context, tx *sql.Tx, params Cre
 	return postID, nil
 }
 
+func (s *Store) FindPlaygroundPostID(ctx context.Context, tx *sql.Tx, authorID int64, content string) (int64, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, `
+		SELECT id
+		FROM playground_posts
+		WHERE author_id = $1 AND content = $2 AND deleted_at IS NULL
+		ORDER BY id
+		LIMIT 1
+	`, authorID, content)
+	var postID int64
+	if err := row.Scan(&postID); err != nil {
+		if err == sql.ErrNoRows {
+			return 0, ErrNotFound
+		}
+		return 0, fmt.Errorf("find playground post: %w", err)
+	}
+	return postID, nil
+}
+
 func (s *Store) GetPlaygroundPost(ctx context.Context, tx *sql.Tx, viewerID, postID int64) (PlaygroundPost, error) {
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		SELECT p.id,
