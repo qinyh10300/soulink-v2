@@ -80,6 +80,7 @@ func main() {
 			"admin_email", cfg.Demo.AdminEmail,
 			"users_created", seedResult.UsersCreated,
 			"intents_created", seedResult.IntentsCreated,
+			"group_intents_created", seedResult.GroupIntentsCreated,
 			"rooms_created", seedResult.RoomsCreated,
 			"posts_created", seedResult.PostsCreated,
 			"groups_created", seedResult.GroupsCreated,

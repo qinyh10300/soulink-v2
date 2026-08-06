@@ -24,12 +24,13 @@ type Config struct {
 }
 
 type Result struct {
-	UsersCreated   int
-	IntentsCreated int
-	RoomsCreated   int
-	PostsCreated   int
-	GroupsCreated  int
-	EventsCreated  int
+	UsersCreated        int
+	IntentsCreated      int
+	GroupIntentsCreated int
+	RoomsCreated        int
+	PostsCreated        int
+	GroupsCreated       int
+	EventsCreated       int
 }
 
 type userSeed struct {
@@ -64,6 +65,20 @@ type intentSeed struct {
 	DesiredNextStep string
 	ProjectMemo     store.ProjectMemo
 	PublishedAgo    time.Duration
+}
+
+type groupIntentSeed struct {
+	AuthorEmail string
+	Category    string
+	Title       string
+	Description string
+	RoleOffer   string
+	RolesNeeded []string
+	Constraints []string
+	TimeWindow  string
+	Location    string
+	MinMembers  int
+	MaxMembers  int
 }
 
 var demoUsers = []userSeed{
@@ -324,6 +339,74 @@ var demoIntents = []intentSeed{
 	},
 }
 
+var demoGroupIntents = []groupIntentSeed{
+	{
+		AuthorEmail: DemoEmail,
+		Category:    "project",
+		Title:       "组一支四周交付的校园 AI 产品小队",
+		Description: "从一个清华同学真实遇到的问题开始，四周内完成访谈、原型和一次校园内测。",
+		RoleOffer:   "AI 产品与用户研究",
+		RolesNeeded: []string{"前端工程", "后端工程", "交互设计"},
+		Constraints: []string{"每周同步", "四周交付", "先验证再开发"},
+		TimeWindow:  "周二、周四晚间和周末下午",
+		Location:    "FIT 楼或李文正馆",
+		MinMembers:  3,
+		MaxMembers:  5,
+	},
+	{
+		AuthorEmail: "chenyu@mails.tsinghua.edu.cn",
+		Category:    "project",
+		Title:       "愿意加入有真实用户的 AI 工程小队",
+		Description: "可以负责后端、端侧 AI 和软硬件协同，希望目标具体、接口清楚、每周有交付。",
+		RoleOffer:   "后端与端侧 AI",
+		RolesNeeded: []string{"产品判断", "前端工程"},
+		Constraints: []string{"每周同步", "四周交付", "先验证再开发"},
+		TimeWindow:  "工作日晚间与周末下午",
+		Location:    "FIT 楼或线上",
+		MinMembers:  3,
+		MaxMembers:  5,
+	},
+	{
+		AuthorEmail: "zhouyan@mails.tsinghua.edu.cn",
+		Category:    "project",
+		Title:       "寻找工程互补的校园产品验证小队",
+		Description: "可以负责产品、增长和用户访谈，希望和工程同学把一个明确问题推进到真实试用。",
+		RoleOffer:   "产品增长与用户访谈",
+		RolesNeeded: []string{"前端工程", "后端工程"},
+		Constraints: []string{"每周同步", "四周交付", "用户证据"},
+		TimeWindow:  "每周可稳定投入 8 到 12 小时",
+		Location:    "双清大厦或线上",
+		MinMembers:  3,
+		MaxMembers:  5,
+	},
+	{
+		AuthorEmail: "xuqinghe@mails.tsinghua.edu.cn",
+		Category:    "study",
+		Title:       "组一个安静守时的晚间自习小组",
+		Description: "各自专注，每 50 分钟短休息一次，结束前用五分钟同步进度。",
+		RoleOffer:   "学习伙伴",
+		RolesNeeded: []string{"守时的学习伙伴"},
+		Constraints: []string{"安静", "守时", "番茄钟"},
+		TimeWindow:  "周一至周四 19:30 后",
+		Location:    "李文正馆",
+		MinMembers:  3,
+		MaxMembers:  4,
+	},
+	{
+		AuthorEmail: "shenmo@mails.tsinghua.edu.cn",
+		Category:    "sport",
+		Title:       "组一个每周二四的轻松跑小组",
+		Description: "五公里左右，不追求竞速，以安全和稳定出门为先。",
+		RoleOffer:   "跑步搭子",
+		RolesNeeded: []string{"召集人", "跑步搭子"},
+		Constraints: []string{"以安全为先", "守时"},
+		TimeWindow:  "周二、周四 20:30",
+		Location:    "东操",
+		MinMembers:  3,
+		MaxMembers:  6,
+	},
+}
+
 func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, error) {
 	if len(cfg.Password) < 8 || len(cfg.Password) > 72 {
 		return Result{}, errors.New("demo password must contain 8 to 72 bytes")
@@ -415,6 +498,20 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 		intents[seed.Key] = intentID
 	}
 
+	for _, seed := range demoGroupIntents {
+		author, ok := users[seed.AuthorEmail]
+		if !ok {
+			return Result{}, fmt.Errorf("demo group intent %q has no author", seed.Title)
+		}
+		created, err := ensureGroupMatchIntent(ctx, dataStore, author.ID, seed, now)
+		if err != nil {
+			return Result{}, err
+		}
+		if created {
+			result.GroupIntentsCreated++
+		}
+	}
+
 	primary := users[DemoEmail]
 	projectCandidate := users["zhouyan@mails.tsinghua.edu.cn"]
 	if err := ensurePendingInterest(
@@ -453,6 +550,36 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 	result.EventsCreated = featureResult.EventsCreated
 
 	return result, nil
+}
+
+func ensureGroupMatchIntent(
+	ctx context.Context,
+	dataStore *store.Store,
+	authorID int64,
+	seed groupIntentSeed,
+	now time.Time,
+) (bool, error) {
+	existing, err := dataStore.ListGroupMatchIntentsByOwner(ctx, nil, authorID, 100)
+	if err != nil {
+		return false, fmt.Errorf("list demo group intents: %w", err)
+	}
+	for _, item := range existing {
+		if item.Title == seed.Title && item.Status != "expired" && item.Status != "cancelled" {
+			return false, nil
+		}
+	}
+	_, err = dataStore.CreateGroupMatchIntent(ctx, nil, store.CreateGroupMatchIntentParams{
+		OrganizerID: authorID, Category: seed.Category, Title: seed.Title,
+		Description: seed.Description, RoleOffer: seed.RoleOffer,
+		RolesNeeded: seed.RolesNeeded, Constraints: seed.Constraints,
+		TimeWindow: seed.TimeWindow, Location: seed.Location,
+		MinMembers: seed.MinMembers, MaxMembers: seed.MaxMembers,
+		ExpiresAt: now.Add(21 * 24 * time.Hour), Now: now,
+	})
+	if err != nil {
+		return false, fmt.Errorf("create demo group intent %q: %w", seed.Title, err)
+	}
+	return true, nil
 }
 
 func ensureUser(
