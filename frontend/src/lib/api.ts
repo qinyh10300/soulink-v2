@@ -32,10 +32,36 @@ export class ApiError extends Error {
   }
 }
 
-function resolveApiBaseUrl() {
+export function resolveApiBaseUrl() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL
 
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
+}
+
+export async function apiBlobRequest(path: string) {
+  const token = getAuthSession()?.token
+  if (!token) {
+    throw new ApiError('请先登录后再继续操作', 401, 4011, null)
+  }
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!response.ok) {
+    let payload: ApiEnvelope<unknown> | null = null
+    try {
+      payload = (await response.json()) as ApiEnvelope<unknown>
+    } catch {
+      // Binary endpoints may return an empty error body.
+    }
+    throw new ApiError(
+      payload?.message || `Request failed with status ${response.status}`,
+      response.status,
+      payload?.code ?? -1,
+      payload?.data ?? null,
+    )
+  }
+  return response.blob()
 }
 
 function buildRequestBody(body: ApiRequestOptions['body']) {

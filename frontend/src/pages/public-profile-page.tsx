@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   BriefcaseBusiness,
   CalendarDays,
+  Camera,
   Clock3,
   MapPin,
   MessageCircle,
@@ -36,6 +37,7 @@ import {
   sendFriendRequest,
 } from '@/lib/friend-api'
 import { fetchPublicProfile, type PublicProfileDetails } from '@/lib/profile-api'
+import { fetchPublicTrustProfile, type TrustProfile } from '@/lib/safety-api'
 
 type RelationshipStatus = 'friend' | 'none' | 'received' | 'sent' | 'unknown'
 
@@ -231,6 +233,7 @@ export function PublicProfilePage() {
   const contextIntentId = Number(searchParams.get('intentId'))
   const hasContext = Number.isInteger(contextIntentId) && contextIntentId > 0
   const [profile, setProfile] = useState<PublicProfileDetails | null>(null)
+  const [trust, setTrust] = useState<TrustProfile | null>(null)
   const [contextProfile, setContextProfile] = useState<ContextProfile | null>(null)
   const [schedule, setSchedule] = useState<CalendarEvent[]>([])
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -245,18 +248,20 @@ export function PublicProfilePage() {
       return
     }
     try {
-      const [profileData, events, relationship, contextData] = await Promise.all([
+      const [profileData, events, relationship, contextData, trustData] = await Promise.all([
         fetchPublicProfile(numericUserId),
         fetchUserSchedule(numericUserId, weekStart, addDays(weekStart, 7)),
         fetchRelationshipStatus(numericUserId),
         hasContext
           ? fetchContextProfile(contextIntentId, numericUserId)
           : Promise.resolve(null),
+        fetchPublicTrustProfile(numericUserId),
       ])
       setProfile(profileData)
       setContextProfile(contextData)
       setSchedule(events)
       setRelationshipStatus(relationship)
+      setTrust(trustData)
       setNotice('')
     } catch (error) {
       setNotice(getErrorMessage(error, '个人主页加载失败，请稍后重试'))
@@ -388,6 +393,21 @@ export function PublicProfilePage() {
                 </button>
               </div>
             </div>
+            {trust ? (
+              <div className="grid border-t border-[#e3e5e1] sm:grid-cols-4">
+                {[
+                  { icon: ShieldCheck, label: trust.emailVerified ? '校园邮箱已验证' : '邮箱未验证', active: trust.emailVerified },
+                  { icon: UserCheck, label: trust.profileComplete ? '连接资料已完善' : '资料待完善', active: trust.profileComplete },
+                  { icon: Camera, label: trust.photoStatus === 'approved' ? '照片人工审核通过' : '照片未核验', active: trust.photoStatus === 'approved' },
+                  { icon: Clock3, label: trust.recentlyActive ? '近期活跃' : '近期未活跃', active: trust.recentlyActive },
+                ].map(({ icon: Icon, label, active }) => (
+                  <div className="flex h-10 items-center gap-2 border-b border-[#e3e5e1] px-5 text-[11px] last:border-b-0 sm:border-b-0 sm:border-r sm:px-4 sm:last:border-r-0" key={label}>
+                    <Icon className={`h-3.5 w-3.5 ${active ? 'text-[#3f705d]' : 'text-[#9a9f99]'}`} />
+                    <span className={active ? 'text-[#4d655b]' : 'text-[#8b908a]'}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
         ) : null}
 

@@ -6,6 +6,7 @@ import { AccountManagementCard } from '@/components/profile/account-management-c
 import { ChangePasswordModal } from '@/components/profile/change-password-modal'
 import { DeleteAccountConfirmModal } from '@/components/profile/delete-account-confirm-modal'
 import { ProfileFormCard } from '@/components/profile/profile-form-card'
+import { TrustVerificationPanel } from '@/components/profile/trust-verification-panel'
 import { getErrorMessage } from '@/lib/api'
 import { majorDescriptionMaxLength } from '@/lib/auth-schema'
 import { fetchContactTypes, fetchGrades } from '@/lib/meta-api'
@@ -208,6 +209,8 @@ export function ProfilePage() {
             }}
             profile={profile}
           />
+
+          <TrustVerificationPanel />
 
           <AccountManagementCard
             onDeleteAccount={() => setDeleteAccountOpen(true)}
