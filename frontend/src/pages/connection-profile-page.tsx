@@ -561,7 +561,7 @@ export function ConnectionProfilePage() {
                 <ClipboardCheck size={16} className="text-[#6c4a80]" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-semibold text-[#4f4b46]">
-                    安全工单
+                    运营与安全
                   </span>
                   <span className="mt-0.5 block text-[10px] text-[#817d76]">
                     核查举报并更新处理状态
