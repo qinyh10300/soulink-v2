@@ -242,6 +242,15 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/conversations/{conversationId}/messages", deps.ChatHandler.CreateMessage)
 			r.Post("/conversations/{conversationId}/read", deps.ChatHandler.MarkRead)
 			r.Get("/conversations/unread-count", deps.ChatHandler.GetUnreadCount)
+			r.Get("/conversations/{conversationId}/assistant", deps.ChatHandler.GetDirectAssistant)
+			r.Post("/conversations/{conversationId}/assistant/starters", deps.ChatHandler.GenerateDirectAssistantStarters)
+			r.Post("/conversations/{conversationId}/assistant/summary", deps.ChatHandler.GenerateDirectAssistantSummary)
+			r.Post("/conversations/{conversationId}/assistant/actions", deps.ChatHandler.GenerateDirectAssistantActions)
+			r.Delete("/conversations/{conversationId}/assistant/artifacts/{artifactId}", deps.ChatHandler.DeleteDirectAssistantArtifact)
+
+			r.Get("/assistant/preferences", deps.ChatHandler.GetAssistantPreferences)
+			r.Put("/assistant/preferences", deps.ChatHandler.UpdateAssistantPreferences)
+			r.Post("/assistant/reset", deps.ChatHandler.ResetAssistantMemory)
 
 			r.Route("/chat-groups", func(r chi.Router) {
 				r.Get("/", deps.ChatHandler.ListGroups)
@@ -253,6 +262,10 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Get("/{groupId}/messages", deps.ChatHandler.ListGroupMessages)
 				r.Post("/{groupId}/messages", deps.ChatHandler.CreateGroupMessage)
 				r.Post("/{groupId}/read", deps.ChatHandler.MarkGroupRead)
+				r.Get("/{groupId}/assistant", deps.ChatHandler.GetGroupAssistant)
+				r.Post("/{groupId}/assistant/summary", deps.ChatHandler.GenerateGroupAssistantSummary)
+				r.Post("/{groupId}/assistant/actions", deps.ChatHandler.GenerateGroupAssistantActions)
+				r.Delete("/{groupId}/assistant/artifacts/{artifactId}", deps.ChatHandler.DeleteGroupAssistantArtifact)
 			})
 
 			if deps.PlaygroundHandler != nil {

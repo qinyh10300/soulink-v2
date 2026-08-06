@@ -174,7 +174,7 @@ func main() {
 		match.WithResultCache(resultCache, cfg.Match.ResultCacheTTL),
 	)
 	chatHub := chat.NewHub(logger)
-	chatService := chat.NewService(dataStore)
+	chatService := chat.NewService(dataStore).WithGenerator(modelGenerator)
 	calendarService := calendar.NewService(dataStore)
 	meetupService := meetup.NewService(dataStore, analyticsService)
 

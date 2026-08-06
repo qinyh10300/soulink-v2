@@ -6,12 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"soulink-backend/internal/ai"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/store"
 )
 
 type Service struct {
-	store *store.Store
+	store     *store.Store
+	generator ai.Generator
+	nowFunc   func() time.Time
 }
 
 type ConversationView struct {
@@ -43,7 +46,12 @@ type MessagesResult struct {
 }
 
 func NewService(dataStore *store.Store) *Service {
-	return &Service{store: dataStore}
+	return &Service{store: dataStore, nowFunc: time.Now}
+}
+
+func (s *Service) WithGenerator(generator ai.Generator) *Service {
+	s.generator = generator
+	return s
 }
 
 func (s *Service) ListConversations(ctx context.Context, userID int64) ([]ConversationView, error) {
