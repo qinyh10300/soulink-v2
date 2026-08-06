@@ -9,120 +9,124 @@ import {
   Menu,
   MessageCircleMore,
   MessagesSquare,
+  PanelLeftClose,
   Plus,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   UserRound,
   X,
-} from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Group,
+  Panel,
+  useDefaultLayout,
+  usePanelRef,
+} from "react-resizable-panels";
 import {
   Link,
   NavLink,
   Outlet,
   useLocation,
   useNavigate,
-} from 'react-router-dom'
+} from "react-router-dom";
 
-import logoUrl from '@/assets/soulink-logo-icon.png'
-import { logout } from '@/lib/auth-api'
-import {
-  fetchMyIntents,
-  type ConnectionIntent,
-} from '@/lib/connection-api'
-import { cn } from '@/lib/utils'
-import { useChat } from '@/contexts/chat-context'
+import logoUrl from "@/assets/soulink-logo-icon.png";
+import { logout } from "@/lib/auth-api";
+import { fetchMyIntents, type ConnectionIntent } from "@/lib/connection-api";
+import { cn } from "@/lib/utils";
+import { useChat } from "@/contexts/chat-context";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   clearAuthSession,
   clearUserProfile,
   getStoredUserProfile,
-} from '@/lib/user-profile-storage'
+} from "@/lib/user-profile-storage";
+import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
+import { WorkspaceResizeHandle } from "@/components/workspace/workspace-resize-handle";
 
 interface NavItem {
-  label: string
-  mobileLabel: string
-  to: string
-  icon: LucideIcon
-  match: (pathname: string) => boolean
-  mobile: boolean
+  label: string;
+  mobileLabel: string;
+  to: string;
+  icon: LucideIcon;
+  match: (pathname: string) => boolean;
+  mobile: boolean;
 }
 
 const navItems: NavItem[] = [
   {
-    label: 'SouLink 助手',
-    mobileLabel: '助手',
-    to: '/home',
+    label: "SouLink 助手",
+    mobileLabel: "助手",
+    to: "/home",
     icon: Sparkles,
     mobile: true,
-    match: (pathname) => pathname === '/home',
+    match: (pathname) => pathname === "/home",
   },
   {
-    label: '校园发现',
-    mobileLabel: '发现',
-    to: '/discover',
+    label: "校园发现",
+    mobileLabel: "发现",
+    to: "/discover",
     icon: Compass,
     mobile: true,
-    match: (pathname) => pathname === '/discover',
+    match: (pathname) => pathname === "/discover",
   },
   {
-    label: '我的意图',
-    mobileLabel: '意图',
-    to: '/intents',
+    label: "我的意图",
+    mobileLabel: "意图",
+    to: "/intents",
     icon: ClipboardList,
     mobile: false,
     match: (pathname) =>
-      pathname === '/intents' || pathname.startsWith('/intents/'),
+      pathname === "/intents" || pathname.startsWith("/intents/"),
   },
   {
-    label: '连接房间',
-    mobileLabel: '连接',
-    to: '/matches',
+    label: "连接房间",
+    mobileLabel: "连接",
+    to: "/matches",
     icon: MessagesSquare,
     mobile: false,
-    match: (pathname) => pathname.startsWith('/matches'),
+    match: (pathname) => pathname.startsWith("/matches"),
   },
   {
-    label: '清华树洞',
-    mobileLabel: '树洞',
-    to: '/plaza',
+    label: "清华树洞",
+    mobileLabel: "树洞",
+    to: "/plaza",
     icon: CircleDotDashed,
     mobile: true,
-    match: (pathname) => pathname === '/plaza',
+    match: (pathname) => pathname === "/plaza",
   },
   {
-    label: '消息',
-    mobileLabel: '消息',
-    to: '/chat',
+    label: "消息",
+    mobileLabel: "消息",
+    to: "/chat",
     icon: MessageCircleMore,
     mobile: true,
-    match: (pathname) => pathname.startsWith('/chat'),
+    match: (pathname) => pathname.startsWith("/chat"),
   },
   {
-    label: '时间表',
-    mobileLabel: '日程',
-    to: '/calendar',
+    label: "时间表",
+    mobileLabel: "日程",
+    to: "/calendar",
     icon: CalendarDays,
     mobile: false,
-    match: (pathname) => pathname === '/calendar',
+    match: (pathname) => pathname === "/calendar",
   },
   {
-    label: 'AI 档案',
-    mobileLabel: '档案',
-    to: '/profile',
+    label: "AI 档案",
+    mobileLabel: "档案",
+    to: "/profile",
     icon: UserRound,
     mobile: true,
-    match: (pathname) => pathname === '/profile',
+    match: (pathname) => pathname === "/profile",
   },
-]
+];
 
 function Brand() {
   return (
     <Link className="flex min-w-0 items-center gap-2.5" to="/home">
-      <img
-        alt=""
-        className="h-8 w-8 rounded-md object-cover"
-        src={logoUrl}
-      />
+      <img alt="" className="h-8 w-8 rounded-md object-cover" src={logoUrl} />
       <span className="min-w-0">
         <span className="block truncate text-[17px] font-semibold text-[#211f1d]">
           SouLink
@@ -132,20 +136,27 @@ function Brand() {
         </span>
       </span>
     </Link>
-  )
+  );
 }
 
 export function ConnectionShell() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [loggingOut, setLoggingOut] = useState(false)
-  const [recentIntents, setRecentIntents] = useState<ConnectionIntent[]>([])
-  const { totalUnread } = useChat()
-  const profile = useMemo(() => getStoredUserProfile(), [])
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [recentIntents, setRecentIntents] = useState<ConnectionIntent[]>([]);
+  const { totalUnread } = useChat();
+  const profile = useMemo(() => getStoredUserProfile(), []);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const navigationPanelRef = usePanelRef();
+  const [navigationCollapsed, setNavigationCollapsed] = useState(false);
+  const navigationLayout = useDefaultLayout({
+    id: "soulink-primary-workbench-v1",
+    panelIds: ["navigation", "content"],
+  });
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     void fetchMyIntents()
       .then((intents) => {
         if (!cancelled) {
@@ -157,246 +168,323 @@ export function ConnectionShell() {
                   new Date(left.updatedAt).getTime(),
               )
               .slice(0, 4),
-          )
+          );
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setRecentIntents([])
+          setRecentIntents([]);
         }
-      })
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [location.pathname])
+      cancelled = true;
+    };
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     if (loggingOut) {
-      return
+      return;
     }
-    setLoggingOut(true)
+    setLoggingOut(true);
     try {
-      await logout()
+      await logout();
     } catch {
       // Local credentials are cleared even when the network request fails.
     } finally {
-      clearAuthSession()
-      clearUserProfile()
-      navigate('/login')
+      clearAuthSession();
+      clearUserProfile();
+      navigate("/login");
     }
-  }
+  };
+
+  const resetNavigationWidth = () => {
+    navigationPanelRef.current?.expand();
+    navigationPanelRef.current?.resize(244);
+  };
 
   return (
     <div className="min-h-screen bg-[#f7f6f3] text-[#23211f]">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[244px] border-r border-[#dfdcd6] bg-[#fbfaf8] px-4 py-5 lg:flex lg:flex-col">
-        <Brand />
-
-        <Link
-          className="mt-7 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#263b35] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#1d302a]"
-          to="/intents/new"
-        >
-          <Plus size={17} />
-          开始新对话
-        </Link>
-
-        <nav aria-label="产品导航" className="mt-5 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <NavLink
-                className={({ isActive }) =>
-                  cn(
-                    'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-[#e8f1ed] text-[#315c4d]'
-                      : 'text-[#625e58] hover:bg-[#f0eeea] hover:text-[#23211f]',
-                  )
-                }
-                key={item.to}
-                to={item.to}
-              >
-                <Icon size={17} strokeWidth={1.8} />
-                {item.label}
-                {item.to === '/chat' && totalUnread > 0 ? (
-                  <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d95656] px-1 text-[10px] font-semibold text-white">
-                    {totalUnread > 99 ? '99+' : totalUnread}
-                  </span>
-                ) : null}
-              </NavLink>
-            )
-          })}
-        </nav>
-
-        <section className="mt-6 min-h-0 border-t border-[#e4e1dc] pt-5">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-[11px] font-semibold text-[#817d76]">最近意图</h2>
-            <Link
-              className="text-[11px] font-medium text-[#477062] hover:text-[#315c4d]"
-              to="/intents"
-            >
-              全部
-            </Link>
-          </div>
-          <div className="mt-2 space-y-0.5">
-            {recentIntents.length > 0 ? (
-              recentIntents.map((intent) => (
-                <Link
-                  className="group flex min-w-0 items-center gap-2.5 rounded-md px-2 py-2 text-xs text-[#6f6b65] hover:bg-[#f0eeea] hover:text-[#34312e]"
-                  key={intent.id}
-                  to={`/intents/${intent.id}`}
-                >
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 shrink-0 rounded-full',
-                      intent.status === 'active'
-                        ? 'bg-[#4f846f]'
-                        : 'bg-[#bbb6ae]',
-                    )}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{intent.title}</span>
-                  <Clock3
-                    className="shrink-0 text-[#a19c94] opacity-0 transition-opacity group-hover:opacity-100"
-                    size={12}
-                  />
-                </Link>
-              ))
-            ) : (
-              <p className="px-2 py-3 text-xs leading-5 text-[#9a958d]">
-                暂无最近意图
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="mt-auto border-t border-[#e4e1dc] pt-4">
-          <div className="flex items-center gap-2.5 px-2">
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#e9f1ed] text-sm font-semibold text-[#27614f]">
-              {(profile.nickname || '同学').slice(0, 1)}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-[#302e2b]">
-                {profile.nickname || '清华同学'}
-              </span>
-              <span className="flex items-center gap-1 text-[11px] text-[#77736c]">
-                <ShieldCheck size={11} />
-                身份已验证
-              </span>
-            </span>
-            <button
-              aria-label="退出登录"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#817d76] transition-colors hover:bg-[#eeeae5] hover:text-[#8b3f3f]"
-              disabled={loggingOut}
-              onClick={() => void handleLogout()}
-              title="退出登录"
-              type="button"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      <header className="sticky top-0 z-40 flex h-15 items-center justify-between border-b border-[#dfdcd6] bg-[rgba(251,250,248,0.94)] px-4 backdrop-blur-lg lg:hidden">
-        <Brand />
-        <div className="flex items-center gap-1">
-          <Link
-            aria-label="发布新意图"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#263b35] text-white"
-            title="开始新对话"
-            to="/intents/new"
-          >
-            <Plus size={18} />
-          </Link>
-          <button
-            aria-label={mobileMenuOpen ? '关闭菜单' : '打开菜单'}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#5f5b55] hover:bg-[#efede9]"
-            onClick={() => setMobileMenuOpen((open) => !open)}
-            type="button"
-          >
-            {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
-          </button>
-        </div>
-      </header>
-
-      {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-15 z-30 border-b border-[#dfdcd6] bg-[#fbfaf8] p-3 shadow-[0_12px_32px_rgba(35,33,31,0.08)] lg:hidden">
-          <Link
-            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
-            onClick={() => setMobileMenuOpen(false)}
-            to="/calendar"
-          >
-            <CalendarDays size={17} />
-            时间表
-          </Link>
-          <Link
-            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
-            onClick={() => setMobileMenuOpen(false)}
-            to="/intents"
-          >
-            <ClipboardList size={17} />
-            我的意图
-          </Link>
-          <Link
-            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
-            onClick={() => setMobileMenuOpen(false)}
-            to="/matches"
-          >
-            <MessagesSquare size={17} />
-            连接房间
-          </Link>
-          <Link
-            className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
-            onClick={() => setMobileMenuOpen(false)}
-            to="/account"
-          >
-            <UserRound size={17} />
-            账户设置
-          </Link>
-          <button
-            className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm text-[#8b3f3f] hover:bg-[#f5eaea]"
-            disabled={loggingOut}
-            onClick={() => void handleLogout()}
-            type="button"
-          >
-            <LogOut size={17} />
-            {loggingOut ? '正在退出...' : '退出登录'}
-          </button>
-        </div>
-      ) : null}
-
-      <main className="min-h-screen pb-20 lg:ml-[244px] lg:pb-0">
-        <Outlet />
-      </main>
-
-      <nav
-        aria-label="移动端导航"
-        className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+      <Group
+        className="min-h-screen w-full"
+        defaultLayout={isDesktop ? navigationLayout.defaultLayout : undefined}
+        id="soulink-primary-workbench"
+        onLayoutChanged={
+          isDesktop ? navigationLayout.onLayoutChanged : undefined
+        }
+        orientation="horizontal"
+        resizeTargetMinimumSize={{ coarse: 24, fine: 11 }}
       >
-        {navItems.filter((item) => item.mobile).map((item) => {
-          const Icon = item.icon
-          return (
-            <NavLink
-              className={({ isActive }) =>
-                cn(
-                  'relative flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium',
-                  isActive ? 'text-[#315c4d]' : 'text-[#77736c]',
-                )
-              }
-              key={item.to}
-              to={item.to}
+        {isDesktop ? (
+          <>
+            <Panel
+              collapsedSize={0}
+              collapsible
+              defaultSize={244}
+              groupResizeBehavior="preserve-pixel-size"
+              id="navigation"
+              maxSize={336}
+              minSize={208}
+              onResize={({ inPixels }) => setNavigationCollapsed(inPixels < 1)}
+              panelRef={navigationPanelRef}
             >
-              <Icon size={18} strokeWidth={1.8} />
-              <span className="truncate">{item.mobileLabel}</span>
-              {item.to === '/chat' && totalUnread > 0 ? (
-                <span className="absolute ml-5 mt-[-20px] inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#d95656] px-1 text-[9px] font-semibold text-white">
-                  {totalUnread > 9 ? '9+' : totalUnread}
-                </span>
-              ) : null}
-            </NavLink>
-          )
-        })}
-      </nav>
+              <aside className="flex h-screen w-full flex-col overflow-hidden bg-[#fbfaf8] px-4 py-5">
+                <div className="flex items-center justify-between gap-2">
+                  <Brand />
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      aria-label="恢复默认侧栏宽度"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#8a857e] transition-colors hover:bg-[#efede9] hover:text-[#445f55] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#527b6d]"
+                      onClick={resetNavigationWidth}
+                      title="恢复默认侧栏宽度"
+                      type="button"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                    <button
+                      aria-label="隐藏主侧栏"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#8a857e] transition-colors hover:bg-[#efede9] hover:text-[#445f55] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#527b6d]"
+                      onClick={() => navigationPanelRef.current?.collapse()}
+                      title="隐藏主侧栏"
+                      type="button"
+                    >
+                      <PanelLeftClose size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <Link
+                  className="mt-7 inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#263b35] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#1d302a]"
+                  to="/intents/new"
+                >
+                  <Plus size={17} />
+                  开始新对话
+                </Link>
+
+                <nav aria-label="产品导航" className="mt-5 space-y-1">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        className={({ isActive }) =>
+                          cn(
+                            "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                            isActive
+                              ? "bg-[#e8f1ed] text-[#315c4d]"
+                              : "text-[#625e58] hover:bg-[#f0eeea] hover:text-[#23211f]",
+                          )
+                        }
+                        key={item.to}
+                        to={item.to}
+                      >
+                        <Icon size={17} strokeWidth={1.8} />
+                        {item.label}
+                        {item.to === "/chat" && totalUnread > 0 ? (
+                          <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d95656] px-1 text-[10px] font-semibold text-white">
+                            {totalUnread > 99 ? "99+" : totalUnread}
+                          </span>
+                        ) : null}
+                      </NavLink>
+                    );
+                  })}
+                </nav>
+
+                <section className="mt-6 min-h-0 border-t border-[#e4e1dc] pt-5">
+                  <div className="flex items-center justify-between px-2">
+                    <h2 className="text-[11px] font-semibold text-[#817d76]">
+                      最近意图
+                    </h2>
+                    <Link
+                      className="text-[11px] font-medium text-[#477062] hover:text-[#315c4d]"
+                      to="/intents"
+                    >
+                      全部
+                    </Link>
+                  </div>
+                  <div className="mt-2 space-y-0.5">
+                    {recentIntents.length > 0 ? (
+                      recentIntents.map((intent) => (
+                        <Link
+                          className="group flex min-w-0 items-center gap-2.5 rounded-md px-2 py-2 text-xs text-[#6f6b65] hover:bg-[#f0eeea] hover:text-[#34312e]"
+                          key={intent.id}
+                          to={`/intents/${intent.id}`}
+                        >
+                          <span
+                            className={cn(
+                              "h-1.5 w-1.5 shrink-0 rounded-full",
+                              intent.status === "active"
+                                ? "bg-[#4f846f]"
+                                : "bg-[#bbb6ae]",
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {intent.title}
+                          </span>
+                          <Clock3
+                            className="shrink-0 text-[#a19c94] opacity-0 transition-opacity group-hover:opacity-100"
+                            size={12}
+                          />
+                        </Link>
+                      ))
+                    ) : (
+                      <p className="px-2 py-3 text-xs leading-5 text-[#9a958d]">
+                        暂无最近意图
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <div className="mt-auto border-t border-[#e4e1dc] pt-4">
+                  <div className="flex items-center gap-2.5 px-2">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#e9f1ed] text-sm font-semibold text-[#27614f]">
+                      {(profile.nickname || "同学").slice(0, 1)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-[#302e2b]">
+                        {profile.nickname || "清华同学"}
+                      </span>
+                      <span className="flex items-center gap-1 text-[11px] text-[#77736c]">
+                        <ShieldCheck size={11} />
+                        身份已验证
+                      </span>
+                    </span>
+                    <button
+                      aria-label="退出登录"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#817d76] transition-colors hover:bg-[#eeeae5] hover:text-[#8b3f3f]"
+                      disabled={loggingOut}
+                      onClick={() => void handleLogout()}
+                      title="退出登录"
+                      type="button"
+                    >
+                      <LogOut size={16} />
+                    </button>
+                  </div>
+                </div>
+              </aside>
+            </Panel>
+
+            <WorkspaceResizeHandle label="调整主侧栏宽度" />
+          </>
+        ) : null}
+
+        <Panel
+          className="relative min-w-0"
+          groupResizeBehavior="preserve-relative-size"
+          id="content"
+          minSize={isDesktop ? 560 : 0}
+        >
+          {isDesktop && navigationCollapsed ? (
+            <WorkspaceEdgeButton
+              label="显示主侧栏"
+              onClick={() => navigationPanelRef.current?.expand()}
+              side="left"
+            />
+          ) : null}
+
+          <header className="sticky top-0 z-40 flex h-15 items-center justify-between border-b border-[#dfdcd6] bg-[rgba(251,250,248,0.94)] px-4 backdrop-blur-lg lg:hidden">
+            <Brand />
+            <div className="flex items-center gap-1">
+              <Link
+                aria-label="发布新意图"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#263b35] text-white"
+                title="开始新对话"
+                to="/intents/new"
+              >
+                <Plus size={18} />
+              </Link>
+              <button
+                aria-label={mobileMenuOpen ? "关闭菜单" : "打开菜单"}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#5f5b55] hover:bg-[#efede9]"
+                onClick={() => setMobileMenuOpen((open) => !open)}
+                type="button"
+              >
+                {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
+              </button>
+            </div>
+          </header>
+
+          {mobileMenuOpen ? (
+            <div className="fixed inset-x-0 top-15 z-30 border-b border-[#dfdcd6] bg-[#fbfaf8] p-3 shadow-[0_12px_32px_rgba(35,33,31,0.08)] lg:hidden">
+              <Link
+                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                onClick={() => setMobileMenuOpen(false)}
+                to="/calendar"
+              >
+                <CalendarDays size={17} />
+                时间表
+              </Link>
+              <Link
+                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                onClick={() => setMobileMenuOpen(false)}
+                to="/intents"
+              >
+                <ClipboardList size={17} />
+                我的意图
+              </Link>
+              <Link
+                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                onClick={() => setMobileMenuOpen(false)}
+                to="/matches"
+              >
+                <MessagesSquare size={17} />
+                连接房间
+              </Link>
+              <Link
+                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                onClick={() => setMobileMenuOpen(false)}
+                to="/account"
+              >
+                <UserRound size={17} />
+                账户设置
+              </Link>
+              <button
+                className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm text-[#8b3f3f] hover:bg-[#f5eaea]"
+                disabled={loggingOut}
+                onClick={() => void handleLogout()}
+                type="button"
+              >
+                <LogOut size={17} />
+                {loggingOut ? "正在退出..." : "退出登录"}
+              </button>
+            </div>
+          ) : null}
+
+          <main className="min-h-screen pb-20 lg:h-screen lg:min-h-0 lg:pb-0">
+            <Outlet />
+          </main>
+
+          <nav
+            aria-label="移动端导航"
+            className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+          >
+            {navItems
+              .filter((item) => item.mobile)
+              .map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    className={({ isActive }) =>
+                      cn(
+                        "relative flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+                        isActive ? "text-[#315c4d]" : "text-[#77736c]",
+                      )
+                    }
+                    key={item.to}
+                    to={item.to}
+                  >
+                    <Icon size={18} strokeWidth={1.8} />
+                    <span className="truncate">{item.mobileLabel}</span>
+                    {item.to === "/chat" && totalUnread > 0 ? (
+                      <span className="absolute ml-5 mt-[-20px] inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#d95656] px-1 text-[9px] font-semibold text-white">
+                        {totalUnread > 9 ? "9+" : totalUnread}
+                      </span>
+                    ) : null}
+                  </NavLink>
+                );
+              })}
+          </nav>
+        </Panel>
+      </Group>
     </div>
-  )
+  );
 }
