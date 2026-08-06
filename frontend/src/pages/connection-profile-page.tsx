@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom'
 
 import { getErrorMessage } from '@/lib/api'
 import { RecommendationPreferencesCard } from '@/components/connection/recommendation-preferences-card'
+import { NotificationSettingsPanel } from '@/components/engagement/notification-settings-panel'
 import {
   fetchMatchingProfile,
   updateMatchingProfile,
@@ -526,6 +527,8 @@ export function ConnectionProfilePage() {
           </section>
 
           <RecommendationPreferencesCard />
+
+          <NotificationSettingsPanel />
 
           <section className="rounded-lg border border-[#dfdcd6] bg-[#f5f3ef]">
             <Link

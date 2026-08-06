@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { ScrollManager } from '@/components/shared/scroll-manager'
 import { ChatProvider } from '@/contexts/chat-context'
+import { EngagementProvider } from '@/contexts/engagement-context'
 import { ApiError } from '@/lib/api'
 import { fetchCurrentUser } from '@/lib/auth-api'
 import { connectionPaths } from '@/lib/connection-routes'
@@ -120,10 +121,12 @@ export function RequireAuth() {
   }
 
   return (
-    <ChatProvider>
-      <ScrollManager />
-      <Outlet />
-    </ChatProvider>
+    <EngagementProvider>
+      <ChatProvider>
+        <ScrollManager />
+        <Outlet />
+      </ChatProvider>
+    </EngagementProvider>
   )
 }
 

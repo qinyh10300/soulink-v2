@@ -1,0 +1,45 @@
+{
+  "name": "SouLink - 清华校内连接",
+  "short_name": "SouLink",
+  "description": "AI 辅助、用户可控的清华校内连接平台。",
+  "lang": "zh-CN",
+  "id": "/connect",
+  "start_url": "/connect?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7f6f3",
+  "theme_color": "#263b35",
+  "categories": ["social", "lifestyle", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "认识",
+      "short_name": "认识",
+      "url": "/connect"
+    },
+    {
+      "name": "消息",
+      "short_name": "消息",
+      "url": "/chat"
+    },
+    {
+      "name": "时间表",
+      "short_name": "日历",
+      "url": "/calendar"
+    }
+  ]
+}

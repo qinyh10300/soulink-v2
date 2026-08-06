@@ -22,6 +22,7 @@ import {
   intentCategoryMeta,
 } from "@/components/connection/intent-category";
 import { InferenceBadge } from "@/components/connection/inference-badge";
+import { CampusThemeStrip } from "@/components/engagement/campus-theme-strip";
 import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
 import { WorkspaceResizeHandle } from "@/components/workspace/workspace-resize-handle";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -505,6 +506,10 @@ export function ConnectionHomePage() {
               </button>
             </div>
           ) : null}
+
+          <CampusThemeStrip
+            onSelect={(theme) => startConversation(theme.defaultPrompt)}
+          />
 
           {pendingMeetups.length > 0 ? (
             <section className="mt-7 border-t border-[#dedad4] pt-6">

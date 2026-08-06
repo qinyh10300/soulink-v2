@@ -28,6 +28,9 @@ import {
 
 import logoUrl from "@/assets/soulink-logo-icon.png";
 import { ConnectionJourneyNav } from "@/components/connection/connection-journey-nav";
+import { NotificationCenter } from "@/components/engagement/notification-center";
+import { OnboardingDialog } from "@/components/engagement/onboarding-dialog";
+import { PWAUpdateBanner } from "@/components/engagement/pwa-update-banner";
 import { logout } from "@/lib/auth-api";
 import { fetchMyIntents, type ConnectionIntent } from "@/lib/connection-api";
 import {
@@ -131,6 +134,7 @@ export function ConnectionShell() {
     navigationLayout.isInitiallyCollapsed("navigation"),
   );
   const inConnectionJourney = isConnectionPath(location.pathname);
+  const inAdminWorkspace = location.pathname.startsWith("/admin");
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +187,8 @@ export function ConnectionShell() {
 
   return (
     <div className="min-h-screen bg-[#f7f6f3] text-[#23211f]">
+      {!inAdminWorkspace ? <OnboardingDialog /> : null}
+      <PWAUpdateBanner />
       <Group
         className="min-h-screen w-full"
         elementRef={navigationLayout.groupElementRef}
@@ -210,6 +216,7 @@ export function ConnectionShell() {
                 <div className="flex items-center justify-between gap-2">
                   <Brand />
                   <div className="flex shrink-0 items-center gap-0.5">
+                    <NotificationCenter />
                     <button
                       aria-label="恢复默认侧栏宽度"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#8a857e] transition-colors hover:bg-[#efede9] hover:text-[#445f55] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#527b6d]"
@@ -369,6 +376,7 @@ export function ConnectionShell() {
           <header className="sticky top-0 z-40 flex h-15 items-center justify-between border-b border-[#dfdcd6] bg-[rgba(251,250,248,0.94)] px-4 backdrop-blur-lg lg:hidden">
             <Brand />
             <div className="flex items-center gap-1">
+              <NotificationCenter mobile />
               <Link
                 aria-label="发布新意图"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#263b35] text-white"

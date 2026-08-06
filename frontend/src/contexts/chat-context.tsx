@@ -14,6 +14,7 @@ import {
 } from '@/lib/chat-api'
 import { fetchReceivedRequests } from '@/lib/friend-api'
 import { SoulinkWebSocket, type WSEnvelope } from '@/lib/websocket'
+import { useEngagement } from '@/contexts/engagement-context'
 
 interface ChatContextValue {
   ws: SoulinkWebSocket | null
@@ -38,6 +39,7 @@ const ChatContext = createContext<ChatContextValue>({
 })
 
 export function ChatProvider({ children }: { children: ReactNode }) {
+  const { refreshNotifications } = useEngagement()
   const [ws, setWs] = useState<SoulinkWebSocket | null>(null)
   const [totalUnread, setTotalUnread] = useState(0)
   const [pendingRequests, setPendingRequests] = useState(0)
@@ -69,11 +71,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const msg = env.data as MessageItem
         setLastMessage(msg)
         refreshUnread()
+        void refreshNotifications()
       }
       if (env.type === 'group_message') {
         const message = env.data as GroupMessageItem
         setLastGroupMessage(message)
         refreshUnread()
+        void refreshNotifications()
       }
       if (env.type === 'read') {
         refreshUnread()
@@ -91,7 +95,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       instance.disconnect()
       setWs(null)
     }
-  }, [refreshUnread, refreshPendingRequests])
+  }, [refreshNotifications, refreshUnread, refreshPendingRequests])
 
   return (
     <ChatContext.Provider

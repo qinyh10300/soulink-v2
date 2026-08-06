@@ -126,6 +126,7 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Post("/{notificationId}/delivered", deps.EngagementHandler.MarkNotificationDelivered)
 				})
 				r.Get("/admin/campus-themes/metrics", deps.EngagementHandler.ThemeMetrics)
+				r.Get("/admin/campus-themes", deps.EngagementHandler.ListAdminThemes)
 				r.Put("/admin/campus-themes/{themeKey}", deps.EngagementHandler.UpdateTheme)
 			}
 

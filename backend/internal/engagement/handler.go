@@ -236,6 +236,19 @@ func (h *Handler) ThemeMetrics(w http.ResponseWriter, r *http.Request) {
 	httpapi.OK(w, metrics)
 }
 
+func (h *Handler) ListAdminThemes(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(w, r)
+	if !ok {
+		return
+	}
+	themes, err := h.service.ListAdminThemes(r.Context(), user.Email, user.ID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, themes)
+}
+
 func (h *Handler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(w, r)
 	if !ok {

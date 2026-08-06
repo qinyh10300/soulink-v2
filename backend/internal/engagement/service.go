@@ -140,6 +140,21 @@ func (s *Service) ListThemes(ctx context.Context, userID int64) ([]CampusThemeVi
 	return toCampusThemeViews(themes), nil
 }
 
+func (s *Service) ListAdminThemes(
+	ctx context.Context,
+	adminEmail string,
+	userID int64,
+) ([]CampusThemeView, error) {
+	if !s.isAdmin(adminEmail) {
+		return nil, forbidden("仅管理员可以配置校园主题")
+	}
+	themes, err := s.store.ListCampusThemes(ctx, nil, userID, true)
+	if err != nil {
+		return nil, httpapi.InternalError(err)
+	}
+	return toCampusThemeViews(themes), nil
+}
+
 func (s *Service) ReplaceThemes(
 	ctx context.Context,
 	userID int64,

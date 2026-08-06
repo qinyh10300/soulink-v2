@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 
 import { getErrorMessage } from '@/lib/api'
+import { CampusThemeAdminPanel } from '@/components/admin/campus-theme-admin-panel'
 import { fetchProductMetrics, type ProductMetricsDashboard } from '@/lib/product-metrics-api'
 
 type MetricsPeriod = 7 | 28 | 90
@@ -260,6 +261,7 @@ export function ProductMetricsPanel() {
           </div>
         </>
       ) : null}
+      <CampusThemeAdminPanel period={period} />
     </section>
   )
 }
