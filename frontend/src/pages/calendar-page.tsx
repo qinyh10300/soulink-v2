@@ -5,6 +5,7 @@ import {
   Clock3,
   MapPin,
   Plus,
+  Settings2,
 } from 'lucide-react'
 import {
   addDays,
@@ -23,6 +24,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { CalendarEventDialog } from '@/components/calendar/calendar-event-dialog'
 import { WeekCalendarGrid } from '@/components/calendar/week-calendar-grid'
+import { AvailabilityDialog } from '@/components/meetup/availability-dialog'
+import { MeetupAgenda } from '@/components/meetup/meetup-agenda'
 import { getErrorMessage } from '@/lib/api'
 import { fetchCalendarEvents, type CalendarEvent } from '@/lib/calendar-api'
 import { fetchFriends, type FriendItem } from '@/lib/friend-api'
@@ -37,6 +40,7 @@ export function CalendarPage() {
   const [friends, setFriends] = useState<FriendItem[]>([])
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [draftStart, setDraftStart] = useState<Date | null>(null)
+  const [availabilityOpen, setAvailabilityOpen] = useState(false)
   const [notice, setNotice] = useState('正在加载日程...')
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart])
@@ -121,7 +125,16 @@ export function CalendarPage() {
               <ChevronRight className="h-5 w-5" />
             </button>
             <button
-              className="ml-2 inline-flex h-9 items-center gap-2 rounded bg-[#337a49] px-3 text-sm font-medium text-white hover:bg-[#28663c]"
+              aria-label="设置可约时间"
+              className="ml-2 inline-flex h-9 w-9 items-center justify-center rounded border border-[#cfd2ce] bg-white text-[#59605a] hover:bg-[#eef0ed]"
+              onClick={() => setAvailabilityOpen(true)}
+              title="可约时间"
+              type="button"
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+            <button
+              className="inline-flex h-9 items-center gap-2 rounded bg-[#337a49] px-3 text-sm font-medium text-white hover:bg-[#28663c]"
               onClick={() => setDraftStart(nextHour())}
               type="button"
             >
@@ -154,6 +167,8 @@ export function CalendarPage() {
             </div>
           </section>
         ) : null}
+
+        <MeetupAgenda from={weekStart} to={addDays(weekStart, 7)} />
 
         {notice ? (
           <div className="mt-4 rounded border border-[#d9dcd8] bg-white px-4 py-3 text-sm text-[#70746f]">
@@ -229,6 +244,12 @@ export function CalendarPage() {
           initialStart={draftStart ?? undefined}
           onClose={closeDialog}
           onSaved={handleSaved}
+        />
+      ) : null}
+      {availabilityOpen ? (
+        <AvailabilityDialog
+          onClose={() => setAvailabilityOpen(false)}
+          onSaved={() => void load()}
         />
       ) : null}
     </div>

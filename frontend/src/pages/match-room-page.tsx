@@ -1,18 +1,14 @@
 import {
   AlertCircle,
   ArrowLeft,
-  CalendarDays,
   Check,
   CheckCircle2,
   CircleX,
-  Clock3,
   ContactRound,
   Copy,
   Flag,
   LoaderCircle,
-  MapPin,
   MessageCircle,
-  MessageSquareText,
   Send,
   ShieldCheck,
   Sparkles,
@@ -21,27 +17,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { IntentCategoryIcon } from '@/components/connection/intent-category'
+import { MeetupContextPanel } from '@/components/meetup/meetup-context-panel'
 import { getErrorMessage } from '@/lib/api'
 import {
   createMatchRoomMessage,
   fetchMatchRoom,
   fetchMatchRoomMessages,
   setMatchRoomContactSharing,
-  updateMatchRoomPlan,
   updateMatchRoomStatus,
   type MatchRoom,
   type MatchRoomMessage,
 } from '@/lib/connection-api'
 import { cn } from '@/lib/utils'
-
-function toDateTimeLocal(value?: string) {
-  if (!value) {
-    return ''
-  }
-  const date = new Date(value)
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
-}
 
 function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -60,16 +47,11 @@ export function MatchRoomPage() {
   const [messages, setMessages] = useState<MatchRoomMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
-  const [scheduledAt, setScheduledAt] = useState('')
-  const [place, setPlace] = useState('')
-  const [savingPlan, setSavingPlan] = useState(false)
   const [sharingContact, setSharingContact] = useState(false)
   const [message, setMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [updatingStatus, setUpdatingStatus] = useState<'met' | 'closed' | null>(
-    null,
-  )
+  const [updatingStatus, setUpdatingStatus] = useState<'closed' | null>(null)
   const [confirmingClose, setConfirmingClose] = useState(false)
 
   useEffect(() => {
@@ -90,8 +72,6 @@ export function MatchRoomPage() {
         }
         setRoom(roomResult)
         setMessages(messageResult)
-        setScheduledAt(toDateTimeLocal(roomResult.scheduledAt))
-        setPlace(roomResult.selectedPlace)
       } catch (error) {
         if (!cancelled) {
           setNotice(getErrorMessage(error, '这个匹配房间暂时无法打开'))
@@ -111,25 +91,6 @@ export function MatchRoomPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages])
-
-  const savePlan = async () => {
-    if (!room || savingPlan) {
-      return
-    }
-    setSavingPlan(true)
-    setNotice('')
-    try {
-      const updated = await updateMatchRoomPlan(room.id, {
-        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-        place,
-      })
-      setRoom(updated)
-    } catch (error) {
-      setNotice(getErrorMessage(error, '见面安排暂时无法保存'))
-    } finally {
-      setSavingPlan(false)
-    }
-  }
 
   const toggleContact = async () => {
     if (!room || sharingContact) {
@@ -172,7 +133,7 @@ export function MatchRoomPage() {
     window.setTimeout(() => setCopied(false), 1600)
   }
 
-  const changeRoomStatus = async (status: 'met' | 'closed') => {
+  const changeRoomStatus = async (status: 'closed') => {
     if (!room || updatingStatus) {
       return
     }
@@ -213,11 +174,6 @@ export function MatchRoomPage() {
   }
 
   const feedbackSubject = `和 ${room.other.nickname} 的匹配 · ${room.intentTitle}`
-  const feedbackPath = `/feedback?${new URLSearchParams({
-    category: 'match',
-    roomId: String(room.id),
-    subject: feedbackSubject,
-  }).toString()}`
   const reportPath = `/feedback?${new URLSearchParams({
     category: 'report',
     roomId: String(room.id),
@@ -225,7 +181,6 @@ export function MatchRoomPage() {
   }).toString()}`
   const roomClosed = room.status === 'closed'
   const meetingConfirmed = room.status === 'met'
-  const planLocked = room.status !== 'open'
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -298,83 +253,11 @@ export function MatchRoomPage() {
           </section>
 
           <section className="rounded-lg border border-[#dfdcd6] bg-white p-5">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[#37332f]">
-              <CalendarDays size={16} />
-              约一个校内见面
-            </h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-medium text-[#65615b]">
-                时间
-                <span className="relative mt-2 block">
-                  <Clock3
-                    className="pointer-events-none absolute left-3 top-3 text-[#817d76]"
-                    size={15}
-                  />
-                  <input
-                    className="h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] pl-9 pr-2 text-xs outline-none focus:border-[#7a5a8e]"
-                    onChange={(event) => setScheduledAt(event.target.value)}
-                    disabled={planLocked}
-                    type="datetime-local"
-                    value={scheduledAt}
-                  />
-                </span>
-              </label>
-              <label className="text-xs font-medium text-[#65615b]">
-                地点
-                <span className="relative mt-2 block">
-                  <MapPin
-                    className="pointer-events-none absolute left-3 top-3 text-[#817d76]"
-                    size={15}
-                  />
-                  <input
-                    className="h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] pl-9 pr-2 text-xs outline-none focus:border-[#7a5a8e]"
-                    list="suggested-places"
-                    onChange={(event) => setPlace(event.target.value)}
-                    disabled={planLocked}
-                    placeholder="选择或输入校内地点"
-                    value={place}
-                  />
-                  <datalist id="suggested-places">
-                    {room.suggestedPlaces.map((suggestion) => (
-                      <option key={suggestion} value={suggestion} />
-                    ))}
-                  </datalist>
-                </span>
-              </label>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {room.suggestedPlaces.map((suggestion) => (
-                <button
-                  className={cn(
-                    'h-8 rounded-md border px-2.5 text-[11px] transition-colors',
-                    place === suggestion
-                      ? 'border-[#735087] bg-[#f1ebf4] text-[#4d2d66]'
-                      : 'border-[#dedad4] text-[#706c65] hover:border-[#bbaac5]',
-                  )}
-                  key={suggestion}
-                  onClick={() => setPlace(suggestion)}
-                  disabled={planLocked}
-                  type="button"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                className="inline-flex h-9 items-center gap-2 rounded-md bg-[#376f5b] px-4 text-xs font-semibold text-white disabled:opacity-50"
-                disabled={savingPlan || planLocked}
-                onClick={() => void savePlan()}
-                type="button"
-              >
-                {savingPlan ? (
-                  <LoaderCircle className="animate-spin" size={14} />
-                ) : (
-                  <Check size={14} />
-                )}
-                保存见面安排
-              </button>
-            </div>
+            <MeetupContextPanel
+              context={{ id: room.id, type: 'match_room' }}
+              defaultCategory={room.intentCategory}
+              defaultTitle={room.intentTitle}
+            />
           </section>
 
           <section className="rounded-lg border border-[#dfdcd6] bg-[#fbfaf8] p-5">
@@ -448,33 +331,6 @@ export function MatchRoomPage() {
           </section>
 
           <section className="flex flex-wrap items-center gap-2 border-t border-[#dfdcd6] pt-4">
-            {room.status === 'open' ? (
-              <button
-                className="inline-flex h-9 items-center gap-2 rounded-md bg-[#376f5b] px-3 text-xs font-semibold text-white disabled:opacity-50"
-                disabled={updatingStatus !== null}
-                onClick={() => void changeRoomStatus('met')}
-                type="button"
-              >
-                {updatingStatus === 'met' ? (
-                  <LoaderCircle className="animate-spin" size={14} />
-                ) : (
-                  <CheckCircle2 size={14} />
-                )}
-                确认已经见面
-              </button>
-            ) : null}
-            <Link
-              className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs font-semibold hover:border-[#bbaac5] hover:text-[#5b3477]',
-                meetingConfirmed
-                  ? 'border-[#bbaac5] text-[#5b3477]'
-                  : 'border-[#d8d3cc] text-[#5f5b55]',
-              )}
-              to={feedbackPath}
-            >
-              <MessageSquareText size={14} />
-              {meetingConfirmed ? '提交见面反馈' : '见面后反馈'}
-            </Link>
             <Link
               className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-[#8b4559] hover:bg-[#fff0f4]"
               to={reportPath}

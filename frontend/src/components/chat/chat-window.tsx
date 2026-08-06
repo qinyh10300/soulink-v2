@@ -1,9 +1,10 @@
-import { Users } from 'lucide-react'
+import { CalendarClock, Users } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChatInput } from '@/components/chat/chat-input'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { TimeSeparator } from '@/components/chat/time-separator'
+import { MeetupWorkflowDialog } from '@/components/meetup/meetup-context-panel'
 import { useChat } from '@/contexts/chat-context'
 import {
   fetchGroupMessages,
@@ -46,6 +47,7 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [sendNotice, setSendNotice] = useState('')
+  const [meetupsOpen, setMeetupsOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
@@ -177,10 +179,19 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
           <h2 className="truncate text-sm font-semibold text-[#292b28]">{thread.title}</h2>
           <p className="truncate text-xs text-[#81857f]">{thread.subtitle}</p>
         </div>
+        <button
+          aria-label="约见与共同空闲"
+          className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#e4e6e3]"
+          onClick={() => setMeetupsOpen(true)}
+          title="约见"
+          type="button"
+        >
+          <CalendarClock className="h-5 w-5" />
+        </button>
         {thread.kind === 'group' ? (
           <button
             aria-label="群聊信息"
-            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#e4e6e3]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#e4e6e3]"
             onClick={onOpenGroupInfo}
             title="群聊信息"
             type="button"
@@ -220,6 +231,17 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
         </div>
       ) : null}
       <ChatInput disabled={!thread.canSend} onSend={(content) => void handleSend(content)} />
+      {meetupsOpen ? (
+        <MeetupWorkflowDialog
+          context={{
+            id: thread.id,
+            type: thread.kind === 'group' ? 'group' : 'direct',
+          }}
+          defaultTitle={thread.kind === 'group' ? thread.title : `和 ${thread.title} 见面`}
+          onClose={() => setMeetupsOpen(false)}
+          title={thread.kind === 'group' ? `${thread.title} · 约见` : `和 ${thread.title} 约见`}
+        />
+      ) : null}
     </div>
   )
 }
