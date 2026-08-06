@@ -16,6 +16,7 @@ type Handler struct {
 }
 
 type createPostRequest struct {
+	Topic     string   `json:"topic"`
 	Content   string   `json:"content"`
 	ImageURLs []string `json:"imageUrls"`
 }
@@ -36,13 +37,11 @@ func (h *Handler) ListPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorID, err := parseOptionalPositiveInt64(r.URL.Query().Get("authorId"))
-	if err != nil {
-		httpapi.Error(w, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "invalid params"))
-		return
-	}
-
-	posts, err := h.service.ListPosts(r.Context(), user.ID, authorID)
+	posts, err := h.service.ListPosts(r.Context(), user.ID, ListPostsInput{
+		Topic: strings.TrimSpace(r.URL.Query().Get("topic")),
+		Query: strings.TrimSpace(r.URL.Query().Get("q")),
+		Sort:  strings.TrimSpace(r.URL.Query().Get("sort")),
+	})
 	if err != nil {
 		httpapi.Error(w, err)
 		return
@@ -64,6 +63,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	post, err := h.service.CreatePost(r.Context(), user.ID, CreatePostInput{
+		Topic:     req.Topic,
 		Content:   req.Content,
 		ImageURLs: req.ImageURLs,
 	})
@@ -167,18 +167,6 @@ func parseRouteID(r *http.Request, key string) (int64, error) {
 	value, err := strconv.ParseInt(chi.URLParam(r, key), 10, 64)
 	if err != nil || value <= 0 {
 		return 0, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "invalid params")
-	}
-	return value, nil
-}
-
-func parseOptionalPositiveInt64(raw string) (int64, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, nil
-	}
-	value, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || value <= 0 {
-		return 0, strconv.ErrSyntax
 	}
 	return value, nil
 }

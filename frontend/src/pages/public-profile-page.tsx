@@ -1,9 +1,8 @@
-import { ArrowLeft, Heart, MessageCircle, UserRound } from 'lucide-react'
+import { ArrowLeft, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 import { getErrorMessage } from '@/lib/api'
-import { fetchPlaygroundPosts, type PlaygroundPost } from '@/lib/playground-api'
 import { fetchPublicProfile, type PublicProfileDetails } from '@/lib/profile-api'
 
 function formatDate(value: string) {
@@ -22,7 +21,6 @@ export function PublicProfilePage() {
   const { userId } = useParams()
   const numericUserId = Number(userId)
   const [profile, setProfile] = useState<PublicProfileDetails | null>(null)
-  const [posts, setPosts] = useState<PlaygroundPost[]>([])
   const [notice, setNotice] = useState('正在加载个人主页...')
 
   const loadProfile = useCallback(async () => {
@@ -32,12 +30,8 @@ export function PublicProfilePage() {
     }
 
     try {
-      const [profileData, postData] = await Promise.all([
-        fetchPublicProfile(numericUserId),
-        fetchPlaygroundPosts(numericUserId),
-      ])
+      const profileData = await fetchPublicProfile(numericUserId)
       setProfile(profileData)
-      setPosts(postData)
       setNotice('')
     } catch (error) {
       setNotice(getErrorMessage(error, '个人主页加载失败，请稍后重试'))
@@ -54,7 +48,7 @@ export function PublicProfilePage() {
         <div className="flex items-center gap-3">
           <Link
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#eee4db] bg-white/80 text-[#5f4d42] transition-colors hover:bg-white"
-            to="/playground"
+            to="/plaza"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -86,51 +80,6 @@ export function PublicProfilePage() {
             {notice}
           </div>
         ) : null}
-
-        <section className="space-y-4">
-          <h3 className="text-lg font-semibold text-[#2f221b]">TA 的动态</h3>
-          {posts.length === 0 && profile ? (
-            <div className="rounded-[28px] border border-[#eee4db] bg-white/78 p-6 text-sm text-[#8a7467]">
-              暂时还没有公开动态。
-            </div>
-          ) : null}
-          {posts.map((post) => (
-            <article
-              className="rounded-[28px] border border-[#eee4db] bg-[rgba(255,251,247,0.96)] p-5 shadow-[0_18px_54px_rgba(72,50,33,0.06)]"
-              key={post.id}
-            >
-              <p className="text-xs text-[#a08d81]">{formatDate(post.createdAt)}</p>
-              {post.content ? (
-                <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-8 text-[#3f332d]">
-                  {post.content}
-                </p>
-              ) : null}
-              {post.imageUrls.length > 0 ? (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {post.imageUrls.map((imageUrl) => (
-                    <img
-                      alt=""
-                      className="max-h-72 w-full rounded-[22px] border border-[#eee4db] object-cover"
-                      key={imageUrl}
-                      loading="lazy"
-                      src={imageUrl}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              <div className="mt-4 flex items-center gap-4 text-sm text-[#8a7467]">
-                <span className="inline-flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  {post.likeCount}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <MessageCircle className="h-4 w-4" />
-                  {post.commentCount}
-                </span>
-              </div>
-            </article>
-          ))}
-        </section>
       </div>
     </div>
   )

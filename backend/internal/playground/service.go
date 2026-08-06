@@ -3,6 +3,7 @@ package playground
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"unicode/utf8"
 
 	"soulink-backend/internal/httpapi"
-	"soulink-backend/internal/school"
 	"soulink-backend/internal/store"
 )
 
@@ -19,15 +19,31 @@ const (
 	maxCommentContentLength = 1000
 	maxPostImageCount       = 9
 	maxImageURLLength       = 2048
+	maxSearchQueryLength    = 80
 )
+
+var allowedTopics = map[string]struct{}{
+	"campus":     {},
+	"partner":    {},
+	"study":      {},
+	"emotion":    {},
+	"secondhand": {},
+}
 
 type Service struct {
 	store *store.Store
 }
 
 type CreatePostInput struct {
+	Topic     string
 	Content   string
 	ImageURLs []string
+}
+
+type ListPostsInput struct {
+	Topic string
+	Query string
+	Sort  string
 }
 
 type CreateCommentInput struct {
@@ -37,11 +53,9 @@ type CreateCommentInput struct {
 }
 
 type AuthorView struct {
-	UserID     int64  `json:"userId"`
-	Nickname   string `json:"nickname"`
-	SchoolName string `json:"schoolName"`
-	Department string `json:"department"`
-	Grade      string `json:"grade"`
+	Label   string `json:"label"`
+	IsMe    bool   `json:"isMe"`
+	IsOwner bool   `json:"isOwner"`
 }
 
 type CommentView struct {
@@ -52,6 +66,7 @@ type CommentView struct {
 	Content         string        `json:"content"`
 	LikeCount       int           `json:"likeCount"`
 	ReplyCount      int           `json:"replyCount"`
+	Floor           int           `json:"floor"`
 	LikedByMe       bool          `json:"likedByMe"`
 	CreatedAt       string        `json:"createdAt"`
 	Replies         []CommentView `json:"replies"`
@@ -60,6 +75,7 @@ type CommentView struct {
 type PostView struct {
 	ID           int64         `json:"id"`
 	Author       AuthorView    `json:"author"`
+	Topic        string        `json:"topic"`
 	Content      string        `json:"content"`
 	ImageURLs    []string      `json:"imageUrls"`
 	LikeCount    int           `json:"likeCount"`
@@ -78,12 +94,34 @@ func NewService(dataStore *store.Store) *Service {
 	return &Service{store: dataStore}
 }
 
-func (s *Service) ListPosts(ctx context.Context, viewerID, authorID int64) ([]PostView, error) {
+func (s *Service) ListPosts(ctx context.Context, viewerID int64, input ListPostsInput) ([]PostView, error) {
 	if err := s.ensureReady(); err != nil {
 		return nil, err
 	}
+	topic := strings.TrimSpace(input.Topic)
+	if topic != "" {
+		if _, ok := allowedTopics[topic]; !ok {
+			return nil, invalidParams()
+		}
+	}
+	query := strings.TrimSpace(input.Query)
+	if utf8.RuneCountInString(query) > maxSearchQueryLength {
+		return nil, invalidParams()
+	}
+	sortMode := strings.TrimSpace(input.Sort)
+	if sortMode == "" {
+		sortMode = "latest"
+	}
+	if sortMode != "latest" && sortMode != "hot" {
+		return nil, invalidParams()
+	}
 
-	posts, err := s.store.ListPlaygroundPosts(ctx, nil, viewerID, authorID, 50)
+	posts, err := s.store.ListPlaygroundPosts(ctx, nil, viewerID, store.PlaygroundPostFilter{
+		Topic: topic,
+		Query: query,
+		Sort:  sortMode,
+		Limit: 50,
+	})
 	if err != nil {
 		return nil, httpapi.InternalError(err)
 	}
@@ -94,7 +132,7 @@ func (s *Service) ListPosts(ctx context.Context, viewerID, authorID int64) ([]Po
 		if err != nil {
 			return nil, httpapi.InternalError(err)
 		}
-		views = append(views, toPostView(post, buildCommentTree(comments)))
+		views = append(views, toPostView(post, buildCommentTree(post.Author.UserID, comments, viewerID), viewerID))
 	}
 	return views, nil
 }
@@ -104,7 +142,7 @@ func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePo
 		return PostView{}, err
 	}
 
-	content, imageURLs, err := normalizePostInput(input)
+	topic, content, imageURLs, err := normalizePostInput(input)
 	if err != nil {
 		return PostView{}, err
 	}
@@ -113,6 +151,7 @@ func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePo
 	err = s.store.WithTx(ctx, func(tx *sql.Tx) error {
 		postID, err := s.store.CreatePlaygroundPost(ctx, tx, store.CreatePlaygroundPostParams{
 			AuthorID:  authorID,
+			Topic:     topic,
 			Content:   content,
 			ImageURLs: imageURLs,
 			Now:       time.Now(),
@@ -132,7 +171,7 @@ func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePo
 		return PostView{}, err
 	}
 
-	return toPostView(post, nil), nil
+	return toPostView(post, nil, authorID), nil
 }
 
 func (s *Service) SetPostLike(ctx context.Context, userID, postID int64, liked bool) (LikeResult, error) {
@@ -191,10 +230,13 @@ func (s *Service) CreateComment(ctx context.Context, authorID int64, input Creat
 	}
 
 	var comment store.PlaygroundComment
+	var post store.PlaygroundPost
 	err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
-		if _, err := s.store.GetPlaygroundPost(ctx, tx, authorID, input.PostID); err != nil {
+		loadedPost, err := s.store.GetPlaygroundPost(ctx, tx, authorID, input.PostID)
+		if err != nil {
 			return mapPlaygroundStoreError(err)
 		}
+		post = loadedPost
 
 		var parentID sql.NullInt64
 		if input.ParentCommentID > 0 {
@@ -242,7 +284,11 @@ func (s *Service) CreateComment(ctx context.Context, authorID int64, input Creat
 		return CommentView{}, err
 	}
 
-	return toCommentView(comment), nil
+	comments, err := s.store.ListPlaygroundComments(ctx, nil, authorID, input.PostID)
+	if err != nil {
+		return CommentView{}, httpapi.InternalError(err)
+	}
+	return toCommentView(comment, newAnonymousContext(post.Author.UserID, comments), authorID), nil
 }
 
 func (s *Service) SetCommentLike(ctx context.Context, userID, commentID int64, liked bool) (LikeResult, error) {
@@ -294,10 +340,17 @@ func (s *Service) ensureReady() error {
 	return nil
 }
 
-func normalizePostInput(input CreatePostInput) (string, []string, error) {
+func normalizePostInput(input CreatePostInput) (string, string, []string, error) {
+	topic := strings.TrimSpace(input.Topic)
+	if topic == "" {
+		topic = "campus"
+	}
+	if _, ok := allowedTopics[topic]; !ok {
+		return "", "", nil, invalidParams()
+	}
 	content := strings.TrimSpace(input.Content)
 	if utf8.RuneCountInString(content) > maxPostContentLength {
-		return "", nil, invalidParams()
+		return "", "", nil, invalidParams()
 	}
 
 	imageURLs := make([]string, 0, len(input.ImageURLs))
@@ -308,11 +361,11 @@ func normalizePostInput(input CreatePostInput) (string, []string, error) {
 			continue
 		}
 		if utf8.RuneCountInString(imageURL) > maxImageURLLength {
-			return "", nil, invalidParams()
+			return "", "", nil, invalidParams()
 		}
 		parsed, err := url.ParseRequestURI(imageURL)
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-			return "", nil, invalidParams()
+			return "", "", nil, invalidParams()
 		}
 		if _, ok := seen[imageURL]; ok {
 			continue
@@ -322,21 +375,53 @@ func normalizePostInput(input CreatePostInput) (string, []string, error) {
 	}
 
 	if content == "" && len(imageURLs) == 0 {
-		return "", nil, invalidParams()
+		return "", "", nil, invalidParams()
 	}
 	if len(imageURLs) > maxPostImageCount {
-		return "", nil, invalidParams()
+		return "", "", nil, invalidParams()
 	}
 
-	return content, imageURLs, nil
+	return topic, content, imageURLs, nil
 }
 
-func buildCommentTree(comments []store.PlaygroundComment) []CommentView {
+type anonymousContext struct {
+	labelsByUser   map[int64]string
+	floorByComment map[int64]int
+	postAuthorID   int64
+}
+
+func newAnonymousContext(postAuthorID int64, comments []store.PlaygroundComment) anonymousContext {
+	context := anonymousContext{
+		labelsByUser:   map[int64]string{postAuthorID: "洞主"},
+		floorByComment: make(map[int64]int, len(comments)),
+		postAuthorID:   postAuthorID,
+	}
+	nextAlias := 0
+	for index, comment := range comments {
+		context.floorByComment[comment.ID] = index + 1
+		if _, ok := context.labelsByUser[comment.Author.UserID]; ok {
+			continue
+		}
+		context.labelsByUser[comment.Author.UserID] = anonymousLabel(nextAlias)
+		nextAlias++
+	}
+	return context
+}
+
+func anonymousLabel(index int) string {
+	if index < 26 {
+		return fmt.Sprintf("同学 %c", rune('A'+index))
+	}
+	return fmt.Sprintf("同学 %d", index+1)
+}
+
+func buildCommentTree(postAuthorID int64, comments []store.PlaygroundComment, viewerID int64) []CommentView {
+	anonymous := newAnonymousContext(postAuthorID, comments)
 	viewsByID := make(map[int64]*CommentView, len(comments))
 	roots := make([]CommentView, 0)
 
 	for _, comment := range comments {
-		view := toCommentView(comment)
+		view := toCommentView(comment, anonymous, viewerID)
 		viewsByID[view.ID] = &view
 		if !comment.ParentCommentID.Valid {
 			roots = append(roots, view)
@@ -362,7 +447,7 @@ func buildCommentTree(comments []store.PlaygroundComment) []CommentView {
 	return result
 }
 
-func toPostView(post store.PlaygroundPost, comments []CommentView) PostView {
+func toPostView(post store.PlaygroundPost, comments []CommentView, viewerID int64) PostView {
 	if comments == nil {
 		comments = []CommentView{}
 	}
@@ -371,7 +456,8 @@ func toPostView(post store.PlaygroundPost, comments []CommentView) PostView {
 	}
 	return PostView{
 		ID:           post.ID,
-		Author:       toAuthorView(post.Author),
+		Author:       AuthorView{Label: "洞主", IsMe: post.Author.UserID == viewerID, IsOwner: true},
+		Topic:        post.Topic,
 		Content:      post.Content,
 		ImageURLs:    post.ImageURLs,
 		LikeCount:    post.LikeCount,
@@ -382,42 +468,29 @@ func toPostView(post store.PlaygroundPost, comments []CommentView) PostView {
 	}
 }
 
-func toCommentView(comment store.PlaygroundComment) CommentView {
+func toCommentView(comment store.PlaygroundComment, anonymous anonymousContext, viewerID int64) CommentView {
 	var parentID *int64
 	if comment.ParentCommentID.Valid {
 		value := comment.ParentCommentID.Int64
 		parentID = &value
 	}
 	return CommentView{
-		ID:              comment.ID,
-		PostID:          comment.PostID,
-		Author:          toAuthorView(comment.Author),
+		ID:     comment.ID,
+		PostID: comment.PostID,
+		Author: AuthorView{
+			Label:   anonymous.labelsByUser[comment.Author.UserID],
+			IsMe:    comment.Author.UserID == viewerID,
+			IsOwner: comment.Author.UserID == anonymous.postAuthorID,
+		},
 		ParentCommentID: parentID,
 		Content:         comment.Content,
 		LikeCount:       comment.LikeCount,
 		ReplyCount:      comment.ReplyCount,
+		Floor:           anonymous.floorByComment[comment.ID],
 		LikedByMe:       comment.LikedByMe,
 		CreatedAt:       comment.CreatedAt.Format(time.RFC3339),
 		Replies:         []CommentView{},
 	}
-}
-
-func toAuthorView(author store.PlaygroundAuthor) AuthorView {
-	return AuthorView{
-		UserID:     author.UserID,
-		Nickname:   author.Nickname,
-		SchoolName: schoolNameForEmail(author.Email),
-		Department: author.Department,
-		Grade:      author.Grade,
-	}
-}
-
-func schoolNameForEmail(email string) string {
-	displayName, ok := school.DisplayNameByEmail(email)
-	if !ok {
-		return ""
-	}
-	return displayName
 }
 
 func mapPlaygroundStoreError(err error) error {

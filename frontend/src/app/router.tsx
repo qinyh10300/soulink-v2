@@ -51,6 +51,10 @@ const ProfilePage = lazy(async () => {
   const module = await import('@/pages/profile-page')
   return { default: module.ProfilePage }
 })
+const PlaygroundPage = lazy(async () => {
+  const module = await import('@/pages/playground-page')
+  return { default: module.PlaygroundPage }
+})
 const PublicProfilePage = lazy(async () => {
   const module = await import('@/pages/public-profile-page')
   return { default: module.PublicProfilePage }
@@ -138,6 +142,14 @@ export const router = createBrowserRouter([
             element: withSuspense(<PublicProfilePage />),
           },
           {
+            path: '/plaza',
+            element: withSuspense(<PlaygroundPage />),
+          },
+          {
+            path: '/playground',
+            element: <Navigate replace to="/plaza" />,
+          },
+          {
             path: '/feedback',
             element: withSuspense(<FeedbackPage />),
           },
@@ -163,10 +175,6 @@ export const router = createBrowserRouter([
           },
           {
             path: '/friends',
-            element: <Navigate replace to="/discover" />,
-          },
-          {
-            path: '/playground',
             element: <Navigate replace to="/discover" />,
           },
         ],

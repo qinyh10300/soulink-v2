@@ -1,12 +1,19 @@
 import { apiRequest } from '@/lib/api'
 
 export interface PlaygroundAuthor {
-  userId: number
-  nickname: string
-  schoolName: string
-  department: string
-  grade: string
+  label: string
+  isMe: boolean
+  isOwner: boolean
 }
+
+export type PlaygroundTopic =
+  | 'campus'
+  | 'partner'
+  | 'study'
+  | 'emotion'
+  | 'secondhand'
+
+export type PlaygroundSort = 'latest' | 'hot'
 
 export interface PlaygroundComment {
   id: number
@@ -16,6 +23,7 @@ export interface PlaygroundComment {
   content: string
   likeCount: number
   replyCount: number
+  floor: number
   likedByMe: boolean
   createdAt: string
   replies: PlaygroundComment[]
@@ -24,6 +32,7 @@ export interface PlaygroundComment {
 export interface PlaygroundPost {
   id: number
   author: PlaygroundAuthor
+  topic: PlaygroundTopic
   content: string
   imageUrls: string[]
   likeCount: number
@@ -38,12 +47,24 @@ export interface PlaygroundLikeResult {
   likeCount: number
 }
 
-export function fetchPlaygroundPosts(authorId?: number) {
-  const query = authorId ? `?authorId=${encodeURIComponent(String(authorId))}` : ''
+export function fetchPlaygroundPosts(options: {
+  topic?: PlaygroundTopic
+  sort?: PlaygroundSort
+  query?: string
+} = {}) {
+  const params = new URLSearchParams()
+  if (options.topic) params.set('topic', options.topic)
+  if (options.sort) params.set('sort', options.sort)
+  if (options.query?.trim()) params.set('q', options.query.trim())
+  const query = params.size > 0 ? `?${params.toString()}` : ''
   return apiRequest<PlaygroundPost[]>(`/playground/posts${query}`, { auth: true })
 }
 
-export function createPlaygroundPost(input: { content: string; imageUrls: string[] }) {
+export function createPlaygroundPost(input: {
+  topic: PlaygroundTopic
+  content: string
+  imageUrls: string[]
+}) {
   return apiRequest<PlaygroundPost>('/playground/posts', {
     method: 'POST',
     auth: true,

@@ -19,6 +19,7 @@ type PlaygroundAuthor struct {
 type PlaygroundPost struct {
 	ID           int64
 	Author       PlaygroundAuthor
+	Topic        string
 	Content      string
 	ImageURLs    []string
 	LikeCount    int
@@ -43,9 +44,17 @@ type PlaygroundComment struct {
 
 type CreatePlaygroundPostParams struct {
 	AuthorID  int64
+	Topic     string
 	Content   string
 	ImageURLs []string
 	Now       time.Time
+}
+
+type PlaygroundPostFilter struct {
+	Topic string
+	Query string
+	Sort  string
+	Limit int
 }
 
 type CreatePlaygroundCommentParams struct {
@@ -63,10 +72,10 @@ func (s *Store) CreatePlaygroundPost(ctx context.Context, tx *sql.Tx, params Cre
 	}
 
 	row := executor(s.db, tx).QueryRowContext(ctx, `
-		INSERT INTO playground_posts (author_id, content, image_urls, created_at, updated_at)
-		VALUES ($1, $2, $3::jsonb, $4, $4)
+		INSERT INTO playground_posts (author_id, topic, content, image_urls, created_at, updated_at)
+		VALUES ($1, $2, $3, $4::jsonb, $5, $5)
 		RETURNING id
-	`, params.AuthorID, params.Content, string(rawImageURLs), params.Now)
+	`, params.AuthorID, params.Topic, params.Content, string(rawImageURLs), params.Now)
 
 	var postID int64
 	if err := row.Scan(&postID); err != nil {
@@ -79,7 +88,7 @@ func (s *Store) GetPlaygroundPost(ctx context.Context, tx *sql.Tx, viewerID, pos
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		SELECT p.id,
 		       u.id, u.nickname, u.email, u.department, u.grade,
-		       p.content, p.image_urls::text, p.like_count, p.comment_count,
+		       p.topic, p.content, p.image_urls::text, p.like_count, p.comment_count,
 		       EXISTS(
 		         SELECT 1 FROM playground_post_likes l
 		         WHERE l.post_id = p.id AND l.user_id = $1
@@ -98,18 +107,18 @@ func (s *Store) GetPlaygroundPost(ctx context.Context, tx *sql.Tx, viewerID, pos
 	return post, nil
 }
 
-func (s *Store) ListPlaygroundPosts(ctx context.Context, tx *sql.Tx, viewerID, authorID int64, limit int) ([]PlaygroundPost, error) {
-	if limit <= 0 {
-		limit = 50
+func (s *Store) ListPlaygroundPosts(ctx context.Context, tx *sql.Tx, viewerID int64, filter PlaygroundPostFilter) ([]PlaygroundPost, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = 50
 	}
-	if limit > 100 {
-		limit = 100
+	if filter.Limit > 100 {
+		filter.Limit = 100
 	}
 
 	query := `
 		SELECT p.id,
 		       u.id, u.nickname, u.email, u.department, u.grade,
-		       p.content, p.image_urls::text, p.like_count, p.comment_count,
+		       p.topic, p.content, p.image_urls::text, p.like_count, p.comment_count,
 		       EXISTS(
 		         SELECT 1 FROM playground_post_likes l
 		         WHERE l.post_id = p.id AND l.user_id = $1
@@ -120,12 +129,20 @@ func (s *Store) ListPlaygroundPosts(ctx context.Context, tx *sql.Tx, viewerID, a
 		WHERE p.deleted_at IS NULL AND u.deleted_at IS NULL
 	`
 	args := []any{viewerID}
-	if authorID > 0 {
-		args = append(args, authorID)
-		query += fmt.Sprintf(" AND p.author_id = $%d", len(args))
+	if filter.Topic != "" {
+		args = append(args, filter.Topic)
+		query += fmt.Sprintf(" AND p.topic = $%d", len(args))
 	}
-	args = append(args, limit)
-	query += fmt.Sprintf(" ORDER BY p.created_at DESC, p.id DESC LIMIT $%d", len(args))
+	if filter.Query != "" {
+		args = append(args, "%"+filter.Query+"%")
+		query += fmt.Sprintf(" AND p.content ILIKE $%d", len(args))
+	}
+	args = append(args, filter.Limit)
+	if filter.Sort == "hot" {
+		query += fmt.Sprintf(" ORDER BY (p.like_count + p.comment_count * 2) DESC, p.created_at DESC, p.id DESC LIMIT $%d", len(args))
+	} else {
+		query += fmt.Sprintf(" ORDER BY p.created_at DESC, p.id DESC LIMIT $%d", len(args))
+	}
 
 	rows, err := executor(s.db, tx).(interface {
 		QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -354,6 +371,7 @@ func scanPlaygroundPost(row *sql.Row) (PlaygroundPost, error) {
 		&post.Author.Email,
 		&post.Author.Department,
 		&post.Author.Grade,
+		&post.Topic,
 		&post.Content,
 		&rawImageURLs,
 		&post.LikeCount,
@@ -384,6 +402,7 @@ func scanPlaygroundPostRows(rows *sql.Rows) (PlaygroundPost, error) {
 		&post.Author.Email,
 		&post.Author.Department,
 		&post.Author.Grade,
+		&post.Topic,
 		&post.Content,
 		&rawImageURLs,
 		&post.LikeCount,
