@@ -30,6 +30,13 @@ function formatMeeting(value?: string) {
   }).format(new Date(value))
 }
 
+function roomStatusLabel(status: MatchRoom['status']) {
+  if (status === 'met') {
+    return '已确认见面'
+  }
+  return status === 'closed' ? '连接已结束' : '双方同意'
+}
+
 export function MatchRoomsPage() {
   const [rooms, setRooms] = useState<MatchRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,11 +112,13 @@ export function MatchRoomsPage() {
                               'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold',
                               room.status === 'open'
                                 ? 'bg-[#e8f3ed] text-[#2d6a53]'
-                                : 'bg-[#edeae5] text-[#6d6963]',
+                                : room.status === 'met'
+                                  ? 'bg-[#eee8f2] text-[#5b3477]'
+                                  : 'bg-[#edeae5] text-[#6d6963]',
                             )}
                           >
                             <ShieldCheck size={11} />
-                            {room.status === 'open' ? '双方同意' : '交流已结束'}
+                            {roomStatusLabel(room.status)}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-sm text-[#706c65]">
@@ -129,7 +138,7 @@ export function MatchRoomsPage() {
                     <div
                       className={cn(
                         'mt-4 grid gap-2 border-t border-[#ebe8e3] pt-3 text-xs text-[#69655f] sm:grid-cols-2',
-                        room.status !== 'open' && 'opacity-60',
+                        room.status === 'closed' && 'opacity-60',
                       )}
                     >
                       <span className="inline-flex items-center gap-1.5">

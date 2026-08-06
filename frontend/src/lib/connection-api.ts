@@ -316,6 +316,14 @@ export function updateMatchRoomPlan(
   })
 }
 
+export function updateMatchRoomStatus(roomId: number, status: 'met' | 'closed') {
+  return apiRequest<MatchRoom>(`/match-rooms/${roomId}/status`, {
+    method: 'PUT',
+    auth: true,
+    body: { status },
+  })
+}
+
 export function setMatchRoomContactSharing(roomId: number, shared: boolean) {
   return apiRequest<MatchRoom>(`/match-rooms/${roomId}/contact-sharing`, {
     method: 'PUT',

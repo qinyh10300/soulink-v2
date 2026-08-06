@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
+  CheckCircle2,
+  CircleX,
   Clock3,
   ContactRound,
   Copy,
@@ -26,6 +28,7 @@ import {
   fetchMatchRoomMessages,
   setMatchRoomContactSharing,
   updateMatchRoomPlan,
+  updateMatchRoomStatus,
   type MatchRoom,
   type MatchRoomMessage,
 } from '@/lib/connection-api'
@@ -64,6 +67,10 @@ export function MatchRoomPage() {
   const [message, setMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState<'met' | 'closed' | null>(
+    null,
+  )
+  const [confirmingClose, setConfirmingClose] = useState(false)
 
   useEffect(() => {
     if (!Number.isInteger(roomId) || roomId <= 0) {
@@ -165,6 +172,22 @@ export function MatchRoomPage() {
     window.setTimeout(() => setCopied(false), 1600)
   }
 
+  const changeRoomStatus = async (status: 'met' | 'closed') => {
+    if (!room || updatingStatus) {
+      return
+    }
+    setUpdatingStatus(status)
+    setNotice('')
+    try {
+      setRoom(await updateMatchRoomStatus(room.id, status))
+      setConfirmingClose(false)
+    } catch (error) {
+      setNotice(getErrorMessage(error, '匹配房间状态暂时无法更新'))
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center text-sm text-[#77736c]">
@@ -200,7 +223,9 @@ export function MatchRoomPage() {
     roomId: String(room.id),
     subject: feedbackSubject,
   }).toString()}`
-  const roomClosed = room.status !== 'open'
+  const roomClosed = room.status === 'closed'
+  const meetingConfirmed = room.status === 'met'
+  const planLocked = room.status !== 'open'
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -230,11 +255,13 @@ export function MatchRoomPage() {
             'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold',
             roomClosed
               ? 'bg-[#edeae5] text-[#6d6963]'
-              : 'bg-[#e8f3ed] text-[#2d6a53]',
+              : meetingConfirmed
+                ? 'bg-[#eee8f2] text-[#5b3477]'
+                : 'bg-[#e8f3ed] text-[#2d6a53]',
           )}
         >
-          <ShieldCheck size={13} />
-          {roomClosed ? '交流已结束' : '双方同意'}
+          {meetingConfirmed ? <CheckCircle2 size={13} /> : <ShieldCheck size={13} />}
+          {roomClosed ? '连接已结束' : meetingConfirmed ? '已确认见面' : '双方同意'}
         </span>
       </header>
 
@@ -286,7 +313,7 @@ export function MatchRoomPage() {
                   <input
                     className="h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] pl-9 pr-2 text-xs outline-none focus:border-[#7a5a8e]"
                     onChange={(event) => setScheduledAt(event.target.value)}
-                    disabled={roomClosed}
+                    disabled={planLocked}
                     type="datetime-local"
                     value={scheduledAt}
                   />
@@ -303,7 +330,7 @@ export function MatchRoomPage() {
                     className="h-10 w-full rounded-md border border-[#d9d5cf] bg-[#fcfbf9] pl-9 pr-2 text-xs outline-none focus:border-[#7a5a8e]"
                     list="suggested-places"
                     onChange={(event) => setPlace(event.target.value)}
-                    disabled={roomClosed}
+                    disabled={planLocked}
                     placeholder="选择或输入校内地点"
                     value={place}
                   />
@@ -326,7 +353,7 @@ export function MatchRoomPage() {
                   )}
                   key={suggestion}
                   onClick={() => setPlace(suggestion)}
-                  disabled={roomClosed}
+                  disabled={planLocked}
                   type="button"
                 >
                   {suggestion}
@@ -336,7 +363,7 @@ export function MatchRoomPage() {
             <div className="mt-4 flex justify-end">
               <button
                 className="inline-flex h-9 items-center gap-2 rounded-md bg-[#376f5b] px-4 text-xs font-semibold text-white disabled:opacity-50"
-                disabled={savingPlan || roomClosed}
+                disabled={savingPlan || planLocked}
                 onClick={() => void savePlan()}
                 type="button"
               >
@@ -421,12 +448,32 @@ export function MatchRoomPage() {
           </section>
 
           <section className="flex flex-wrap items-center gap-2 border-t border-[#dfdcd6] pt-4">
+            {room.status === 'open' ? (
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-[#376f5b] px-3 text-xs font-semibold text-white disabled:opacity-50"
+                disabled={updatingStatus !== null}
+                onClick={() => void changeRoomStatus('met')}
+                type="button"
+              >
+                {updatingStatus === 'met' ? (
+                  <LoaderCircle className="animate-spin" size={14} />
+                ) : (
+                  <CheckCircle2 size={14} />
+                )}
+                确认已经见面
+              </button>
+            ) : null}
             <Link
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#d8d3cc] bg-white px-3 text-xs font-semibold text-[#5f5b55] hover:border-[#bbaac5] hover:text-[#5b3477]"
+              className={cn(
+                'inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs font-semibold hover:border-[#bbaac5] hover:text-[#5b3477]',
+                meetingConfirmed
+                  ? 'border-[#bbaac5] text-[#5b3477]'
+                  : 'border-[#d8d3cc] text-[#5f5b55]',
+              )}
               to={feedbackPath}
             >
               <MessageSquareText size={14} />
-              见面后反馈
+              {meetingConfirmed ? '提交见面反馈' : '见面后反馈'}
             </Link>
             <Link
               className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-[#8b4559] hover:bg-[#fff0f4]"
@@ -435,6 +482,43 @@ export function MatchRoomPage() {
               <Flag size={14} />
               举报与拉黑
             </Link>
+            {!roomClosed ? (
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-[#77736c] hover:bg-[#eeece8]"
+                onClick={() => setConfirmingClose(true)}
+                type="button"
+              >
+                <CircleX size={14} />
+                结束连接
+              </button>
+            ) : null}
+            {confirmingClose ? (
+              <div className="mt-2 flex w-full flex-col gap-3 rounded-md border border-[#ead4ce] bg-[#fff6f3] p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs leading-5 text-[#7a5149]">
+                  结束后将停止站内消息，并立即收回双方联系方式。
+                </p>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    className="h-8 rounded-md px-3 text-xs font-medium text-[#6f6b65]"
+                    onClick={() => setConfirmingClose(false)}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#8b4559] px-3 text-xs font-semibold text-white disabled:opacity-50"
+                    disabled={updatingStatus !== null}
+                    onClick={() => void changeRoomStatus('closed')}
+                    type="button"
+                  >
+                    {updatingStatus === 'closed' ? (
+                      <LoaderCircle className="animate-spin" size={13} />
+                    ) : null}
+                    确认结束
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
         </div>
 
@@ -450,6 +534,7 @@ export function MatchRoomPage() {
                   className="max-w-64 shrink-0 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-3 py-2 text-left text-[11px] leading-4 text-[#69655f] hover:border-[#bbaac5]"
                   key={starter}
                   onClick={() => setMessage(starter)}
+                  disabled={roomClosed}
                   type="button"
                 >
                   {starter}

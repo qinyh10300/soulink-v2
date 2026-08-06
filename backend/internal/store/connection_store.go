@@ -754,6 +754,23 @@ func (s *Store) UpdateMatchRoomPlan(ctx context.Context, tx *sql.Tx, viewerID, r
 	return requireRowsAffected(result)
 }
 
+func (s *Store) UpdateMatchRoomStatus(ctx context.Context, tx *sql.Tx, viewerID, roomID int64, status string, now time.Time) error {
+	result, err := executor(s.db, tx).ExecContext(ctx, `
+		UPDATE match_rooms
+		SET status = CAST($3 AS VARCHAR(24)),
+		    owner_contact_shared = CASE WHEN CAST($3 AS VARCHAR(24)) = 'closed' THEN FALSE ELSE owner_contact_shared END,
+		    candidate_contact_shared = CASE WHEN CAST($3 AS VARCHAR(24)) = 'closed' THEN FALSE ELSE candidate_contact_shared END,
+		    updated_at = $4
+		WHERE id = $2
+		  AND ($1 = owner_id OR $1 = candidate_id)
+		  AND status <> 'closed'
+	`, viewerID, roomID, status, now)
+	if err != nil {
+		return fmt.Errorf("update match room status: %w", err)
+	}
+	return requireRowsAffected(result)
+}
+
 func (s *Store) SetMatchRoomContactShared(ctx context.Context, tx *sql.Tx, viewerID, roomID int64, shared bool, now time.Time) error {
 	room, err := s.GetMatchRoom(ctx, tx, viewerID, roomID)
 	if err != nil {
@@ -764,12 +781,12 @@ func (s *Store) SetMatchRoomContactShared(ctx context.Context, tx *sql.Tx, viewe
 	if viewerID == room.OwnerID {
 		result, err = executor(s.db, tx).ExecContext(ctx, `
 			UPDATE match_rooms SET owner_contact_shared = $3, updated_at = $4
-			WHERE id = $2 AND owner_id = $1
+			WHERE id = $2 AND owner_id = $1 AND status <> 'closed'
 		`, viewerID, roomID, shared, now)
 	} else {
 		result, err = executor(s.db, tx).ExecContext(ctx, `
 			UPDATE match_rooms SET candidate_contact_shared = $3, updated_at = $4
-			WHERE id = $2 AND candidate_id = $1
+			WHERE id = $2 AND candidate_id = $1 AND status <> 'closed'
 		`, viewerID, roomID, shared, now)
 	}
 	if err != nil {
@@ -785,7 +802,7 @@ func (s *Store) CreateMatchRoomMessage(ctx context.Context, tx *sql.Tx, roomID, 
 		FROM match_rooms r
 		WHERE r.id = $1
 		  AND ($2 = r.owner_id OR $2 = r.candidate_id)
-		  AND r.status = 'open'
+		  AND r.status IN ('open', 'met')
 		RETURNING id, room_id, sender_id, content, created_at
 	`, roomID, senderID, content, now)
 

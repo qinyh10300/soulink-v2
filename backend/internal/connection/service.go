@@ -383,6 +383,30 @@ func (s *Service) RespondToInterest(ctx context.Context, ownerID, intentID, cand
 		if intent.AuthorID != ownerID {
 			return forbidden("只有发布者可以处理回应")
 		}
+		if intent.Status != StatusActive ||
+			(intent.ExpiresAt.Valid && !intent.ExpiresAt.Time.After(s.now())) {
+			return forbidden("这个意图已经停止匹配")
+		}
+		if accepted {
+			for _, participantID := range []int64{ownerID, candidateID} {
+				profile, profileErr := s.store.GetMatchingProfile(ctx, tx, participantID)
+				if errors.Is(profileErr, store.ErrNotFound) {
+					if intent.Category == CategoryRomantic {
+						return forbidden("双方都需要主动开启认真关系匹配")
+					}
+					continue
+				}
+				if profileErr != nil {
+					return httpapi.InternalError(profileErr)
+				}
+				if profile.MatchingPaused {
+					return forbidden("其中一方已经暂停新匹配")
+				}
+				if intent.Category == CategoryRomantic && !profile.RomanticOptIn {
+					return forbidden("双方都需要主动开启认真关系匹配")
+				}
+			}
+		}
 
 		status := "declined"
 		if accepted {
@@ -528,6 +552,20 @@ func (s *Service) UpdateMatchRoomPlan(ctx context.Context, userID, roomID int64,
 	}
 	if err := s.store.UpdateMatchRoomPlan(ctx, nil, userID, roomID, scheduled, place, s.now()); err != nil {
 		return MatchRoomView{}, mapStoreError(err, "找不到这个匹配房间")
+	}
+	return s.GetMatchRoom(ctx, userID, roomID)
+}
+
+func (s *Service) UpdateMatchRoomStatus(ctx context.Context, userID, roomID int64, status string) (MatchRoomView, error) {
+	if err := s.ensureReady(); err != nil {
+		return MatchRoomView{}, err
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if !validRoomStatusTarget(status) {
+		return MatchRoomView{}, invalidParams("未知的匹配房间状态")
+	}
+	if err := s.store.UpdateMatchRoomStatus(ctx, nil, userID, roomID, status, s.now()); err != nil {
+		return MatchRoomView{}, mapStoreError(err, "找不到可更新的匹配房间")
 	}
 	return s.GetMatchRoom(ctx, userID, roomID)
 }
@@ -1144,6 +1182,10 @@ func validWritableStatus(value string) bool {
 	default:
 		return false
 	}
+}
+
+func validRoomStatusTarget(value string) bool {
+	return value == RoomStatusMet || value == RoomStatusClosed
 }
 
 func defaultIntentLifetime(category string) time.Duration {

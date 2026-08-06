@@ -29,6 +29,10 @@ type roomPlanRequest struct {
 	Place       string  `json:"place"`
 }
 
+type roomStatusRequest struct {
+	Status string `json:"status"`
+}
+
 type contactSharingRequest struct {
 	Shared bool `json:"shared"`
 }
@@ -354,6 +358,24 @@ func (h *Handler) UpdateMatchRoomPlan(w http.ResponseWriter, r *http.Request) {
 		scheduledAt = &parsed
 	}
 	result, err := h.service.UpdateMatchRoomPlan(r.Context(), userID, roomID, scheduledAt, req.Place)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
+func (h *Handler) UpdateMatchRoomStatus(w http.ResponseWriter, r *http.Request) {
+	userID, roomID, ok := currentUserAndRouteID(w, r, "roomId")
+	if !ok {
+		return
+	}
+	var req roomStatusRequest
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	result, err := h.service.UpdateMatchRoomStatus(r.Context(), userID, roomID, req.Status)
 	if err != nil {
 		httpapi.Error(w, err)
 		return

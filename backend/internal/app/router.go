@@ -138,6 +138,7 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/", deps.ConnectionHandler.ListMatchRooms)
 					r.Get("/{roomId}", deps.ConnectionHandler.GetMatchRoom)
 					r.Put("/{roomId}/plan", deps.ConnectionHandler.UpdateMatchRoomPlan)
+					r.Put("/{roomId}/status", deps.ConnectionHandler.UpdateMatchRoomStatus)
 					r.Put("/{roomId}/contact-sharing", deps.ConnectionHandler.SetContactSharing)
 					r.Get("/{roomId}/messages", deps.ConnectionHandler.ListRoomMessages)
 					r.Post("/{roomId}/messages", deps.ConnectionHandler.CreateRoomMessage)

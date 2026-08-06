@@ -160,3 +160,14 @@ func TestDefaultIntentLifetimeKeepsUrgentIntentsShort(t *testing.T) {
 		t.Fatal("meal intent lifetime should be shorter than project intent lifetime")
 	}
 }
+
+func TestValidRoomStatusTargetRejectsReopening(t *testing.T) {
+	t.Parallel()
+
+	if !validRoomStatusTarget(RoomStatusMet) || !validRoomStatusTarget(RoomStatusClosed) {
+		t.Fatal("met and closed should be valid room status targets")
+	}
+	if validRoomStatusTarget(RoomStatusOpen) {
+		t.Fatal("clients must not be able to reopen a room")
+	}
+}

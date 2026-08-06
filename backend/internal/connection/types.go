@@ -28,6 +28,12 @@ const (
 	StatusExpired   = "expired"
 )
 
+const (
+	RoomStatusOpen   = "open"
+	RoomStatusMet    = "met"
+	RoomStatusClosed = "closed"
+)
+
 type MatchingProfileInput struct {
 	Bio                string   `json:"bio"`
 	Skills             []string `json:"skills"`
