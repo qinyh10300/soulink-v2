@@ -16,6 +16,7 @@ import (
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/match"
+	"soulink-backend/internal/meetup"
 	"soulink-backend/internal/meta"
 	"soulink-backend/internal/playground"
 	"soulink-backend/internal/profile"
@@ -37,6 +38,7 @@ type Dependencies struct {
 	MetaHandler          *meta.Handler
 	QuestionnaireHandler *questionnaire.Handler
 	MatchHandler         *match.Handler
+	MeetupHandler        *meetup.Handler
 	FriendHandler        *friend.Handler
 	ChatHandler          *chat.Handler
 	PlaygroundHandler    *playground.Handler
@@ -114,6 +116,23 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/users/{userId}/profile", deps.ProfileHandler.GetPublicProfile)
 			if deps.CalendarHandler != nil {
 				r.Get("/users/{userId}/calendar", deps.CalendarHandler.ListUserSchedule)
+			}
+
+			if deps.MeetupHandler != nil {
+				r.Get("/users/me/availability", deps.MeetupHandler.ListAvailability)
+				r.Put("/users/me/availability", deps.MeetupHandler.ReplaceAvailability)
+				r.Post("/meetup-suggestions", deps.MeetupHandler.SuggestTimes)
+				r.Route("/meetups", func(r chi.Router) {
+					r.Get("/", deps.MeetupHandler.List)
+					r.Post("/", deps.MeetupHandler.Create)
+					r.Get("/{meetupId}", deps.MeetupHandler.Get)
+					r.Put("/{meetupId}/response", deps.MeetupHandler.Respond)
+					r.Put("/{meetupId}/reschedule", deps.MeetupHandler.Reschedule)
+					r.Put("/{meetupId}/cancel", deps.MeetupHandler.Cancel)
+					r.Put("/{meetupId}/complete", deps.MeetupHandler.Complete)
+					r.Post("/{meetupId}/feedback", deps.MeetupHandler.SubmitFeedback)
+					r.Delete("/{meetupId}/feedback", deps.MeetupHandler.RevokeFeedback)
+				})
 			}
 			r.Get("/users/me/contacts", deps.ProfileHandler.GetContacts)
 			r.With(matchWriteGuard).Put("/users/me/contacts/{contactType}", deps.ProfileHandler.UpsertContact)

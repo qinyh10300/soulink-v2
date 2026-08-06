@@ -24,6 +24,7 @@ import (
 	"soulink-backend/internal/gate"
 	"soulink-backend/internal/mail"
 	"soulink-backend/internal/match"
+	"soulink-backend/internal/meetup"
 	"soulink-backend/internal/meta"
 	"soulink-backend/internal/migrate"
 	platformcache "soulink-backend/internal/platform/cache"
@@ -150,6 +151,7 @@ func main() {
 	chatHub := chat.NewHub(logger)
 	chatService := chat.NewService(dataStore)
 	calendarService := calendar.NewService(dataStore)
+	meetupService := meetup.NewService(dataStore, analyticsService)
 
 	friendNotify := func(userID int64, eventType string, data any) {
 		raw, err := json.Marshal(data)
@@ -175,6 +177,7 @@ func main() {
 		MetaHandler:          meta.NewHandler(metaService),
 		QuestionnaireHandler: questionnaire.NewHandler(questionnaireService),
 		MatchHandler:         match.NewHandler(matchService),
+		MeetupHandler:        meetup.NewHandler(meetupService),
 		FriendHandler:        friend.NewHandler(friendService),
 		ChatHandler:          chat.NewHandler(chatService, chatHub),
 		PlaygroundHandler:    playground.NewHandler(playgroundService),
