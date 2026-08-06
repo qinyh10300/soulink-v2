@@ -15,6 +15,7 @@ import (
 
 	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/httpapi"
+	"soulink-backend/internal/mail"
 	"soulink-backend/internal/store"
 )
 
@@ -32,7 +33,13 @@ const (
 type Service struct {
 	store    *store.Store
 	recorder analytics.EventRecorder
+	mailer   mail.Sender
 	nowFunc  func() time.Time
+}
+
+func (s *Service) WithMailer(sender mail.Sender) *Service {
+	s.mailer = sender
+	return s
 }
 
 func NewService(dataStore *store.Store, recorder analytics.EventRecorder) *Service {

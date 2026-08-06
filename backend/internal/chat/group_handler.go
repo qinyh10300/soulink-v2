@@ -29,8 +29,9 @@ type addGroupMembersRequest struct {
 }
 
 type createChatMessageRequest struct {
-	Content     string `json:"content"`
-	ContentType string `json:"contentType"`
+	Content          string `json:"content"`
+	ContentType      string `json:"contentType"`
+	RiskAcknowledged bool   `json:"riskAcknowledged"`
 }
 
 func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +69,10 @@ func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, err)
 		return
 	}
-	message, err := h.service.SendMessage(r.Context(), user.ID, conversationID, request.Content, request.ContentType)
+	message, err := h.service.SendMessageAcknowledged(
+		r.Context(), user.ID, conversationID, request.Content, request.ContentType,
+		request.RiskAcknowledged,
+	)
 	if err != nil {
 		httpapi.Error(w, err)
 		return
@@ -251,7 +255,10 @@ func (h *Handler) CreateGroupMessage(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, err)
 		return
 	}
-	message, memberIDs, err := h.service.SendGroupMessage(r.Context(), user.ID, groupID, request.Content, request.ContentType)
+	message, memberIDs, err := h.service.SendGroupMessageAcknowledged(
+		r.Context(), user.ID, groupID, request.Content, request.ContentType,
+		request.RiskAcknowledged,
+	)
 	if err != nil {
 		httpapi.Error(w, err)
 		return

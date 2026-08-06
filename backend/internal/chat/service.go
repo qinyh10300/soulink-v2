@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"soulink-backend/internal/ai"
 	"soulink-backend/internal/httpapi"
@@ -141,9 +142,18 @@ func (s *Service) MarkRead(ctx context.Context, userID, convID int64) error {
 }
 
 func (s *Service) SendMessage(ctx context.Context, userID, convID int64, content, contentType string) (store.Message, error) {
+	return s.SendMessageAcknowledged(ctx, userID, convID, content, contentType, false)
+}
+
+func (s *Service) SendMessageAcknowledged(
+	ctx context.Context,
+	userID, convID int64,
+	content, contentType string,
+	riskAcknowledged bool,
+) (store.Message, error) {
 	content = strings.TrimSpace(content)
-	if content == "" {
-		return store.Message{}, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "消息内容不能为空")
+	if content == "" || utf8.RuneCountInString(content) > maxChatMessageLength {
+		return store.Message{}, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "消息内容不符合要求")
 	}
 	if contentType == "" {
 		contentType = "text"
@@ -161,6 +171,13 @@ func (s *Service) SendMessage(ctx context.Context, userID, convID int64, content
 	}
 	if conv.FriendshipDisabledAt.Valid {
 		return store.Message{}, httpapi.NewError(http.StatusConflict, httpapi.CodeConflict, conversationStatusMessage(conv, userID))
+	}
+	if deterministicMessageSafety(content).RequiresConfirmation && !riskAcknowledged {
+		return store.Message{}, httpapi.NewError(
+			http.StatusConflict,
+			httpapi.CodeConflict,
+			"消息包含高风险表达，请重新检查并明确确认后再发送",
+		)
 	}
 
 	msg, err := s.store.CreateMessage(ctx, nil, convID, userID, content, contentType, time.Now())

@@ -458,3 +458,11 @@ func meetupRequestIDs(w http.ResponseWriter, r *http.Request) (int64, int64, boo
 	}
 	return userID, meetupID, true
 }
+
+func parseMeetupRouteID(r *http.Request, key string) (int64, error) {
+	value, err := strconv.ParseInt(chi.URLParam(r, key), 10, 64)
+	if err != nil || value <= 0 {
+		return 0, invalidParams("资源编号不正确")
+	}
+	return value, nil
+}

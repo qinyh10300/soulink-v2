@@ -121,6 +121,9 @@ func NewRouter(deps Dependencies) http.Handler {
 			if deps.MeetupHandler != nil {
 				r.Get("/users/me/availability", deps.MeetupHandler.ListAvailability)
 				r.Put("/users/me/availability", deps.MeetupHandler.ReplaceAvailability)
+				r.Get("/users/me/trusted-contacts", deps.MeetupHandler.ListTrustedContacts)
+				r.Post("/users/me/trusted-contacts", deps.MeetupHandler.CreateTrustedContact)
+				r.Delete("/users/me/trusted-contacts/{contactId}", deps.MeetupHandler.DeleteTrustedContact)
 				r.Post("/meetup-suggestions", deps.MeetupHandler.SuggestTimes)
 				r.Route("/meetups", func(r chi.Router) {
 					r.Get("/", deps.MeetupHandler.List)
@@ -132,6 +135,7 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Put("/{meetupId}/complete", deps.MeetupHandler.Complete)
 					r.Post("/{meetupId}/feedback", deps.MeetupHandler.SubmitFeedback)
 					r.Delete("/{meetupId}/feedback", deps.MeetupHandler.RevokeFeedback)
+					r.Post("/{meetupId}/safety-share", deps.MeetupHandler.ShareSafetySummary)
 				})
 			}
 			r.Get("/users/me/contacts", deps.ProfileHandler.GetContacts)
@@ -200,9 +204,20 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			if deps.SafetyHandler != nil {
 				r.Get("/safety/capabilities", deps.SafetyHandler.Capabilities)
+				r.Get("/users/me/trust", deps.SafetyHandler.GetMyTrustProfile)
+				r.Get("/users/{userId}/trust", deps.SafetyHandler.GetPublicTrustProfile)
+				r.Post("/users/me/photo-verifications", deps.SafetyHandler.SubmitPhotoVerification)
+				r.Post("/users/me/photo-verifications/{requestId}/appeal", deps.SafetyHandler.AppealPhotoVerification)
 				r.With(track(analytics.EventSafetyReportSubmitted, "", "")).Post("/safety/reports", deps.SafetyHandler.SubmitReport)
+				r.Get("/safety/cases", deps.SafetyHandler.ListMyCases)
+				r.Post("/safety/reports/{reportId}/appeals", deps.SafetyHandler.AppealReport)
 				r.Get("/admin/safety-reports", deps.SafetyHandler.ListReports)
 				r.Put("/admin/safety-reports/{reportId}", deps.SafetyHandler.UpdateReport)
+				r.Put("/admin/safety-appeals/{appealId}", deps.SafetyHandler.ReviewReportAppeal)
+				r.Get("/admin/photo-verifications", deps.SafetyHandler.ListPhotoVerifications)
+				r.Get("/admin/photo-verifications/{requestId}/evidence", deps.SafetyHandler.PhotoVerificationEvidence)
+				r.Put("/admin/photo-verifications/{requestId}", deps.SafetyHandler.ReviewPhotoVerification)
+				r.Get("/admin/safety-review-events", deps.SafetyHandler.ListReviewEvents)
 			}
 
 			if deps.CalendarHandler != nil {
@@ -240,6 +255,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/conversations", deps.ChatHandler.CreateConversation)
 			r.Get("/conversations/{conversationId}/messages", deps.ChatHandler.ListMessages)
 			r.Post("/conversations/{conversationId}/messages", deps.ChatHandler.CreateMessage)
+			r.Post("/conversations/{conversationId}/safety-check", deps.ChatHandler.CheckDirectMessageSafety)
 			r.Post("/conversations/{conversationId}/read", deps.ChatHandler.MarkRead)
 			r.Get("/conversations/unread-count", deps.ChatHandler.GetUnreadCount)
 			r.Get("/conversations/{conversationId}/assistant", deps.ChatHandler.GetDirectAssistant)
@@ -261,6 +277,7 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Delete("/{groupId}/members/{userId}", deps.ChatHandler.RemoveGroupMember)
 				r.Get("/{groupId}/messages", deps.ChatHandler.ListGroupMessages)
 				r.Post("/{groupId}/messages", deps.ChatHandler.CreateGroupMessage)
+				r.Post("/{groupId}/safety-check", deps.ChatHandler.CheckGroupMessageSafety)
 				r.Post("/{groupId}/read", deps.ChatHandler.MarkGroupRead)
 				r.Get("/{groupId}/assistant", deps.ChatHandler.GetGroupAssistant)
 				r.Post("/{groupId}/assistant/summary", deps.ChatHandler.GenerateGroupAssistantSummary)

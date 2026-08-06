@@ -176,7 +176,7 @@ func main() {
 	chatHub := chat.NewHub(logger)
 	chatService := chat.NewService(dataStore).WithGenerator(modelGenerator)
 	calendarService := calendar.NewService(dataStore)
-	meetupService := meetup.NewService(dataStore, analyticsService)
+	meetupService := meetup.NewService(dataStore, analyticsService).WithMailer(mailer)
 
 	friendNotify := func(userID int64, eventType string, data any) {
 		raw, err := json.Marshal(data)

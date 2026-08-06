@@ -260,6 +260,15 @@ func (s *Service) ListGroupMessages(ctx context.Context, userID, groupID, before
 }
 
 func (s *Service) SendGroupMessage(ctx context.Context, userID, groupID int64, content, contentType string) (store.ChatGroupMessage, []int64, error) {
+	return s.SendGroupMessageAcknowledged(ctx, userID, groupID, content, contentType, false)
+}
+
+func (s *Service) SendGroupMessageAcknowledged(
+	ctx context.Context,
+	userID, groupID int64,
+	content, contentType string,
+	riskAcknowledged bool,
+) (store.ChatGroupMessage, []int64, error) {
 	if _, err := s.requireGroupMember(ctx, groupID, userID); err != nil {
 		return store.ChatGroupMessage{}, nil, err
 	}
@@ -272,6 +281,13 @@ func (s *Service) SendGroupMessage(ctx context.Context, userID, groupID int64, c
 	}
 	if contentType != "text" {
 		return store.ChatGroupMessage{}, nil, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "暂不支持该消息类型")
+	}
+	if deterministicMessageSafety(content).RequiresConfirmation && !riskAcknowledged {
+		return store.ChatGroupMessage{}, nil, httpapi.NewError(
+			http.StatusConflict,
+			httpapi.CodeConflict,
+			"消息包含高风险表达，请重新检查并明确确认后再发送",
+		)
 	}
 	message, err := s.store.CreateChatGroupMessage(ctx, nil, groupID, userID, content, contentType, time.Now())
 	if err != nil {
