@@ -40,6 +40,7 @@ type MatchingProfileInput struct {
 	AIPortraitApproved bool     `json:"aiPortraitApproved"`
 	RomanticOptIn      bool     `json:"romanticOptIn"`
 	MatchingPaused     bool     `json:"matchingPaused"`
+	HiddenCategories   []string `json:"hiddenCategories"`
 }
 
 type MatchingProfileView struct {

@@ -117,6 +117,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 				r.Route("/intents", func(r chi.Router) {
 					r.Get("/feed", deps.ConnectionHandler.ListFeed)
+					r.Get("/saved", deps.ConnectionHandler.ListSaved)
 					r.Get("/mine", deps.ConnectionHandler.ListMine)
 					r.Post("/", deps.ConnectionHandler.CreateIntent)
 					r.Get("/{intentId}", deps.ConnectionHandler.GetIntent)
@@ -124,6 +125,7 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Delete("/{intentId}", deps.ConnectionHandler.ExpireIntent)
 					r.Post("/{intentId}/save", deps.ConnectionHandler.SaveIntent)
 					r.Delete("/{intentId}/save", deps.ConnectionHandler.UnsaveIntent)
+					r.Post("/{intentId}/dismiss", deps.ConnectionHandler.DismissIntent)
 					r.Post("/{intentId}/interest", deps.ConnectionHandler.ExpressInterest)
 					r.Delete("/{intentId}/interest", deps.ConnectionHandler.WithdrawInterest)
 					r.Get("/{intentId}/interests", deps.ConnectionHandler.ListInterests)

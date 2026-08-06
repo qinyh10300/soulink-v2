@@ -56,9 +56,10 @@ func (s *Service) GetMatchingProfile(ctx context.Context, userID int64) (Matchin
 	if errors.Is(err, store.ErrNotFound) {
 		return MatchingProfileView{
 			MatchingProfileInput: MatchingProfileInput{
-				Skills:          []string{},
-				Interests:       []string{},
-				PreferredScenes: []string{},
+				Skills:           []string{},
+				Interests:        []string{},
+				PreferredScenes:  []string{},
+				HiddenCategories: []string{},
 			},
 		}, nil
 	}
@@ -90,6 +91,7 @@ func (s *Service) UpdateMatchingProfile(ctx context.Context, userID int64, input
 		AIPortraitApproved: normalized.AIPortraitApproved,
 		RomanticOptIn:      normalized.RomanticOptIn,
 		MatchingPaused:     normalized.MatchingPaused,
+		HiddenCategories:   normalized.HiddenCategories,
 		Now:                s.now(),
 	})
 	if err != nil {
@@ -195,6 +197,14 @@ func (s *Service) GetIntent(ctx context.Context, viewerID, intentID int64) (Inte
 		return IntentView{}, mapStoreError(err, "找不到这个意图")
 	}
 	if intent.AuthorID != viewerID {
+		authorProfile, err := s.GetMatchingProfile(ctx, intent.AuthorID)
+		if err != nil {
+			return IntentView{}, err
+		}
+		if authorProfile.MatchingPaused ||
+			(intent.Category == CategoryRomantic && !authorProfile.RomanticOptIn) {
+			return IntentView{}, forbidden("这个意图当前不可见")
+		}
 		blocked, err := s.store.UsersBlocked(ctx, nil, viewerID, intent.AuthorID)
 		if err != nil {
 			return IntentView{}, httpapi.InternalError(err)
@@ -202,7 +212,8 @@ func (s *Service) GetIntent(ctx context.Context, viewerID, intentID int64) (Inte
 		if blocked {
 			return IntentView{}, forbidden("这个意图当前不可见")
 		}
-		if intent.Status != StatusActive || intent.Visibility == VisibilityPrivate {
+		if intent.Status != StatusActive || intent.Visibility == VisibilityPrivate ||
+			(intent.ExpiresAt.Valid && !intent.ExpiresAt.Time.After(s.now())) {
 			return IntentView{}, forbidden("这个意图当前不可见")
 		}
 	}
@@ -235,6 +246,21 @@ func (s *Service) ListFeed(ctx context.Context, userID int64, category string) (
 	return mapIntentViews(intents, userID), nil
 }
 
+func (s *Service) ListSavedIntents(ctx context.Context, userID int64, category string) ([]IntentView, error) {
+	if err := s.ensureReady(); err != nil {
+		return nil, err
+	}
+	category = strings.TrimSpace(category)
+	if category != "" && !validCategory(category) {
+		return nil, invalidParams("未知的意图类别")
+	}
+	intents, err := s.store.ListSavedConnectionIntents(ctx, nil, userID, category, 50)
+	if err != nil {
+		return nil, httpapi.InternalError(err)
+	}
+	return mapIntentViews(intents, userID), nil
+}
+
 func (s *Service) SetIntentSaved(ctx context.Context, userID, intentID int64, saved bool) (IntentView, error) {
 	intent, err := s.GetIntent(ctx, userID, intentID)
 	if err != nil {
@@ -249,6 +275,29 @@ func (s *Service) SetIntentSaved(ctx context.Context, userID, intentID int64, sa
 	return s.GetIntent(ctx, userID, intentID)
 }
 
+func (s *Service) DismissIntent(ctx context.Context, userID, intentID int64) error {
+	intent, err := s.GetIntent(ctx, userID, intentID)
+	if err != nil {
+		return err
+	}
+	if intent.IsOwner {
+		return invalidParams("不能忽略自己的意图")
+	}
+	if intent.InterestState == "interested" || intent.InterestState == "accepted" {
+		return invalidParams("已回应的意图不能忽略")
+	}
+	now := s.now()
+	if err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.store.DismissIntent(ctx, tx, intentID, userID, now); err != nil {
+			return err
+		}
+		return s.store.SetIntentSaved(ctx, tx, intentID, userID, false, now)
+	}); err != nil {
+		return httpapi.InternalError(err)
+	}
+	return nil
+}
+
 func (s *Service) SetIntentInterest(ctx context.Context, userID, intentID int64, message string) (IntentView, error) {
 	intent, err := s.GetIntent(ctx, userID, intentID)
 	if err != nil {
@@ -257,15 +306,18 @@ func (s *Service) SetIntentInterest(ctx context.Context, userID, intentID int64,
 	if intent.IsOwner {
 		return IntentView{}, invalidParams("不能回应自己的意图")
 	}
+	profile, err := s.GetMatchingProfile(ctx, userID)
+	if err != nil {
+		return IntentView{}, err
+	}
+	if profile.MatchingPaused {
+		return IntentView{}, forbidden("你已暂停匹配，请先在资料中重新开启")
+	}
 	message = strings.TrimSpace(message)
 	if utf8.RuneCountInString(message) > maxInterestMessageLength {
 		return IntentView{}, invalidParams("附言不能超过 500 个字")
 	}
 	if intent.Category == CategoryRomantic {
-		profile, err := s.GetMatchingProfile(ctx, userID)
-		if err != nil {
-			return IntentView{}, err
-		}
 		if !profile.RomanticOptIn {
 			return IntentView{}, forbidden("请先在资料中主动开启认真关系匹配")
 		}
@@ -393,11 +445,14 @@ func (s *Service) Recommendations(ctx context.Context, userID, intentID int64) (
 	if source.Status != StatusActive {
 		return []RecommendationView{}, nil
 	}
+	profile, err := s.GetMatchingProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if profile.MatchingPaused || stringListContains(profile.HiddenCategories, source.Category) {
+		return []RecommendationView{}, nil
+	}
 	if source.Category == CategoryRomantic {
-		profile, err := s.GetMatchingProfile(ctx, userID)
-		if err != nil {
-			return nil, err
-		}
 		if !profile.RomanticOptIn {
 			return nil, forbidden("请先在资料中主动开启认真关系匹配")
 		}
@@ -634,6 +689,10 @@ func normalizeMatchingProfile(input MatchingProfileInput) (MatchingProfileInput,
 	if err != nil {
 		return MatchingProfileInput{}, err
 	}
+	input.HiddenCategories, err = normalizeCategoryList(input.HiddenCategories)
+	if err != nil {
+		return MatchingProfileInput{}, err
+	}
 	if input.AIPortrait == "" {
 		input.AIPortraitApproved = false
 	}
@@ -673,6 +732,26 @@ func normalizeProjectMemo(input ProjectMemo) (ProjectMemo, error) {
 		return ProjectMemo{}, err
 	}
 	return input, nil
+}
+
+func normalizeCategoryList(values []string) ([]string, error) {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" {
+			continue
+		}
+		if !validCategory(value) {
+			return nil, invalidParams("未知的隐藏类别")
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result, nil
 }
 
 func normalizeStringList(values []string, maxItems, maxLength int) ([]string, error) {
@@ -833,6 +912,7 @@ func toMatchingProfileView(profile store.MatchingProfile) MatchingProfileView {
 			AIPortraitApproved: profile.AIPortraitApproved,
 			RomanticOptIn:      profile.RomanticOptIn,
 			MatchingPaused:     profile.MatchingPaused,
+			HiddenCategories:   nonNilStrings(profile.HiddenCategories),
 		},
 		UpdatedAt: &updatedAt,
 	}
@@ -1197,6 +1277,15 @@ func nonNilStrings(values []string) []string {
 		return []string{}
 	}
 	return values
+}
+
+func stringListContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) ensureReady() error {

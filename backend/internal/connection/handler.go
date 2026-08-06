@@ -102,6 +102,19 @@ func (h *Handler) ListFeed(w http.ResponseWriter, r *http.Request) {
 	httpapi.OK(w, result)
 }
 
+func (h *Handler) ListSaved(w http.ResponseWriter, r *http.Request) {
+	userID, ok := currentUserID(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.service.ListSavedIntents(r.Context(), userID, r.URL.Query().Get("category"))
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
 func (h *Handler) ListMine(w http.ResponseWriter, r *http.Request) {
 	userID, ok := currentUserID(w, r)
 	if !ok {
@@ -182,6 +195,18 @@ func (h *Handler) SaveIntent(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UnsaveIntent(w http.ResponseWriter, r *http.Request) {
 	h.setIntentSaved(w, r, false)
+}
+
+func (h *Handler) DismissIntent(w http.ResponseWriter, r *http.Request) {
+	userID, intentID, ok := currentUserAndRouteID(w, r, "intentId")
+	if !ok {
+		return
+	}
+	if err := h.service.DismissIntent(r.Context(), userID, intentID); err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, map[string]bool{"dismissed": true})
 }
 
 func (h *Handler) setIntentSaved(w http.ResponseWriter, r *http.Request, saved bool) {

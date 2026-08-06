@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Eye,
+  EyeOff,
   Heart,
   LoaderCircle,
   LockKeyhole,
@@ -21,6 +22,7 @@ import { getErrorMessage } from '@/lib/api'
 import {
   fetchMatchingProfile,
   updateMatchingProfile,
+  type IntentCategory,
   type MatchingProfile,
 } from '@/lib/connection-api'
 import { fetchSafetyCapabilities } from '@/lib/safety-api'
@@ -41,6 +43,7 @@ const emptyProfile: MatchingProfile = {
   aiPortraitApproved: false,
   romanticOptIn: false,
   matchingPaused: false,
+  hiddenCategories: [],
 }
 
 const previewModes: Array<{ value: PreviewMode; label: string }> = [
@@ -48,6 +51,16 @@ const previewModes: Array<{ value: PreviewMode; label: string }> = [
   { value: 'project', label: '项目协作' },
   { value: 'romantic', label: '认真关系' },
   { value: 'feed', label: '意图流' },
+]
+
+const categoryPrivacyOptions: Array<{ value: IntentCategory; label: string }> = [
+  { value: 'meal', label: '饭搭子' },
+  { value: 'study', label: '学习搭子' },
+  { value: 'sport', label: '运动搭子' },
+  { value: 'event', label: '活动同伴' },
+  { value: 'conversation', label: '认真聊天' },
+  { value: 'project', label: '项目伙伴' },
+  { value: 'cofounder', label: 'CTO / 联创' },
 ]
 
 function tagsToText(values: string[]) {
@@ -142,6 +155,16 @@ export function ConnectionProfilePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const toggleHiddenCategory = (category: IntentCategory) => {
+    const hidden = profile.hiddenCategories.includes(category)
+    update(
+      'hiddenCategories',
+      hidden
+        ? profile.hiddenCategories.filter((item) => item !== category)
+        : [...profile.hiddenCategories, category],
+    )
   }
 
   if (loading) {
@@ -474,6 +497,29 @@ export function ConnectionProfilePage() {
                   />
                 </span>
               </button>
+
+              <div className="border-t border-[#e4e1dc] pt-4">
+                <div className="flex items-center gap-2">
+                  <EyeOff size={15} className="text-[#716c66]" />
+                  <p className="text-xs font-semibold text-[#4f4b46]">隐藏意图类别</p>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+                  {categoryPrivacyOptions.map((option) => (
+                    <label
+                      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-2.5 text-[11px] text-[#5f5b55]"
+                      key={option.value}
+                    >
+                      <input
+                        checked={profile.hiddenCategories.includes(option.value)}
+                        className="h-3.5 w-3.5 accent-[#5b3477]"
+                        onChange={() => toggleHiddenCategory(option.value)}
+                        type="checkbox"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 

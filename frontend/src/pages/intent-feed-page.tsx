@@ -1,7 +1,10 @@
 import {
   AlertCircle,
   ArrowRight,
+  Bookmark,
   Check,
+  Compass,
+  EyeOff,
   Filter,
   LoaderCircle,
   MessageSquarePlus,
@@ -16,8 +19,10 @@ import { IntentCard } from '@/components/connection/intent-card'
 import { intentCategoryMeta } from '@/components/connection/intent-category'
 import { getErrorMessage } from '@/lib/api'
 import {
+  dismissIntent,
   expressIntentInterest,
   fetchIntentFeed,
+  fetchSavedIntents,
   setIntentSaved,
   type ConnectionIntent,
   type IntentCategory,
@@ -36,6 +41,7 @@ const filters: Array<{ value: IntentCategory | ''; label: string }> = [
 ]
 
 export function IntentFeedPage() {
+  const [mode, setMode] = useState<'campus' | 'saved'>('campus')
   const [category, setCategory] = useState<IntentCategory | ''>('')
   const [intents, setIntents] = useState<ConnectionIntent[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,12 +51,17 @@ export function IntentFeedPage() {
   const [interestId, setInterestId] = useState<number | null>(null)
   const [interestMessage, setInterestMessage] = useState('')
   const [sendingInterest, setSendingInterest] = useState(false)
+  const [dismissingId, setDismissingId] = useState<number | null>(null)
 
-  const loadFeed = async (nextCategory = category) => {
+  const loadFeed = async (nextCategory = category, nextMode = mode) => {
     setLoading(true)
     setNotice('')
     try {
-      setIntents(await fetchIntentFeed(nextCategory))
+      setIntents(
+        await (nextMode === 'saved'
+          ? fetchSavedIntents(nextCategory)
+          : fetchIntentFeed(nextCategory)),
+      )
     } catch (error) {
       setNotice(getErrorMessage(error, '意图流暂时无法加载'))
     } finally {
@@ -59,10 +70,10 @@ export function IntentFeedPage() {
   }
 
   useEffect(() => {
-    void loadFeed(category)
-    // loadFeed is scoped to this page and keyed by category.
+    void loadFeed(category, mode)
+    // loadFeed is scoped to this page and keyed by category and mode.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category])
+  }, [category, mode])
 
   const handleSave = async (intent: ConnectionIntent) => {
     if (savingId) {
@@ -71,13 +82,32 @@ export function IntentFeedPage() {
     setSavingId(intent.id)
     try {
       const updated = await setIntentSaved(intent.id, !intent.savedByMe)
-      setIntents((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      )
+      setIntents((current) => {
+        if (mode === 'saved' && !updated.savedByMe) {
+          return current.filter((item) => item.id !== updated.id)
+        }
+        return current.map((item) => (item.id === updated.id ? updated : item))
+      })
     } catch (error) {
       setNotice(getErrorMessage(error, '收藏状态没有保存'))
     } finally {
       setSavingId(null)
+    }
+  }
+
+  const handleDismiss = async (intentId: number) => {
+    if (dismissingId) {
+      return
+    }
+    setDismissingId(intentId)
+    setNotice('')
+    try {
+      await dismissIntent(intentId)
+      setIntents((current) => current.filter((intent) => intent.id !== intentId))
+    } catch (error) {
+      setNotice(getErrorMessage(error, '这条意图暂时无法忽略'))
+    } finally {
+      setDismissingId(null)
     }
   }
 
@@ -126,6 +156,33 @@ export function IntentFeedPage() {
 
       <div className="sticky top-15 z-20 -mx-4 overflow-x-auto border-b border-[#e1ded8] bg-[rgba(247,246,243,0.95)] px-4 py-3 backdrop-blur-lg sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-8 lg:px-8">
         <div className="flex min-w-max gap-2">
+          <button
+            className={cn(
+              'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors',
+              mode === 'campus'
+                ? 'bg-[#e8f1ed] text-[#315c4d]'
+                : 'text-[#706c65] hover:bg-[#ece9e5]',
+            )}
+            onClick={() => setMode('campus')}
+            type="button"
+          >
+            <Compass size={13} />
+            校园此刻
+          </button>
+          <button
+            className={cn(
+              'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors',
+              mode === 'saved'
+                ? 'bg-[#eee8f2] text-[#5b3477]'
+                : 'text-[#706c65] hover:bg-[#ece9e5]',
+            )}
+            onClick={() => setMode('saved')}
+            type="button"
+          >
+            <Bookmark size={13} />
+            已收藏
+          </button>
+          <span className="mx-1 h-8 w-px bg-[#d8d4cd]" />
           {filters.map((filter) => (
             <button
               className={cn(
@@ -254,6 +311,22 @@ export function IntentFeedPage() {
                           <Sparkles size={14} />
                           问 AI 为什么
                         </button>
+                        {intent.interestState !== 'interested' &&
+                        intent.interestState !== 'accepted' ? (
+                          <button
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-[#77736c] hover:bg-[#eeece8] disabled:opacity-50"
+                            disabled={dismissingId === intent.id}
+                            onClick={() => void handleDismiss(intent.id)}
+                            type="button"
+                          >
+                            {dismissingId === intent.id ? (
+                              <LoaderCircle className="animate-spin" size={14} />
+                            ) : (
+                              <EyeOff size={14} />
+                            )}
+                            不适合我
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   }
@@ -267,8 +340,12 @@ export function IntentFeedPage() {
           </div>
         ) : (
           <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-[#d7d2cb] px-6 text-center">
-            <p className="text-sm font-medium text-[#55514c]">这个分类暂时没有活跃意图</p>
-            <p className="mt-1 text-xs text-[#817d76]">过期需求会自动离开这里。</p>
+            <p className="text-sm font-medium text-[#55514c]">
+              {mode === 'saved' ? '这个分类还没有收藏' : '这个分类暂时没有活跃意图'}
+            </p>
+            <p className="mt-1 text-xs text-[#817d76]">
+              {mode === 'saved' ? '在校园意图中收藏后，会留在这里。' : '过期需求会自动离开这里。'}
+            </p>
             <button
               className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9cbc4] px-3 text-xs font-semibold text-[#315c4d]"
               onClick={() => void loadFeed()}

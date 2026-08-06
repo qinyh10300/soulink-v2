@@ -53,6 +53,7 @@ export interface MatchingProfile {
   aiPortraitApproved: boolean
   romanticOptIn: boolean
   matchingPaused: boolean
+  hiddenCategories: IntentCategory[]
   updatedAt?: string
 }
 
@@ -194,6 +195,13 @@ export function fetchIntentFeed(category?: IntentCategory | '') {
   })
 }
 
+export function fetchSavedIntents(category?: IntentCategory | '') {
+  const query = category ? `?category=${encodeURIComponent(category)}` : ''
+  return apiRequest<ConnectionIntent[]>(`/intents/saved${query}`, {
+    auth: true,
+  })
+}
+
 export function fetchMyIntents() {
   return apiRequest<ConnectionIntent[]>('/intents/mine', {
     auth: true,
@@ -232,6 +240,13 @@ export function expireIntent(intentId: number) {
 export function setIntentSaved(intentId: number, saved: boolean) {
   return apiRequest<ConnectionIntent>(`/intents/${intentId}/save`, {
     method: saved ? 'POST' : 'DELETE',
+    auth: true,
+  })
+}
+
+export function dismissIntent(intentId: number) {
+  return apiRequest<{ dismissed: boolean }>(`/intents/${intentId}/dismiss`, {
+    method: 'POST',
     auth: true,
   })
 }

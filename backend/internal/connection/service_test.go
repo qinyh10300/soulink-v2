@@ -21,6 +21,20 @@ func TestNormalizeStringListDeduplicatesAndTrims(t *testing.T) {
 	}
 }
 
+func TestNormalizeCategoryListDeduplicatesAndValidates(t *testing.T) {
+	result, err := normalizeCategoryList([]string{" meal ", "PROJECT", "meal", ""})
+	if err != nil {
+		t.Fatalf("normalizeCategoryList() error = %v", err)
+	}
+	if len(result) != 2 || result[0] != CategoryMeal || result[1] != CategoryProject {
+		t.Fatalf("normalizeCategoryList() = %#v", result)
+	}
+
+	if _, err := normalizeCategoryList([]string{"people-search"}); err == nil {
+		t.Fatal("normalizeCategoryList() accepted an unknown category")
+	}
+}
+
 func TestRecommendationScoringRewardsConcreteOverlap(t *testing.T) {
 	t.Parallel()
 

@@ -21,6 +21,7 @@ type MatchingProfile struct {
 	AIPortraitApproved bool
 	RomanticOptIn      bool
 	MatchingPaused     bool
+	HiddenCategories   []string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -38,6 +39,7 @@ type UpsertMatchingProfileParams struct {
 	AIPortraitApproved bool
 	RomanticOptIn      bool
 	MatchingPaused     bool
+	HiddenCategories   []string
 	Now                time.Time
 }
 
@@ -194,7 +196,7 @@ func (s *Store) GetMatchingProfile(ctx context.Context, tx *sql.Tx, userID int64
 		SELECT user_id, bio, skills::text, interests::text, availability,
 		       preferred_scenes::text, collaboration_style, boundaries,
 		       ai_portrait, ai_portrait_approved, romantic_opt_in, matching_paused,
-		       created_at, updated_at
+		       hidden_categories::text, created_at, updated_at
 		FROM matching_profiles
 		WHERE user_id = $1
 	`, userID)
@@ -214,15 +216,19 @@ func (s *Store) UpsertMatchingProfile(ctx context.Context, tx *sql.Tx, params Up
 	if err != nil {
 		return MatchingProfile{}, err
 	}
+	hiddenCategories, err := marshalStringList(params.HiddenCategories)
+	if err != nil {
+		return MatchingProfile{}, err
+	}
 
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		INSERT INTO matching_profiles (
 			user_id, bio, skills, interests, availability, preferred_scenes,
 			collaboration_style, boundaries, ai_portrait, ai_portrait_approved,
-			romantic_opt_in, matching_paused, created_at, updated_at
+			romantic_opt_in, matching_paused, hidden_categories, created_at, updated_at
 		) VALUES (
 			$1, $2, $3::jsonb, $4::jsonb, $5, $6::jsonb,
-			$7, $8, $9, $10, $11, $12, $13, $13
+			$7, $8, $9, $10, $11, $12, $13::jsonb, $14, $14
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
 			bio = EXCLUDED.bio,
@@ -236,14 +242,16 @@ func (s *Store) UpsertMatchingProfile(ctx context.Context, tx *sql.Tx, params Up
 			ai_portrait_approved = EXCLUDED.ai_portrait_approved,
 			romantic_opt_in = EXCLUDED.romantic_opt_in,
 			matching_paused = EXCLUDED.matching_paused,
+			hidden_categories = EXCLUDED.hidden_categories,
 			updated_at = EXCLUDED.updated_at
 		RETURNING user_id, bio, skills::text, interests::text, availability,
 		          preferred_scenes::text, collaboration_style, boundaries,
 		          ai_portrait, ai_portrait_approved, romantic_opt_in, matching_paused,
-		          created_at, updated_at
+		          hidden_categories::text, created_at, updated_at
 	`, params.UserID, params.Bio, skills, interests, params.Availability, scenes,
 		params.CollaborationStyle, params.Boundaries, params.AIPortrait,
-		params.AIPortraitApproved, params.RomanticOptIn, params.MatchingPaused, params.Now)
+		params.AIPortraitApproved, params.RomanticOptIn, params.MatchingPaused,
+		hiddenCategories, params.Now)
 
 	profile, err := scanMatchingProfile(row)
 	if err != nil {
@@ -404,6 +412,16 @@ func (s *Store) ListFeedConnectionIntents(ctx context.Context, tx *sql.Tx, viewe
 		  AND i.category <> 'romantic'
 		  AND (i.expires_at IS NULL OR i.expires_at > NOW())
 		  AND ($2 = '' OR i.category = $2)
+		  AND COALESCE(mp.matching_paused, FALSE) = FALSE
+		  AND NOT EXISTS (
+			SELECT 1 FROM matching_profiles viewer_profile
+			WHERE viewer_profile.user_id = $1
+			  AND viewer_profile.hidden_categories ? i.category
+		  )
+		  AND NOT EXISTS (
+			SELECT 1 FROM intent_dismissals d
+			WHERE d.intent_id = i.id AND d.user_id = $1
+		  )
 		  AND u.deleted_at IS NULL
 		  AND NOT EXISTS (
 			SELECT 1
@@ -412,6 +430,29 @@ func (s *Store) ListFeedConnectionIntents(ctx context.Context, tx *sql.Tx, viewe
 			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
 		  )
 		ORDER BY i.published_at DESC NULLS LAST, i.id DESC
+		LIMIT $3
+	`, viewerID, category, normalizeConnectionLimit(limit))
+}
+
+func (s *Store) ListSavedConnectionIntents(ctx context.Context, tx *sql.Tx, viewerID int64, category string, limit int) ([]ConnectionIntent, error) {
+	return s.listConnectionIntents(ctx, tx, `
+		JOIN intent_saves saved ON saved.intent_id = i.id
+		WHERE saved.user_id = $1
+		  AND i.author_id <> $1
+		  AND i.status = 'active'
+		  AND i.visibility <> 'private'
+		  AND i.category <> 'romantic'
+		  AND (i.expires_at IS NULL OR i.expires_at > NOW())
+		  AND ($2 = '' OR i.category = $2)
+		  AND COALESCE(mp.matching_paused, FALSE) = FALSE
+		  AND u.deleted_at IS NULL
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_blocks b
+			WHERE (b.blocker_id = $1 AND b.blocked_id = i.author_id)
+			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
+		  )
+		ORDER BY saved.created_at DESC, i.id DESC
 		LIMIT $3
 	`, viewerID, category, normalizeConnectionLimit(limit))
 }
@@ -425,6 +466,17 @@ func (s *Store) ListRecommendationCandidates(ctx context.Context, tx *sql.Tx, vi
 		  AND (
 		    ($2 = 'romantic' AND i.category = 'romantic')
 		    OR ($2 <> 'romantic' AND i.category <> 'romantic')
+		  )
+		  AND COALESCE(mp.matching_paused, FALSE) = FALSE
+		  AND (i.category <> 'romantic' OR COALESCE(mp.romantic_opt_in, FALSE))
+		  AND NOT EXISTS (
+			SELECT 1 FROM matching_profiles viewer_profile
+			WHERE viewer_profile.user_id = $1
+			  AND viewer_profile.hidden_categories ? i.category
+		  )
+		  AND NOT EXISTS (
+			SELECT 1 FROM intent_dismissals d
+			WHERE d.intent_id = i.id AND d.user_id = $1
 		  )
 		  AND u.deleted_at IS NULL
 		  AND NOT EXISTS (
@@ -495,6 +547,18 @@ func (s *Store) SetIntentSaved(ctx context.Context, tx *sql.Tx, intentID, userID
 	`, intentID, userID)
 	if err != nil {
 		return fmt.Errorf("unsave intent: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) DismissIntent(ctx context.Context, tx *sql.Tx, intentID, userID int64, now time.Time) error {
+	_, err := executor(s.db, tx).ExecContext(ctx, `
+		INSERT INTO intent_dismissals (intent_id, user_id, created_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (intent_id, user_id) DO NOTHING
+	`, intentID, userID, now)
+	if err != nil {
+		return fmt.Errorf("dismiss intent: %w", err)
 	}
 	return nil
 }
@@ -792,12 +856,12 @@ const matchRoomSelect = `
 
 func scanMatchingProfile(row rowScanner) (MatchingProfile, error) {
 	var profile MatchingProfile
-	var rawSkills, rawInterests, rawScenes string
+	var rawSkills, rawInterests, rawScenes, rawHiddenCategories string
 	if err := row.Scan(
 		&profile.UserID, &profile.Bio, &rawSkills, &rawInterests, &profile.Availability,
 		&rawScenes, &profile.CollaborationStyle, &profile.Boundaries, &profile.AIPortrait,
 		&profile.AIPortraitApproved, &profile.RomanticOptIn, &profile.MatchingPaused,
-		&profile.CreatedAt, &profile.UpdatedAt,
+		&rawHiddenCategories, &profile.CreatedAt, &profile.UpdatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return MatchingProfile{}, ErrNotFound
@@ -811,6 +875,9 @@ func scanMatchingProfile(row rowScanner) (MatchingProfile, error) {
 		return MatchingProfile{}, err
 	}
 	if err := unmarshalStringList(rawScenes, &profile.PreferredScenes); err != nil {
+		return MatchingProfile{}, err
+	}
+	if err := unmarshalStringList(rawHiddenCategories, &profile.HiddenCategories); err != nil {
 		return MatchingProfile{}, err
 	}
 	return profile, nil
