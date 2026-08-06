@@ -65,6 +65,10 @@ const MyIntentsPage = lazy(async () => {
   const module = await import('@/pages/my-intents-page')
   return { default: module.MyIntentsPage }
 })
+const GroupMatchPage = lazy(async () => {
+  const module = await import('@/pages/group-match-page')
+  return { default: module.GroupMatchPage }
+})
 const ProfilePage = lazy(async () => {
   const module = await import('@/pages/profile-page')
   return { default: module.ProfilePage }
@@ -145,6 +149,10 @@ export const router = createBrowserRouter([
           {
             path: connectionPaths.newIntent,
             element: withSuspense(<IntentComposerPage />),
+          },
+          {
+            path: connectionPaths.groups,
+            element: withSuspense(<GroupMatchPage />),
           },
           {
             path: '/connect/intents/:intentId',

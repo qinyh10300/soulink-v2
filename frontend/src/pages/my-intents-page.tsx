@@ -133,13 +133,22 @@ export function MyIntentsPage() {
           <h1 className="mt-1 text-2xl font-semibold text-[#292724]">我的意图</h1>
           <p className="mt-1 text-sm text-[#77736c]">每一次寻找，都有清楚的状态和边界。</p>
         </div>
-        <Link
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-md bg-[#5b3477] px-4 text-sm font-semibold text-white hover:bg-[#4c2b65]"
-          to={connectionPaths.newIntent}
-        >
-          <Plus size={16} />
-          新建意图
-        </Link>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#cfd7d3] px-4 text-sm font-semibold text-[#315c4d] hover:bg-[#edf3ef]"
+            to={connectionPaths.groups}
+          >
+            <UsersRound size={16} />
+            多人组队
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#5b3477] px-4 text-sm font-semibold text-white hover:bg-[#4c2b65]"
+            to={connectionPaths.newIntent}
+          >
+            <Plus size={16} />
+            新建意图
+          </Link>
+        </div>
       </header>
 
       {notice ? (

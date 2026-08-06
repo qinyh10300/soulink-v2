@@ -3,6 +3,7 @@ export const connectionPaths = {
   discover: '/connect/discover',
   intents: '/connect/intents',
   newIntent: '/connect/new',
+  groups: '/connect/groups',
   rooms: '/connect/rooms',
 } as const
 
