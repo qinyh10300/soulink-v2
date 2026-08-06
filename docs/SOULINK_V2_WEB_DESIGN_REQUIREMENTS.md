@@ -1,6 +1,6 @@
 # SouLink V2 Web Design Requirements Draft
 
-Draft version: v0.1
+Draft version: v0.2
 Date: 2026-07-30
 Scope: Web product redesign for a Tsinghua-only AI-native campus matching platform
 
@@ -193,6 +193,15 @@ It should include:
 
 10. Admin console
     Review reports, manage categories, inspect matching health, moderate abuse.
+
+11. Anonymous plaza
+    A Tsinghua-only, high-density discussion feed for low-pressure campus context and partner discovery.
+
+12. Messages
+    A persistent direct and group inbox after friendship or explicit group invitation.
+
+13. Calendar
+    A personal week schedule with privacy-safe availability on public profiles and RSVP-based invitations.
 
 ## 6. Home Page Requirements
 
@@ -454,6 +463,29 @@ Visual guidance:
 - Use icons for intent categories and actions.
 - Make trust controls visible but not alarming.
 
+### Anonymous Plaza Direction
+
+- Use a compact, hole-numbered information feed inspired by Tsinghua tree-hole reading patterns.
+- Keep post, reply, search, topic, latest, and hot actions close to the content.
+- Use a desktop secondary column for community rules and active topics; keep mobile single-column.
+- Never render profile links, avatars, departments, grades, or stable cross-post identifiers for anonymous authors.
+- The author is “洞主”; other participants receive stable aliases only within that hole.
+
+### Messaging Direction
+
+- Use a familiar two-pane inbox on desktop and list-to-conversation navigation on mobile.
+- Keep direct and group threads in one chronological list with unread counts.
+- Support group creation, rename, member list, owner removal, self-exit, message history, and real-time delivery.
+- Direct messaging requires accepted friendship; group membership is enforced by the server.
+
+### Calendar Direction
+
+- Use a seven-day hourly grid on desktop and a day-grouped agenda on mobile.
+- Users can create, edit, cancel, invite, accept, and decline events.
+- Public profiles show occupied blocks. Private titles, locations, organizers, and attendees remain hidden.
+- Public events and events shared with the viewer may reveal their details.
+- “约个时间” should prefill a near-term slot that does not conflict with the viewed user’s visible busy blocks.
+
 ## 17. Content Tone
 
 Tone should be:
@@ -527,12 +559,15 @@ Recommended MVP:
 8. Basic in-app messaging or contact reveal.
 9. Feedback after match.
 10. Admin report review.
+11. Anonymous Tsinghua plaza with replies.
+12. Persistent direct and group chat.
+13. Shared week calendar and profile invitations.
 
 Defer:
 
 - Multi-school support.
 - Public people search.
-- Complex social graph.
+- Complex social graph beyond friendship and explicit groups.
 - Group matching.
 - Native mobile app.
 - Fully autonomous AI agent communication.
@@ -544,7 +579,7 @@ SouLink V2 should not be:
 
 - A swipe dating app.
 - A public directory of Tsinghua students.
-- A campus confession wall.
+- An unmoderated confession wall disconnected from trusted campus interactions.
 - A generic forum.
 - A LinkedIn clone.
 - An AI companion app.
