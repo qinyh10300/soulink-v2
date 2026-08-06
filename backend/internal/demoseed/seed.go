@@ -826,8 +826,12 @@ func ensureDemoRoom(
 			"什么样的社交产品指标最容易把团队带偏？",
 			"如果只有一周，你会先验证哪个假设？",
 		},
-		SuggestedPlaces: []string{"紫荆园一层", "桃李园外侧座位", "近春园长椅"},
-		Now:             now.Add(-20 * time.Minute),
+		SuggestedPlaces:     []string{"紫荆园一层", "桃李园外侧座位", "近春园长椅"},
+		AssistantSource:     "deterministic",
+		AssistantModel:      "local-rules",
+		AssistantConfidence: 0.86,
+		AssistantPrompt:     "demo-seed-v1",
+		Now:                 now.Add(-20 * time.Minute),
 	})
 	if err != nil {
 		return false, fmt.Errorf("create demo match room: %w", err)
