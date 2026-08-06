@@ -4,6 +4,7 @@ import {
   Clock3,
   MapPin,
   MessageCircle,
+  UserCheck,
   UserPlus,
   UserRound,
 } from 'lucide-react'
@@ -23,8 +24,31 @@ import { CalendarEventDialog } from '@/components/calendar/calendar-event-dialog
 import { getErrorMessage } from '@/lib/api'
 import { fetchUserSchedule, type CalendarEvent } from '@/lib/calendar-api'
 import { ensureConversation } from '@/lib/chat-api'
-import { sendFriendRequest } from '@/lib/friend-api'
+import {
+  fetchFriends,
+  fetchReceivedRequests,
+  fetchSentRequests,
+  sendFriendRequest,
+} from '@/lib/friend-api'
 import { fetchPublicProfile, type PublicProfileDetails } from '@/lib/profile-api'
+
+type RelationshipStatus = 'friend' | 'none' | 'received' | 'sent' | 'unknown'
+
+async function fetchRelationshipStatus(userId: number): Promise<RelationshipStatus> {
+  try {
+    const [friends, sentRequests, receivedRequests] = await Promise.all([
+      fetchFriends(),
+      fetchSentRequests(),
+      fetchReceivedRequests(),
+    ])
+    if (friends.some((friend) => friend.user.userId === userId)) return 'friend'
+    if (receivedRequests.some((request) => request.user.userId === userId)) return 'received'
+    if (sentRequests.some((request) => request.user.userId === userId)) return 'sent'
+    return 'none'
+  } catch {
+    return 'unknown'
+  }
+}
 
 function formatJoinedAt(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -61,6 +85,7 @@ export function PublicProfilePage() {
   const [profile, setProfile] = useState<PublicProfileDetails | null>(null)
   const [schedule, setSchedule] = useState<CalendarEvent[]>([])
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [relationshipStatus, setRelationshipStatus] = useState<RelationshipStatus>('unknown')
   const [notice, setNotice] = useState('正在加载个人主页...')
   const weekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), [])
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart])
@@ -71,12 +96,14 @@ export function PublicProfilePage() {
       return
     }
     try {
-      const [profileData, events] = await Promise.all([
+      const [profileData, events, relationship] = await Promise.all([
         fetchPublicProfile(numericUserId),
         fetchUserSchedule(numericUserId, weekStart, addDays(weekStart, 7)),
+        fetchRelationshipStatus(numericUserId),
       ])
       setProfile(profileData)
       setSchedule(events)
+      setRelationshipStatus(relationship)
       setNotice('')
     } catch (error) {
       setNotice(getErrorMessage(error, '个人主页加载失败，请稍后重试'))
@@ -89,6 +116,10 @@ export function PublicProfilePage() {
 
   const handleMessage = async () => {
     if (!profile) return
+    if (relationshipStatus !== 'friend') {
+      setNotice('成为好友后才能发消息')
+      return
+    }
     try {
       const conversation = await ensureConversation(numericUserId)
       navigate(`/chat/direct/${conversation.id}`)
@@ -98,9 +129,10 @@ export function PublicProfilePage() {
   }
 
   const handleFriendRequest = async () => {
-    if (!profile) return
+    if (!profile || relationshipStatus !== 'none') return
     try {
       await sendFriendRequest(profile.nickname)
+      setRelationshipStatus('sent')
       setNotice('好友申请已发送')
     } catch (error) {
       setNotice(getErrorMessage(error, '好友申请发送失败'))
@@ -134,17 +166,41 @@ export function PublicProfilePage() {
                 <p className="mt-1 text-xs text-[#959993]">加入于 {formatJoinedAt(profile.createdAt)}</p>
               </div>
               <div className="flex flex-wrap gap-2 sm:pb-1">
+                {relationshipStatus === 'none' ? (
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded border border-[#cfd2ce] bg-white px-3 text-sm hover:bg-[#f0f2ef]"
+                    onClick={() => void handleFriendRequest()}
+                    type="button"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    加好友
+                  </button>
+                ) : (
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded border border-[#d9dcd8] bg-[#f3f4f2] px-3 text-sm text-[#747974]"
+                    disabled
+                    title={relationshipStatus === 'received' ? '请在好友申请中处理' : undefined}
+                    type="button"
+                  >
+                    {relationshipStatus === 'friend' ? (
+                      <UserCheck className="h-4 w-4" />
+                    ) : (
+                      <Clock3 className="h-4 w-4" />
+                    )}
+                    {relationshipStatus === 'friend'
+                      ? '已是好友'
+                      : relationshipStatus === 'sent'
+                        ? '申请已发送'
+                        : relationshipStatus === 'received'
+                          ? '待处理申请'
+                          : '关系加载中'}
+                  </button>
+                )}
                 <button
-                  className="inline-flex h-9 items-center gap-2 rounded border border-[#cfd2ce] bg-white px-3 text-sm hover:bg-[#f0f2ef]"
-                  onClick={() => void handleFriendRequest()}
-                  type="button"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  加好友
-                </button>
-                <button
-                  className="inline-flex h-9 items-center gap-2 rounded border border-[#cfd2ce] bg-white px-3 text-sm hover:bg-[#f0f2ef]"
+                  className="inline-flex h-9 items-center gap-2 rounded border border-[#cfd2ce] bg-white px-3 text-sm hover:bg-[#f0f2ef] disabled:cursor-not-allowed disabled:bg-[#f3f4f2] disabled:text-[#a0a49f]"
+                  disabled={relationshipStatus !== 'friend'}
                   onClick={() => void handleMessage()}
+                  title={relationshipStatus === 'friend' ? undefined : '成为好友后才能发消息'}
                   type="button"
                 >
                   <MessageCircle className="h-4 w-4" />
