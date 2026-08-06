@@ -127,32 +127,32 @@ export function LoginForm() {
 
       <div className="space-y-8">
         <div className="space-y-4">
-          <p className="text-xs font-semibold text-[#6c4a80]">
+          <p className="text-xs font-semibold text-[#1447e6]">
             SOULINK · 清华校内
           </p>
           <div className="space-y-3">
-            <h1 className="text-3xl font-semibold text-[#292724]">欢迎回来</h1>
-            <p className="text-sm leading-7 text-[#77736c]">
+            <h1 className="text-3xl font-semibold text-[#09090b]">欢迎回来</h1>
+            <p className="text-sm leading-7 text-[#71717a]">
               登录后继续你的意图和匹配房间。
             </p>
           </div>
         </div>
 
         {demoMode ? (
-          <section className="flex items-center gap-3 rounded-lg border border-[#cbd9d2] bg-[#eef5f1] p-3">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#376f5b]">
+          <section className="flex items-center gap-3 rounded-lg border border-[#cbd8ff] bg-[#f4f7ff] p-3">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#1447e6]">
               <KeyRound size={17} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-xs font-semibold text-[#3d574d]">
+              <span className="block text-xs font-semibold text-[#243a75]">
                 本地演示账号
               </span>
-              <span className="mt-0.5 block truncate font-mono text-[10px] text-[#687b73]">
+              <span className="mt-0.5 block truncate font-mono text-[10px] text-[#66729a]">
                 {demoEmail} · {demoPassword}
               </span>
             </span>
             <button
-              className="h-8 shrink-0 rounded-md border border-[#b9cec4] bg-white px-3 text-[11px] font-semibold text-[#376f5b] hover:bg-[#f8fbf9]"
+              className="h-8 shrink-0 rounded-md border border-[#b8c8f5] bg-white px-3 text-[11px] font-semibold text-[#1447e6] hover:bg-[#eff4ff]"
               onClick={fillDemoAccount}
               type="button"
             >
@@ -164,7 +164,7 @@ export function LoginForm() {
         <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-2">
             <label
-              className="text-sm font-medium text-[#4f4b46]"
+              className="text-sm font-medium text-[#3f3f46]"
               htmlFor="login-email"
             >
               清华邮箱
@@ -176,20 +176,20 @@ export function LoginForm() {
               {...register('email')}
             />
             {errors.email ? (
-              <p className="text-sm text-[#a35b43]">{errors.email.message}</p>
+              <p className="text-sm text-[#b42318]">{errors.email.message}</p>
             ) : null}
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-4">
               <label
-                className="text-sm font-medium text-[#4f4b46]"
+                className="text-sm font-medium text-[#3f3f46]"
                 htmlFor="login-password"
               >
                 密码
               </label>
               <button
-                className="text-sm text-[#5b3477] transition-colors hover:text-[#45265e]"
+                className="text-sm text-[#1447e6] transition-colors hover:text-[#103bc4]"
                 onClick={() =>
                   setIsForgotPasswordOpen((currentValue) => !currentValue)
                 }
@@ -200,7 +200,7 @@ export function LoginForm() {
             </div>
             <Input id="login-password" type="password" {...register('password')} />
             {errors.password ? (
-              <p className="text-sm text-[#a35b43]">{errors.password.message}</p>
+              <p className="text-sm text-[#b42318]">{errors.password.message}</p>
             ) : null}
           </div>
 
@@ -229,15 +229,15 @@ export function LoginForm() {
               control={control}
               name="agreement"
               render={({ field }) => (
-                <label className="flex items-start gap-3 rounded-md border border-[#dedad4] bg-[#fbfaf8] px-4 py-3">
+                <label className="flex items-start gap-3 rounded-md border border-[#e4e4e7] bg-[#fafafa] px-4 py-3">
                   <Checkbox
                     checked={field.value}
                     onCheckedChange={field.onChange}
                   />
-                  <span className="text-sm leading-6 text-[#65615b]">
+                  <span className="text-sm leading-6 text-[#52525b]">
                     我已阅读并同意
                     <button
-                      className="mx-1 text-[#5b3477] underline decoration-[#bba9c5] underline-offset-4 transition-colors hover:text-[#45265e]"
+                      className="mx-1 text-[#1447e6] underline decoration-[#a9baf0] underline-offset-4 transition-colors hover:text-[#103bc4]"
                       onClick={(event) => {
                         event.preventDefault()
                         setIsAgreementModalOpen(true)
@@ -251,14 +251,14 @@ export function LoginForm() {
               )}
             />
             {errors.agreement ? (
-              <p className="text-sm text-[#a35b43]">{errors.agreement.message}</p>
+              <p className="text-sm text-[#b42318]">{errors.agreement.message}</p>
             ) : null}
           </div>
 
           <button
             className={cn(
               buttonVariants({ size: 'lg' }),
-              'mt-2 w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
+              'mt-2 w-full rounded-md bg-[#1447e6] text-white hover:bg-[#103bc4]',
             )}
             disabled={!isValid || isSubmitting}
             type="submit"
@@ -267,9 +267,9 @@ export function LoginForm() {
           </button>
         </form>
 
-        <p className="text-sm text-[#77736c]">
+        <p className="text-sm text-[#71717a]">
           还没有账号？
-          <Link className="ml-2 text-[#5b3477] hover:text-[#45265e]" to="/register">
+          <Link className="ml-2 text-[#1447e6] hover:text-[#103bc4]" to="/register">
             立即注册
           </Link>
         </p>

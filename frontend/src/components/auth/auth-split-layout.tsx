@@ -1,82 +1,38 @@
+import { ArrowLeft, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { AuthHeroPanel } from '@/components/auth/auth-hero-panel'
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 interface AuthSplitLayoutProps {
   children: ReactNode
-  imageSrc: string
-  imageSources?: {
-    avif: string
-    webp: string
-  }
-  imageAlt: string
   title: string
   subtitle: string
-  showImageOnMobile?: boolean
 }
 
-export function AuthSplitLayout({
-  children,
-  imageSrc,
-  imageSources,
-  imageAlt,
-  title,
-  subtitle,
-  showImageOnMobile = false,
-}: AuthSplitLayoutProps) {
+export function AuthSplitLayout({ children, title, subtitle }: AuthSplitLayoutProps) {
   return (
-    <div className="min-h-screen bg-[#f7f6f3] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(30rem,0.8fr)]">
-      <AuthHeroPanel
-        imageAlt={imageAlt}
-        imageSources={imageSources}
-        imageSrc={imageSrc}
-        subtitle={subtitle}
-        title={title}
-      />
+    <div className="min-h-screen bg-white lg:grid lg:grid-cols-[minmax(0,1.12fr)_minmax(30rem,0.88fr)]">
+      <AuthHeroPanel subtitle={subtitle} title={title} />
 
-      <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f7f6f3] px-6 py-12 sm:px-8 lg:px-12">
-        {showImageOnMobile ? (
-          <div className="absolute inset-0 lg:hidden">
-            <picture className="absolute inset-0 block">
-              {imageSources ? (
-                <>
-                  <source srcSet={imageSources.avif} type="image/avif" />
-                  <source srcSet={imageSources.webp} type="image/webp" />
-                </>
-              ) : null}
-              <img
-                alt={imageAlt}
-                className="h-full w-full object-cover"
-                decoding="async"
-                fetchPriority="high"
-                height={1024}
-                loading="eager"
-                src={imageSrc}
-                width={1536}
-              />
-            </picture>
-            <div className="absolute inset-0 bg-[rgba(24,20,26,0.52)]" />
-          </div>
-        ) : null}
-
-        <Link
-          className={cn(
-            buttonVariants({ variant: 'secondary', size: 'sm' }),
-            'absolute left-6 top-6 z-20 gap-2 border border-[#d9d5cf] bg-white px-4 text-[#5f5b55] shadow-sm sm:left-8 sm:top-8 lg:hidden',
-          )}
-          to="/"
-        >
-          <ArrowLeft size={16} />
-          返回首页
-        </Link>
-
-        <div className="relative z-10 w-full max-w-[28rem] rounded-lg border border-[#dfdcd6] bg-white p-6 shadow-[0_18px_44px_rgba(35,33,31,0.08)] sm:p-8 lg:border-none lg:bg-transparent lg:p-0 lg:shadow-none">
-          {children}
+      <section className="relative flex min-h-screen items-center justify-center bg-white px-5 pb-12 pt-24 sm:px-8 lg:px-12 lg:py-14 xl:px-16">
+        <div className="absolute inset-x-5 top-6 flex items-center justify-between sm:inset-x-8 lg:inset-x-10">
+          <Link className="flex items-center gap-2.5 lg:hidden" to="/">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#1447e6] text-white">
+              <Sparkles size={16} />
+            </span>
+            <span className="text-[16px] font-semibold">SouLink</span>
+          </Link>
+          <Link
+            className="ml-auto inline-flex h-9 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-[#71717a] transition-colors hover:bg-[#f4f4f5] hover:text-[#18181b]"
+            to="/"
+          >
+            <ArrowLeft size={14} />
+            返回首页
+          </Link>
         </div>
+
+        <div className="w-full max-w-[27rem]">{children}</div>
       </section>
     </div>
   )

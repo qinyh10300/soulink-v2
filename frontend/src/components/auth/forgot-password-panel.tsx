@@ -123,7 +123,7 @@ export function ForgotPasswordPanel({
 
   return (
     <div
-      className="space-y-4 rounded-[24px] border border-[#e5d8cf] bg-[#fffaf5]/88 px-4 py-4 shadow-[0_10px_24px_rgba(100,73,57,0.06)]"
+      className="space-y-4 rounded-lg border border-[#e4e4e7] bg-[#fafafa] px-4 py-4"
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
           event.preventDefault()
@@ -131,11 +131,11 @@ export function ForgotPasswordPanel({
       }}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm leading-6 text-[#6f6056]">将向您的邮箱发送验证码</p>
+        <p className="text-sm leading-6 text-[#52525b]">将向您的邮箱发送验证码</p>
         <button
           className={cn(
             buttonVariants({ size: 'sm' }),
-            'gap-2 self-start rounded-full bg-[#8f6548] text-white shadow-[0_12px_24px_rgba(105,73,51,0.14)] hover:bg-[#7f5a40] sm:self-auto',
+            'gap-2 self-start rounded-md bg-[#1447e6] text-white hover:bg-[#103bc4] sm:self-auto',
           )}
           disabled={disabled || isSendingCode || countdown > 0}
           onClick={handleSendCode}
@@ -148,7 +148,7 @@ export function ForgotPasswordPanel({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[#3a302a]" htmlFor="forgot-password-code">
+          <label className="text-sm font-medium text-[#3f3f46]" htmlFor="forgot-password-code">
             验证码
           </label>
           <Input
@@ -158,12 +158,12 @@ export function ForgotPasswordPanel({
             {...register('verificationCode')}
           />
           {errors.verificationCode ? (
-            <p className="text-sm text-[#a35b43]">{errors.verificationCode.message}</p>
+            <p className="text-sm text-[#b42318]">{errors.verificationCode.message}</p>
           ) : null}
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-[#3a302a]" htmlFor="forgot-password-new">
+          <label className="text-sm font-medium text-[#3f3f46]" htmlFor="forgot-password-new">
             新密码
           </label>
           <Input
@@ -173,13 +173,13 @@ export function ForgotPasswordPanel({
             {...register('password')}
           />
           {errors.password ? (
-            <p className="text-sm text-[#a35b43]">{errors.password.message}</p>
+            <p className="text-sm text-[#b42318]">{errors.password.message}</p>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[#3a302a]" htmlFor="forgot-password-confirm">
+        <label className="text-sm font-medium text-[#3f3f46]" htmlFor="forgot-password-confirm">
           确认新密码
         </label>
         <Input
@@ -189,14 +189,14 @@ export function ForgotPasswordPanel({
           {...register('confirmPassword')}
         />
         {errors.confirmPassword ? (
-          <p className="text-sm text-[#a35b43]">{errors.confirmPassword.message}</p>
+          <p className="text-sm text-[#b42318]">{errors.confirmPassword.message}</p>
         ) : null}
       </div>
 
       <button
         className={cn(
           buttonVariants({ size: 'sm' }),
-          'rounded-full bg-[#8f6548] text-white shadow-[0_12px_24px_rgba(105,73,51,0.14)] hover:bg-[#7f5a40]',
+          'rounded-md bg-[#1447e6] text-white hover:bg-[#103bc4]',
         )}
         disabled={disabled || isSubmitting || !isValid}
         onClick={() => {
@@ -208,7 +208,7 @@ export function ForgotPasswordPanel({
       </button>
 
       {notice ? (
-        <p className={isError ? 'text-sm text-[#a35b43]' : 'text-sm text-[#6f6056]'}>
+        <p className={isError ? 'text-sm text-[#b42318]' : 'text-sm text-[#52525b]'}>
           {notice}
         </p>
       ) : null}

@@ -75,8 +75,8 @@ export function RequireAuth() {
 
   if (status === 'checking') {
     return (
-      <div className="min-h-screen bg-[#f7f2ec] px-6 py-20 lg:px-8">
-        <div className="mx-auto max-w-3xl rounded-[32px] border border-[#eee4db] bg-[rgba(255,251,247,0.96)] p-10 text-center text-lg text-[#7e6d61] shadow-[0_18px_54px_rgba(72,50,33,0.06)]">
+      <div className="min-h-screen bg-[#fafafa] px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-3xl rounded-lg border border-[#e4e4e7] bg-white p-10 text-center text-base text-[#71717a] shadow-[0_18px_54px_rgba(9,9,11,0.06)]">
           正在验证登录状态...
         </div>
       </div>
@@ -85,25 +85,25 @@ export function RequireAuth() {
 
   if (status === 'unavailable') {
     return (
-      <div className="min-h-screen bg-[#f7f2ec] px-6 py-20 lg:px-8">
-        <div className="mx-auto max-w-3xl space-y-6 rounded-[32px] border border-[#eee4db] bg-[rgba(255,251,247,0.96)] p-10 text-center shadow-[0_18px_54px_rgba(72,50,33,0.06)]">
+      <div className="min-h-screen bg-[#fafafa] px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-3xl space-y-6 rounded-lg border border-[#e4e4e7] bg-white p-10 text-center shadow-[0_18px_54px_rgba(9,9,11,0.06)]">
           <div className="space-y-2">
-            <h1 className="font-serif text-4xl text-[#2f221b]">暂时无法验证登录状态</h1>
-            <p className="text-base leading-7 text-[#7e6d61]">
+            <h1 className="text-3xl font-semibold text-[#09090b]">暂时无法验证登录状态</h1>
+            <p className="text-base leading-7 text-[#71717a]">
               当前无法连接到认证服务。你可以稍后重试，或重新登录后再继续。
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
-              className="inline-flex rounded-full bg-[#8f6548] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#7f5a40]"
+              className="inline-flex rounded-md bg-[#1447e6] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#103bc4]"
               onClick={() => setRetryKey((value) => value + 1)}
               type="button"
             >
               重新验证
             </button>
             <button
-              className="inline-flex rounded-full border border-[#d9c8bb] bg-white px-5 py-3 text-sm font-medium text-[#5f4d42] transition-colors hover:border-[#c7b09e] hover:text-[#2f221b]"
+              className="inline-flex rounded-md border border-[#d4d4d8] bg-white px-5 py-3 text-sm font-medium text-[#52525b] transition-colors hover:bg-[#f4f4f5] hover:text-[#18181b]"
               onClick={() => {
                 clearStoredAuthentication()
                 setStatus('unauthorized')
@@ -174,8 +174,8 @@ export function RedirectIfAuthenticated() {
 
   if (status === 'checking') {
     return (
-      <div className="min-h-screen bg-[#f7f2ec] px-6 py-20 lg:px-8">
-        <div className="mx-auto max-w-3xl rounded-[32px] border border-[#eee4db] bg-[rgba(255,251,247,0.96)] p-10 text-center text-lg text-[#7e6d61] shadow-[0_18px_54px_rgba(72,50,33,0.06)]">
+      <div className="min-h-screen bg-[#fafafa] px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-3xl rounded-lg border border-[#e4e4e7] bg-white p-10 text-center text-base text-[#71717a] shadow-[0_18px_54px_rgba(9,9,11,0.06)]">
           正在验证登录状态...
         </div>
       </div>

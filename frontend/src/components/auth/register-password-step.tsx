@@ -50,26 +50,26 @@ export function RegisterPasswordStep({
   return (
     <div className="space-y-8">
       <div className="space-y-5">
-        <p className="text-xs font-semibold text-[#6c4a80]">
+        <p className="text-xs font-semibold text-[#1447e6]">
           SOULINK · 清华校内
         </p>
         <RegisterStepHeader activeStep={2} />
       </div>
 
       <div className="space-y-4">
-        <p className="text-xs font-semibold text-[#6c4a80]">
+        <p className="text-xs font-semibold text-[#1447e6]">
           Step 2
         </p>
-        <h1 className="text-3xl font-semibold text-[#292724]">验证并设置密码</h1>
-        <p className="text-sm leading-7 text-[#77736c]">
-          验证码已发送至 <span className="font-medium text-[#4f4b46]">{email}</span>
+        <h1 className="text-3xl font-semibold text-[#09090b]">验证并设置密码</h1>
+        <p className="text-sm leading-7 text-[#71717a]">
+          验证码已发送至 <span className="font-medium text-[#3f3f46]">{email}</span>
         </p>
       </div>
 
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#4f4b46]"
+            className="text-sm font-medium text-[#3f3f46]"
             htmlFor="register-code"
           >
             验证码
@@ -84,9 +84,9 @@ export function RegisterPasswordStep({
             <button
               className={cn(
                 buttonVariants({ variant: 'secondary', size: 'default' }),
-                'rounded-md border-[#d9d5cf] bg-white text-[#5b3477] shadow-none hover:bg-[#f5f3ef]',
+                'rounded-md border-[#d4d4d8] bg-white text-[#1447e6] shadow-none hover:bg-[#f4f4f5]',
                 (countdown > 0 || isSubmitting) &&
-                'cursor-default text-[#9a958d] hover:bg-white',
+                'cursor-default text-[#a1a1aa] hover:bg-white',
               )}
               disabled={countdown > 0 || isSubmitting}
               onClick={() => {
@@ -98,7 +98,7 @@ export function RegisterPasswordStep({
             </button>
           </div>
           {errors.verificationCode ? (
-            <p className="text-sm text-[#a35b43]">
+            <p className="text-sm text-[#b42318]">
               {errors.verificationCode.message}
             </p>
           ) : null}
@@ -106,7 +106,7 @@ export function RegisterPasswordStep({
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#4f4b46]"
+            className="text-sm font-medium text-[#3f3f46]"
             htmlFor="register-password"
           >
             设置密码
@@ -118,13 +118,13 @@ export function RegisterPasswordStep({
             {...register('password')}
           />
           {errors.password ? (
-            <p className="text-sm text-[#a35b43]">{errors.password.message}</p>
+            <p className="text-sm text-[#b42318]">{errors.password.message}</p>
           ) : null}
         </div>
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#4f4b46]"
+            className="text-sm font-medium text-[#3f3f46]"
             htmlFor="register-confirm-password"
           >
             确认密码
@@ -136,7 +136,7 @@ export function RegisterPasswordStep({
             {...register('confirmPassword')}
           />
           {errors.confirmPassword ? (
-            <p className="text-sm text-[#a35b43]">
+            <p className="text-sm text-[#b42318]">
               {errors.confirmPassword.message}
             </p>
           ) : null}
@@ -145,7 +145,7 @@ export function RegisterPasswordStep({
         <button
           className={cn(
             buttonVariants({ size: 'lg' }),
-            'w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
+            'w-full rounded-md bg-[#1447e6] text-white hover:bg-[#103bc4]',
           )}
           disabled={!isValid || isSubmitting}
           type="submit"
@@ -155,7 +155,7 @@ export function RegisterPasswordStep({
       </form>
 
       <button
-        className="text-sm text-[#77736c] transition-colors hover:text-[#5b3477]"
+        className="text-sm text-[#71717a] transition-colors hover:text-[#1447e6]"
         onClick={onBack}
         type="button"
       >

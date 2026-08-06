@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import heroImage from '@/assets/thu.png'
 import { AuthSplitLayout } from '@/components/auth/auth-split-layout'
 import { RegisterForm } from '@/components/auth/register-form'
 import { RegisterPasswordStep } from '@/components/auth/register-password-step'
@@ -185,17 +184,15 @@ export function RegisterPage() {
   }, [toastNotice])
 
   const noticeClass =
-    statusTone === 'error' ? 'text-sm text-[#a35b43]' : 'text-sm text-[#7e6d61]'
+    statusTone === 'error' ? 'text-sm text-[#b42318]' : 'text-sm text-[#71717a]'
 
   return (
     <>
       <FloatingToast message={toastNotice} />
 
       <AuthSplitLayout
-        imageAlt="清华校园"
-        imageSrc={heroImage}
-        subtitle="In Tsinghua, meet with a reason."
-        title="从一个具体意图开始"
+        subtitle="验证清华身份，保留你的选择权，然后用一句话开始寻找值得认识的人。"
+        title="加入 SouLink，让 AI 帮你更好地认识人"
       >
         {currentStep === 1 ? (
           <div className="space-y-6">

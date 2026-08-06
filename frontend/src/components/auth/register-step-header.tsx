@@ -25,10 +25,10 @@ export function RegisterStepHeader({ activeStep }: RegisterStepHeaderProps) {
                   className={[
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.82rem] font-semibold transition-colors sm:h-8 sm:w-8 sm:text-sm',
                     isComplete
-                      ? 'bg-[#6b9b63] text-white'
+                      ? 'bg-[#087a4d] text-white'
                       : isActive
-                        ? 'bg-[#9c6b48] text-white'
-                        : 'border border-[#d9ccc2] bg-white text-[#b29f92]',
+                        ? 'bg-[#1447e6] text-white'
+                        : 'border border-[#d4d4d8] bg-white text-[#a1a1aa]',
                   ].join(' ')}
                 >
                   {isComplete ? <Check size={15} strokeWidth={3} /> : step.id}
@@ -37,8 +37,8 @@ export function RegisterStepHeader({ activeStep }: RegisterStepHeaderProps) {
                   className={[
                     'text-[0.82rem] whitespace-nowrap transition-colors sm:text-sm',
                     isComplete || isActive
-                      ? 'font-medium text-[#2c2521]'
-                      : 'text-[#a59387]',
+                      ? 'font-medium text-[#27272a]'
+                      : 'text-[#a1a1aa]',
                   ].join(' ')}
                 >
                   {step.label}
@@ -48,7 +48,7 @@ export function RegisterStepHeader({ activeStep }: RegisterStepHeaderProps) {
                 <div
                   className={[
                     'h-px min-w-2 flex-1 transition-colors sm:min-w-4',
-                    step.id < activeStep ? 'bg-[#b47f5a]' : 'bg-[#ddd0c6]',
+                    step.id < activeStep ? 'bg-[#1447e6]' : 'bg-[#e4e4e7]',
                   ].join(' ')}
                 />
               ) : null}

@@ -50,18 +50,18 @@ export function RegisterProfileStep({
   return (
     <div className="space-y-8">
       <div className="space-y-5">
-        <p className="text-xs font-semibold text-[#6c4a80]">
+        <p className="text-xs font-semibold text-[#1447e6]">
           SOULINK · 清华校内
         </p>
         <RegisterStepHeader activeStep={3} />
       </div>
 
       <div className="space-y-4">
-        <p className="text-xs font-semibold text-[#6c4a80]">
+        <p className="text-xs font-semibold text-[#1447e6]">
           Step 3
         </p>
-        <h1 className="text-3xl font-semibold text-[#292724]">完善基础资料</h1>
-        <p className="text-sm leading-7 text-[#77736c]">
+        <h1 className="text-3xl font-semibold text-[#09090b]">完善基础资料</h1>
+        <p className="text-sm leading-7 text-[#71717a]">
           填写基本信息，让匹配更准确。
         </p>
       </div>
@@ -69,7 +69,7 @@ export function RegisterProfileStep({
       <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#4f4b46]"
+            className="text-sm font-medium text-[#3f3f46]"
             htmlFor="register-nickname"
           >
             昵称
@@ -80,13 +80,13 @@ export function RegisterProfileStep({
             {...register('nickname')}
           />
           {errors.nickname ? (
-            <p className="text-sm text-[#a35b43]">{errors.nickname.message}</p>
+            <p className="text-sm text-[#b42318]">{errors.nickname.message}</p>
           ) : null}
         </div>
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#4f4b46]"
+            className="text-sm font-medium text-[#3f3f46]"
             htmlFor="register-department"
           >
             专业介绍
@@ -97,15 +97,15 @@ export function RegisterProfileStep({
             placeholder="例如：国际关系 / 金融 / 临床医学"
             {...register('department')}
           />
-          <p className="text-sm text-[#8b7a6f]">1 到 {majorDescriptionMaxLength} 个字，用来简要介绍你的专业方向。</p>
+          <p className="text-sm text-[#71717a]">1 到 {majorDescriptionMaxLength} 个字，用来简要介绍你的专业方向。</p>
           {errors.department ? (
-            <p className="text-sm text-[#a35b43]">{errors.department.message}</p>
+            <p className="text-sm text-[#b42318]">{errors.department.message}</p>
           ) : null}
         </div>
 
         <div className="space-y-2">
           <label
-            className="text-sm font-medium text-[#4f4b46]"
+            className="text-sm font-medium text-[#3f3f46]"
             htmlFor="register-grade"
           >
             年级
@@ -126,14 +126,14 @@ export function RegisterProfileStep({
             ))}
           </Select>
           {errors.grade ? (
-            <p className="text-sm text-[#a35b43]">{errors.grade.message}</p>
+            <p className="text-sm text-[#b42318]">{errors.grade.message}</p>
           ) : null}
         </div>
 
         <button
           className={cn(
             buttonVariants({ size: 'lg' }),
-            'w-full rounded-md bg-[#5b3477] text-white hover:bg-[#4c2b65]',
+            'w-full rounded-md bg-[#1447e6] text-white hover:bg-[#103bc4]',
           )}
           disabled={!isValid || isSubmitting || isOptionsLoading}
           type="submit"
@@ -143,7 +143,7 @@ export function RegisterProfileStep({
       </form>
 
       <button
-        className="text-sm text-[#77736c] transition-colors hover:text-[#5b3477]"
+        className="text-sm text-[#71717a] transition-colors hover:text-[#1447e6]"
         onClick={onBack}
         type="button"
       >

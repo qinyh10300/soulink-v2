@@ -47,23 +47,23 @@ export function UserAgreementModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button
         aria-label="关闭用户协议"
-        className="absolute inset-0 bg-[rgba(46,33,27,0.34)] backdrop-blur-[6px]"
+        className="absolute inset-0 bg-black/45 backdrop-blur-[6px]"
         onClick={onClose}
         type="button"
       />
 
-      <div className="relative z-10 flex max-h-[min(90vh,52rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[32px] border border-[#eadfd5] bg-[#fcf8f3] shadow-[0_28px_90px_rgba(66,46,35,0.18)]">
-        <div className="flex items-start justify-between gap-6 border-b border-[#eee2d8] px-6 py-5 sm:px-8">
+      <div className="relative z-10 flex max-h-[min(90vh,52rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-[#e4e4e7] bg-white shadow-[0_28px_90px_rgba(9,9,11,0.22)]">
+        <div className="flex items-start justify-between gap-6 border-b border-[#e4e4e7] px-6 py-5 sm:px-8">
           <div className="space-y-2">
-            <p className="text-sm font-semibold tracking-[0.18em] text-[#9c6b48] uppercase">
+            <p className="text-xs font-semibold text-[#1447e6] uppercase">
               {agreementMeta.englishTitle}
             </p>
-            <h2 className="font-serif text-3xl text-[#271f1b]">{agreementMeta.title}</h2>
+            <h2 className="text-3xl font-semibold text-[#09090b]">{agreementMeta.title}</h2>
           </div>
 
           <button
             aria-label="关闭"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e6d9cf] bg-white text-[#755947] transition-colors hover:bg-[#f7f0ea]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#e4e4e7] bg-white text-[#71717a] transition-colors hover:bg-[#f4f4f5]"
             onClick={onClose}
             type="button"
           >
@@ -75,7 +75,7 @@ export function UserAgreementModal({
           <div className="space-y-6">
             <section className="space-y-3">
               {agreementMeta.intro.map((paragraph) => (
-                <p className="text-[15px] leading-8 text-[#67584d]" key={paragraph}>
+                <p className="text-[15px] leading-8 text-[#52525b]" key={paragraph}>
                   {paragraph}
                 </p>
               ))}
@@ -83,12 +83,12 @@ export function UserAgreementModal({
 
             {agreementSections.map((section) => (
               <section className="space-y-3" key={section.title}>
-                <h3 className="text-lg font-semibold text-[#2d2521]">{section.title}</h3>
+                <h3 className="text-lg font-semibold text-[#18181b]">{section.title}</h3>
 
                 {'paragraphs' in section && section.paragraphs ? (
                   <div className="space-y-3">
                     {section.paragraphs.map((paragraph) => (
-                      <p className="text-[15px] leading-8 text-[#67584d]" key={paragraph}>
+                      <p className="text-[15px] leading-8 text-[#52525b]" key={paragraph}>
                         {paragraph}
                       </p>
                     ))}
@@ -99,14 +99,14 @@ export function UserAgreementModal({
                   <div className="space-y-4">
                     {section.blocks.map((block) => (
                       <div className="space-y-3" key={block.title}>
-                        <h4 className="text-base font-medium text-[#3b3029]">{block.title}</h4>
+                        <h4 className="text-base font-medium text-[#27272a]">{block.title}</h4>
                         {block.paragraphs.map((paragraph) => (
-                          <p className="text-[15px] leading-8 text-[#67584d]" key={paragraph}>
+                          <p className="text-[15px] leading-8 text-[#52525b]" key={paragraph}>
                             {paragraph}
                           </p>
                         ))}
                         {block.list ? (
-                          <ul className="space-y-2 pl-5 text-[15px] leading-8 text-[#67584d]">
+                          <ul className="space-y-2 pl-5 text-[15px] leading-8 text-[#52525b]">
                             {block.list.map((item) => (
                               <li className="list-disc" key={item}>
                                 {item}
@@ -115,7 +115,7 @@ export function UserAgreementModal({
                           </ul>
                         ) : null}
                         {block.closing ? (
-                          <p className="text-[15px] leading-8 text-[#67584d]">{block.closing}</p>
+                          <p className="text-[15px] leading-8 text-[#52525b]">{block.closing}</p>
                         ) : null}
                       </div>
                     ))}
@@ -123,7 +123,7 @@ export function UserAgreementModal({
                 ) : null}
 
                 {'list' in section && section.list ? (
-                  <ul className="space-y-2 pl-5 text-[15px] leading-8 text-[#67584d]">
+                  <ul className="space-y-2 pl-5 text-[15px] leading-8 text-[#52525b]">
                     {section.list.map((item) => (
                       <li className="list-disc" key={item}>
                         {item}
@@ -133,18 +133,18 @@ export function UserAgreementModal({
                 ) : null}
 
                 {'closing' in section && section.closing ? (
-                  <p className="text-[15px] leading-8 text-[#67584d]">{section.closing}</p>
+                  <p className="text-[15px] leading-8 text-[#52525b]">{section.closing}</p>
                 ) : null}
               </section>
             ))}
           </div>
         </div>
 
-        <div className="border-t border-[#eee2d8] px-6 py-5 sm:px-8">
+        <div className="border-t border-[#e4e4e7] px-6 py-5 sm:px-8">
           <button
             className={cn(
               buttonVariants({ size: 'lg' }),
-              'w-full rounded-full bg-[#8f6548] text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40]',
+              'w-full rounded-md bg-[#1447e6] text-white shadow-[0_12px_28px_rgba(20,71,230,0.18)] hover:bg-[#103bc4]',
             )}
             onClick={onConfirm}
             type="button"
