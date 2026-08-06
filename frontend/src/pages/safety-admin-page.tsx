@@ -3,9 +3,12 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock3,
+  History,
   LoaderCircle,
+  MessageSquareWarning,
   RefreshCw,
   Save,
+  Scale,
   ShieldCheck,
   UserCheck,
   UserRound,
@@ -14,12 +17,16 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ProductMetricsPanel } from '@/components/admin/product-metrics-panel'
+import { PhotoVerificationAdminPanel } from '@/components/admin/photo-verification-admin-panel'
 import { getErrorMessage } from '@/lib/api'
 import { connectionIntentPath, connectionRoomPath } from '@/lib/connection-routes'
 import {
+  fetchSafetyReviewEvents,
   fetchSafetyReports,
+  reviewSafetyReportAppeal,
   updateSafetyReport,
   type SafetyReport,
+  type SafetyReviewEvent,
   type SafetyReportStatus,
 } from '@/lib/safety-api'
 import { cn } from '@/lib/utils'
@@ -51,6 +58,15 @@ const categoryLabels: Record<SafetyReport['category'], string> = {
   other: '其他风险',
 }
 
+const riskSignalLabels: Record<string, string> = {
+  spam: '垃圾推广',
+  contact_inducement: '站外联系方式诱导',
+  harassment: '骚扰冒犯',
+  threat: '威胁',
+  privacy: '隐私风险',
+  coercion: '强迫控制',
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'numeric',
@@ -62,12 +78,16 @@ function formatDateTime(value: string) {
 }
 
 export function SafetyAdminPage() {
-  const [view, setView] = useState<'metrics' | 'reports'>('metrics')
+  const [view, setView] = useState<'metrics' | 'reports' | 'photos'>('metrics')
   const [status, setStatus] = useState<SafetyReportStatus | ''>('open')
   const [reports, setReports] = useState<SafetyReport[]>([])
   const [loading, setLoading] = useState(true)
   const [updatingID, setUpdatingID] = useState<number | null>(null)
   const [draftNotes, setDraftNotes] = useState<Record<number, string>>({})
+  const [appealNotes, setAppealNotes] = useState<Record<number, string>>({})
+  const [reviewingAppealID, setReviewingAppealID] = useState<number | null>(null)
+  const [auditEvents, setAuditEvents] = useState<Record<number, SafetyReviewEvent[]>>({})
+  const [auditLoadingID, setAuditLoadingID] = useState<number | null>(null)
   const [notice, setNotice] = useState('')
 
   const load = async (nextStatus = status) => {
@@ -79,6 +99,11 @@ export function SafetyAdminPage() {
       setDraftNotes(
         Object.fromEntries(nextReports.map((report) => [report.id, report.reviewNotes])),
       )
+      setAppealNotes(Object.fromEntries(
+        nextReports
+          .filter((report) => report.appeal)
+          .map((report) => [report.appeal!.id, report.appeal!.reviewNotes ?? '']),
+      ))
     } catch (error) {
       setNotice(getErrorMessage(error, '安全工单暂时无法加载'))
     } finally {
@@ -120,6 +145,37 @@ export function SafetyAdminPage() {
       setNotice(getErrorMessage(error, '工单暂时无法更新'))
     } finally {
       setUpdatingID(null)
+    }
+  }
+
+  const reviewAppeal = async (report: SafetyReport, nextStatus: 'accepted' | 'rejected') => {
+    if (!report.appeal || reviewingAppealID) return
+    setReviewingAppealID(report.appeal.id)
+    setNotice('')
+    try {
+      await reviewSafetyReportAppeal(report.appeal.id, {
+        status: nextStatus,
+        reviewNotes: appealNotes[report.appeal.id] ?? '',
+      })
+      await load(status)
+    } catch (error) {
+      setNotice(getErrorMessage(error, '申诉暂时无法复核'))
+    } finally {
+      setReviewingAppealID(null)
+    }
+  }
+
+  const loadAudit = async (reportID: number) => {
+    if (auditLoadingID) return
+    setAuditLoadingID(reportID)
+    setNotice('')
+    try {
+      const events = await fetchSafetyReviewEvents('report', reportID)
+      setAuditEvents((current) => ({ ...current, [reportID]: events }))
+    } catch (error) {
+      setNotice(getErrorMessage(error, '审核记录暂时无法加载'))
+    } finally {
+      setAuditLoadingID(null)
     }
   }
 
@@ -188,9 +244,22 @@ export function SafetyAdminPage() {
           <ShieldCheck size={14} />
           安全工单
         </button>
+        <button
+          className={`inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors ${
+            view === 'photos'
+              ? 'bg-white text-[#315c4d] shadow-sm'
+              : 'text-[#77736c] hover:text-[#35322f]'
+          }`}
+          onClick={() => setView('photos')}
+          type="button"
+        >
+          <UserCheck size={14} />
+          照片审核
+        </button>
       </div>
 
       {view === 'metrics' ? <ProductMetricsPanel /> : null}
+      {view === 'photos' ? <PhotoVerificationAdminPanel /> : null}
 
       {view === 'reports' && notice ? (
         <div className="mt-5 flex items-start gap-2 rounded-md border border-[#ead4ce] bg-[#fff6f3] px-4 py-3 text-sm text-[#8c463d]">
@@ -240,6 +309,60 @@ export function SafetyAdminPage() {
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#5f5b55]">
                         {report.details}
                       </p>
+                      {report.riskSignals.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          <MessageSquareWarning className="mr-1 text-[#9b5268]" size={14} />
+                          {report.riskSignals.map((signal) => (
+                            <span
+                              className="rounded bg-[#fff0f3] px-2 py-1 text-[10px] font-semibold text-[#87435a]"
+                              key={signal}
+                            >
+                              {riskSignalLabels[signal] ?? signal}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <details className="mt-4 border-y border-[#eeebe7] py-3">
+                        <summary className="cursor-pointer text-xs font-semibold text-[#5b3477]">
+                          查看提交时的固定上下文快照
+                        </summary>
+                        {report.contextSnapshot.content ? (
+                          <div className="mt-3 text-xs leading-5 text-[#67625c]">
+                            <p className="font-semibold">
+                              {report.contextSnapshot.content.title || report.contextTitle}
+                            </p>
+                            {report.contextSnapshot.content.description ? (
+                              <p className="mt-1 whitespace-pre-wrap">
+                                {report.contextSnapshot.content.description}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {(report.contextSnapshot.messages?.length ?? 0) > 0 ? (
+                          <div className="mt-3 divide-y divide-[#eeebe7] border-t border-[#eeebe7]">
+                            {report.contextSnapshot.messages?.map((message) => (
+                              <div className="py-2.5" key={message.id}>
+                                <div className="flex items-center justify-between gap-3 text-[10px] text-[#918d86]">
+                                  <span>
+                                    {message.senderRole === 'reporter'
+                                      ? '举报人'
+                                      : message.senderRole === 'reported_user'
+                                        ? '被举报者'
+                                        : '其他成员'}
+                                  </span>
+                                  <span>{formatDateTime(message.createdAt)}</span>
+                                </div>
+                                <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[#5f5b55]">
+                                  {message.content}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-[#918d86]">该场景没有可附加的消息。</p>
+                        )}
+                      </details>
                       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-[#eeebe7] pt-3 text-[11px] text-[#817d76]">
                         <span className="inline-flex items-center gap-1.5">
                           <UserRound size={12} />
@@ -249,17 +372,107 @@ export function SafetyAdminPage() {
                           <Clock3 size={12} />
                           {formatDateTime(report.createdAt)}
                         </span>
-                        <Link
-                          className="font-medium text-[#5b3477]"
-                          to={
-                            report.contextType === 'match_room'
-                              ? connectionRoomPath(report.contextId)
-                              : connectionIntentPath(report.contextId)
-                          }
-                        >
-                          查看关联场景
-                        </Link>
+                        {report.contextType === 'intent' || report.contextType === 'match_room' ? (
+                          <Link
+                            className="font-medium text-[#5b3477]"
+                            to={
+                              report.contextType === 'match_room'
+                                ? connectionRoomPath(report.contextId)
+                                : connectionIntentPath(report.contextId)
+                            }
+                          >
+                            查看关联场景
+                          </Link>
+                        ) : (
+                          <span>
+                            {report.contextType === 'direct' ? '一对一会话快照' : '群聊成员会话快照'}
+                          </span>
+                        )}
                       </div>
+
+                      {report.appeal ? (
+                        <section className="mt-4 border-t border-[#e5d9dd] pt-4">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-[#7e3d55]">
+                            <Scale size={14} />
+                            误报申诉 · {
+                              report.appeal.status === 'pending'
+                                ? '等待复核'
+                                : report.appeal.status === 'accepted'
+                                  ? '已通过'
+                                  : '未通过'
+                            }
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[#67625c]">
+                            {report.appeal.reason}
+                          </p>
+                          {report.appeal.status === 'pending' ? (
+                            <div className="mt-3">
+                              <textarea
+                                aria-label={`${report.ticketId} 申诉复核说明`}
+                                className="min-h-20 w-full resize-y rounded-md border border-[#d8d4cd] bg-[#fbfaf8] px-3 py-2 text-xs leading-5 outline-none focus:border-[#8d465d]"
+                                maxLength={1000}
+                                onChange={(event) => setAppealNotes((current) => ({
+                                  ...current,
+                                  [report.appeal!.id]: event.target.value,
+                                }))}
+                                placeholder="记录独立复核依据"
+                                value={appealNotes[report.appeal.id] ?? ''}
+                              />
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <button
+                                  className="h-8 rounded-md bg-[#376f5b] px-3 text-xs font-semibold text-white disabled:opacity-50"
+                                  disabled={reviewingAppealID === report.appeal.id}
+                                  onClick={() => void reviewAppeal(report, 'accepted')}
+                                  type="button"
+                                >
+                                  通过并撤销处理
+                                </button>
+                                <button
+                                  className="h-8 rounded-md border border-[#d8d4cd] bg-white px-3 text-xs font-semibold text-[#7e3d55] disabled:opacity-50"
+                                  disabled={reviewingAppealID === report.appeal.id}
+                                  onClick={() => void reviewAppeal(report, 'rejected')}
+                                  type="button"
+                                >
+                                  维持原处理
+                                </button>
+                              </div>
+                            </div>
+                          ) : report.appeal.reviewNotes ? (
+                            <p className="mt-2 text-xs text-[#817d76]">
+                              复核说明：{report.appeal.reviewNotes}
+                            </p>
+                          ) : null}
+                        </section>
+                      ) : null}
+
+                      <section className="mt-4 border-t border-[#eeebe7] pt-3">
+                        <button
+                          className="inline-flex h-8 items-center gap-1.5 text-xs font-semibold text-[#5b3477] disabled:opacity-50"
+                          disabled={auditLoadingID === report.id}
+                          onClick={() => void loadAudit(report.id)}
+                          type="button"
+                        >
+                          {auditLoadingID === report.id ? (
+                            <LoaderCircle className="animate-spin" size={14} />
+                          ) : (
+                            <History size={14} />
+                          )}
+                          审核记录
+                        </button>
+                        {auditEvents[report.id] ? (
+                          <ol className="mt-2 space-y-2 text-[11px] leading-5 text-[#77736c]">
+                            {auditEvents[report.id].map((event) => (
+                              <li className="flex flex-wrap gap-x-2" key={event.id}>
+                                <span className="font-semibold text-[#4f4b46]">{event.actorNickname}</span>
+                                <span>{event.action}</span>
+                                <span>{event.previousStatus || '创建'} → {event.nextStatus || '记录'}</span>
+                                <span>{formatDateTime(event.createdAt)}</span>
+                                {event.note ? <span className="w-full text-[#817d76]">{event.note}</span> : null}
+                              </li>
+                            ))}
+                          </ol>
+                        ) : null}
+                      </section>
                     </div>
 
                     <div className="w-full shrink-0 border-t border-[#eeebe7] pt-4 lg:w-80 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">

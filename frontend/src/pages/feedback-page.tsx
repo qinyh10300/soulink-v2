@@ -58,6 +58,15 @@ const reportReasons: Array<{
 function parseContext(
   params: URLSearchParams,
 ): { type: SafetyContextType; id: number } | null {
+  const contextType = params.get('contextType')
+  const contextID = Number(params.get('contextId'))
+  if (
+    ['intent', 'match_room', 'direct', 'group'].includes(contextType ?? '') &&
+    Number.isInteger(contextID) &&
+    contextID > 0
+  ) {
+    return { type: contextType as SafetyContextType, id: contextID }
+  }
   const roomID = Number(params.get('roomId'))
   if (Number.isInteger(roomID) && roomID > 0) {
     return { type: 'match_room', id: roomID }
@@ -75,6 +84,7 @@ export function FeedbackPage() {
   const context = useMemo(() => parseContext(searchParams), [searchParams])
   const isSafetyReport = searchParams.get('category') === 'report'
   const subject = searchParams.get('subject')?.trim() ?? ''
+  const reportedUserID = Number(searchParams.get('reportedUserId'))
   const [selectedCategory, setSelectedCategory] =
     useState<FeedbackCategory>('match')
   const [reportReason, setReportReason] =
@@ -93,7 +103,11 @@ export function FeedbackPage() {
       ? connectionRoomPath(context.id)
       : context?.type === 'intent'
         ? connectionIntentPath(context.id)
-        : connectionPaths.root
+        : context?.type === 'direct'
+          ? `/chat/direct/${context.id}`
+          : context?.type === 'group'
+            ? `/chat/group/${context.id}`
+            : connectionPaths.root
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -104,7 +118,12 @@ export function FeedbackPage() {
     if (isSafetyReport) {
       if (!context) {
         setNoticeTone('error')
-        setNotice('没有找到需要举报的意图或匹配房间，请从对应页面重新进入。')
+        setNotice('没有找到需要举报的场景，请从对应页面重新进入。')
+        return
+      }
+      if (context.type === 'group' && (!Number.isInteger(reportedUserID) || reportedUserID <= 0)) {
+        setNoticeTone('error')
+        setNotice('没有找到需要举报的群成员，请从群聊信息页重新进入。')
         return
       }
       if (details.trim().length < 8) {
@@ -128,6 +147,7 @@ export function FeedbackPage() {
           category: reportReason,
           details: details.trim(),
           blockUser,
+          reportedUserId: context.type === 'group' ? reportedUserID : undefined,
         })
         setTicketID(result.ticketId)
         setNoticeTone('success')
@@ -137,8 +157,14 @@ export function FeedbackPage() {
             : '举报已提交，安全管理员会在后台处理。',
         )
       } else {
+        const contextLabel: Record<SafetyContextType, string> = {
+          intent: '意图',
+          match_room: '匹配房间',
+          direct: '一对一会话',
+          group: '群聊',
+        }
         const contextNote = context
-          ? `[${context.type === 'match_room' ? '匹配房间' : '意图'} #${context.id}${subject ? ` · ${subject}` : ''}]\n`
+          ? `[${contextLabel[context.type]} #${context.id}${subject ? ` · ${subject}` : ''}]\n`
           : ''
         const result = await submitFeedback({
           category: selectedCategory,

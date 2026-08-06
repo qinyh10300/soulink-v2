@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Check,
   Columns3,
+  Flag,
   MessageSquarePlus,
   PanelLeftClose,
   Search,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Group, Panel, usePanelRef } from 'react-resizable-panels'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ChatWindow } from '@/components/chat/chat-window'
 import {
@@ -286,17 +287,29 @@ function GroupInfoPanel({ friends, groupId, onChanged, onClose, onLeft }: GroupI
                         {member.role === 'owner' ? '群主' : member.department}
                       </span>
                     </span>
-                    {member.role !== 'owner' && (group.isOwner || member.isMe) ? (
-                      <button
-                        aria-label={member.isMe ? '退出群聊' : `移除 ${member.nickname}`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded text-[#9b5353] hover:bg-[#f5e8e8]"
-                        onClick={() => void handleRemove(member.userId, member.isMe)}
-                        title={member.isMe ? '退出群聊' : '移除成员'}
-                        type="button"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    ) : null}
+                    <span className="flex shrink-0 items-center gap-1">
+                      {!member.isMe ? (
+                        <Link
+                          aria-label={`举报 ${member.nickname}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded text-[#8a8e88] hover:bg-[#f5e8e8] hover:text-[#9b5353]"
+                          title={`举报 ${member.nickname}`}
+                          to={`/feedback?category=report&contextType=group&contextId=${group.id}&reportedUserId=${member.userId}&subject=${encodeURIComponent(`${group.name} · ${member.nickname}`)}`}
+                        >
+                          <Flag className="h-4 w-4" />
+                        </Link>
+                      ) : null}
+                      {member.role !== 'owner' && (group.isOwner || member.isMe) ? (
+                        <button
+                          aria-label={member.isMe ? '退出群聊' : `移除 ${member.nickname}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded text-[#9b5353] hover:bg-[#f5e8e8]"
+                          onClick={() => void handleRemove(member.userId, member.isMe)}
+                          title={member.isMe ? '退出群聊' : '移除成员'}
+                          type="button"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </span>
                   </div>
                 ))}
               </div>
