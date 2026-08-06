@@ -54,6 +54,19 @@ func buildCommonSuggestions(
 	return chooseSuggestions(common, duration, len(participantIDs)), missing
 }
 
+// BuildCommonSuggestions exposes the same privacy-preserving availability
+// intersection used by meetup proposals to other connection workflows.
+func BuildCommonSuggestions(
+	windows []store.AvailabilityWindow,
+	busy []store.BusyInterval,
+	participantIDs []int64,
+	from time.Time,
+	to time.Time,
+	duration time.Duration,
+) ([]TimeSuggestion, int) {
+	return buildCommonSuggestions(windows, busy, participantIDs, from, to, duration)
+}
+
 func materializeWindow(window store.AvailabilityWindow, from, to time.Time) []interval {
 	if window.WindowType == "one_time" && window.StartsAt.Valid && window.EndsAt.Valid {
 		candidate, ok := clippedInterval(

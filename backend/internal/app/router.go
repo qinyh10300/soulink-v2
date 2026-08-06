@@ -184,6 +184,18 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/{roomId}/messages", deps.ConnectionHandler.ListRoomMessages)
 					r.Post("/{roomId}/messages", deps.ConnectionHandler.CreateRoomMessage)
 				})
+
+				r.Route("/group-intents", func(r chi.Router) {
+					r.Get("/", deps.ConnectionHandler.ListMyGroupMatchIntents)
+					r.Post("/", deps.ConnectionHandler.CreateGroupMatchIntent)
+					r.Get("/{groupIntentId}", deps.ConnectionHandler.GetGroupMatchIntent)
+					r.Get("/{groupIntentId}/recommendations", deps.ConnectionHandler.GroupMatchRecommendations)
+					r.Post("/{groupIntentId}/invitations", deps.ConnectionHandler.InviteGroupMatchCandidate)
+					r.Post("/{groupIntentId}/form", deps.ConnectionHandler.FormGroupMatchIntent)
+					r.Post("/{groupIntentId}/leave", deps.ConnectionHandler.LeaveGroupMatchIntent)
+				})
+				r.Get("/group-invitations", deps.ConnectionHandler.ListMyGroupMatchInvitations)
+				r.Put("/group-invitations/{invitationId}/response", deps.ConnectionHandler.RespondGroupMatchInvitation)
 			}
 
 			if deps.SafetyHandler != nil {

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"soulink-backend/internal/ai"
+	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/store"
 )
@@ -27,7 +28,13 @@ type Service struct {
 	store       *store.Store
 	interpreter *Interpreter
 	generator   ai.Generator
+	recorder    analytics.EventRecorder
 	nowFunc     func() time.Time
+}
+
+func (s *Service) WithEventRecorder(recorder analytics.EventRecorder) *Service {
+	s.recorder = recorder
+	return s
 }
 
 func NewService(dataStore *store.Store, interpreter *Interpreter) *Service {
