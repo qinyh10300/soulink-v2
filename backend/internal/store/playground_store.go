@@ -51,10 +51,17 @@ type CreatePlaygroundPostParams struct {
 }
 
 type PlaygroundPostFilter struct {
-	Topic string
-	Query string
-	Sort  string
-	Limit int
+	Topic  string
+	Query  string
+	Sort   string
+	Limit  int
+	Cursor *PlaygroundPostCursor
+}
+
+type PlaygroundPostCursor struct {
+	Score     int
+	CreatedAt time.Time
+	ID        int64
 }
 
 type CreatePlaygroundCommentParams struct {
@@ -154,6 +161,21 @@ func (s *Store) ListPlaygroundPosts(ctx context.Context, tx *sql.Tx, viewerID in
 	if filter.Query != "" {
 		args = append(args, "%"+filter.Query+"%")
 		query += fmt.Sprintf(" AND p.content ILIKE $%d", len(args))
+	}
+	if filter.Cursor != nil {
+		if filter.Sort == "hot" {
+			args = append(args, filter.Cursor.Score, filter.Cursor.CreatedAt, filter.Cursor.ID)
+			query += fmt.Sprintf(
+				" AND (p.like_count + p.comment_count * 2, p.created_at, p.id) < ($%d::int, $%d::timestamptz, $%d::bigint)",
+				len(args)-2, len(args)-1, len(args),
+			)
+		} else {
+			args = append(args, filter.Cursor.CreatedAt, filter.Cursor.ID)
+			query += fmt.Sprintf(
+				" AND (p.created_at, p.id) < ($%d::timestamptz, $%d::bigint)",
+				len(args)-1, len(args),
+			)
+		}
 	}
 	args = append(args, filter.Limit)
 	if filter.Sort == "hot" {

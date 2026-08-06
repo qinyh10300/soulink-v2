@@ -306,6 +306,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			if deps.PlaygroundHandler != nil {
 				r.Get("/playground/posts", deps.PlaygroundHandler.ListPosts)
+				r.Get("/playground/posts/page", deps.PlaygroundHandler.ListPostPage)
 				r.Post("/playground/posts", deps.PlaygroundHandler.CreatePost)
 				r.Post("/playground/posts/{postId}/likes", deps.PlaygroundHandler.LikePost)
 				r.Delete("/playground/posts/{postId}/likes", deps.PlaygroundHandler.UnlikePost)

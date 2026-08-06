@@ -49,7 +49,7 @@ interface Props {
 }
 
 export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
-  const { lastMessage, lastGroupMessage, refreshUnread } = useChat()
+  const { lastMessage, lastGroupMessage, reconnectVersion, refreshUnread } = useChat()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -101,7 +101,7 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
     setMessages([])
     setSendNotice('')
     void loadMessages()
-  }, [loadMessages])
+  }, [loadMessages, reconnectVersion])
 
   useEffect(() => {
     if (thread.kind !== 'direct' || !lastMessage || lastMessage.conversationId !== thread.id) return

@@ -60,6 +60,7 @@ interface EngagementContextValue {
 const EngagementContext = createContext<EngagementContextValue | null>(null)
 
 const fallbackPreferences: EngagementPreferences = {
+  isAdmin: false,
   notificationsEnabled: false,
   newMessages: true,
   meetupInvites: true,

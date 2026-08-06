@@ -9,6 +9,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  WifiOff,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -371,7 +372,7 @@ export function ChatPage() {
     groupId?: string
   }>()
   const navigate = useNavigate()
-  const { lastMessage, lastGroupMessage, conversationVersion } = useChat()
+  const { connectionState, lastMessage, lastGroupMessage, conversationVersion } = useChat()
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [groups, setGroups] = useState<GroupItem[]>([])
   const [friends, setFriends] = useState<FriendItem[]>([])
@@ -499,6 +500,19 @@ export function ChatPage() {
       >
         <header className="flex h-15 items-center border-b border-[#dfe1de] px-3">
           <h1 className="text-lg font-semibold text-[#292b28]">消息</h1>
+          {connectionState !== 'connected' ? (
+            <span
+              className="ml-2 inline-flex items-center gap-1 text-[11px] text-[#8a5d4e]"
+              role="status"
+            >
+              <WifiOff className="h-3.5 w-3.5" />
+              {connectionState === 'reconnecting'
+                ? '正在重连'
+                : connectionState === 'connecting'
+                  ? '连接中'
+                  : '已离线'}
+            </span>
+          ) : null}
           {isSplitWorkspace ? (
             <div className="ml-auto flex items-center gap-0.5">
               <button

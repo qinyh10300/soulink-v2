@@ -5,6 +5,7 @@ import "time"
 const defaultTimezone = "Asia/Shanghai"
 
 type PreferencesView struct {
+	IsAdmin               bool     `json:"isAdmin"`
 	NotificationsEnabled  bool     `json:"notificationsEnabled"`
 	NewMessages           bool     `json:"newMessages"`
 	MeetupInvites         bool     `json:"meetupInvites"`

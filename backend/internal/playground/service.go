@@ -2,7 +2,11 @@ package playground
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,6 +25,9 @@ const (
 	maxPostImageCount       = 9
 	maxImageURLLength       = 2048
 	maxSearchQueryLength    = 80
+	defaultPostPageSize     = 12
+	maxPostPageSize         = 30
+	maxPostCursorLength     = 512
 )
 
 var allowedTopics = map[string]struct{}{
@@ -44,9 +51,11 @@ type CreatePostInput struct {
 }
 
 type ListPostsInput struct {
-	Topic string
-	Query string
-	Sort  string
+	Topic  string
+	Query  string
+	Sort   string
+	Cursor string
+	Limit  int
 }
 
 type CreateCommentInput struct {
@@ -89,6 +98,19 @@ type PostView struct {
 	GroupInvite  *PlazaGroupInviteSummary `json:"groupInvite,omitempty"`
 }
 
+type PostPage struct {
+	Items      []PostView `json:"items"`
+	NextCursor string     `json:"nextCursor,omitempty"`
+}
+
+type encodedPostCursor struct {
+	Version   int    `json:"v"`
+	Scope     string `json:"s"`
+	Score     int    `json:"o"`
+	CreatedAt string `json:"t"`
+	ID        int64  `json:"i"`
+}
+
 type LikeResult struct {
 	Liked     bool `json:"liked"`
 	LikeCount int  `json:"likeCount"`
@@ -104,61 +126,145 @@ func (s *Service) WithEventRecorder(recorder analytics.EventRecorder) *Service {
 }
 
 func (s *Service) ListPosts(ctx context.Context, viewerID int64, input ListPostsInput) ([]PostView, error) {
-	if err := s.ensureReady(); err != nil {
+	input.Cursor = ""
+	input.Limit = 50
+	page, err := s.listPostPage(ctx, viewerID, input, 50)
+	if err != nil {
 		return nil, err
+	}
+	return page.Items, nil
+}
+
+func (s *Service) ListPostPage(ctx context.Context, viewerID int64, input ListPostsInput) (PostPage, error) {
+	return s.listPostPage(ctx, viewerID, input, maxPostPageSize)
+}
+
+func (s *Service) listPostPage(ctx context.Context, viewerID int64, input ListPostsInput, maxLimit int) (PostPage, error) {
+	if err := s.ensureReady(); err != nil {
+		return PostPage{}, err
 	}
 	topic := strings.TrimSpace(input.Topic)
 	if topic != "" {
 		if _, ok := allowedTopics[topic]; !ok {
-			return nil, invalidParams()
+			return PostPage{}, invalidParams()
 		}
 	}
 	query := strings.TrimSpace(input.Query)
 	if utf8.RuneCountInString(query) > maxSearchQueryLength {
-		return nil, invalidParams()
+		return PostPage{}, invalidParams()
 	}
 	sortMode := strings.TrimSpace(input.Sort)
 	if sortMode == "" {
 		sortMode = "latest"
 	}
 	if sortMode != "latest" && sortMode != "hot" {
-		return nil, invalidParams()
+		return PostPage{}, invalidParams()
+	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = defaultPostPageSize
+	}
+	if limit < 1 || limit > maxLimit {
+		return PostPage{}, invalidParams()
+	}
+
+	scope := postCursorScope(topic, query, sortMode)
+	var storeCursor *store.PlaygroundPostCursor
+	if rawCursor := strings.TrimSpace(input.Cursor); rawCursor != "" {
+		decoded, err := decodePostCursor(rawCursor, scope)
+		if err != nil {
+			return PostPage{}, invalidParams()
+		}
+		storeCursor = &decoded
 	}
 	if err := s.expirePlazaGroups(ctx); err != nil {
-		return nil, err
+		return PostPage{}, err
 	}
 
 	posts, err := s.store.ListPlaygroundPosts(ctx, nil, viewerID, store.PlaygroundPostFilter{
-		Topic: topic,
-		Query: query,
-		Sort:  sortMode,
-		Limit: 50,
+		Topic:  topic,
+		Query:  query,
+		Sort:   sortMode,
+		Limit:  limit + 1,
+		Cursor: storeCursor,
 	})
 	if err != nil {
-		return nil, httpapi.InternalError(err)
+		return PostPage{}, httpapi.InternalError(err)
+	}
+
+	hasMore := len(posts) > limit
+	if hasMore {
+		posts = posts[:limit]
 	}
 
 	views := make([]PostView, 0, len(posts))
 	for _, post := range posts {
 		comments, err := s.store.ListPlaygroundComments(ctx, nil, viewerID, post.ID)
 		if err != nil {
-			return nil, httpapi.InternalError(err)
+			return PostPage{}, httpapi.InternalError(err)
 		}
 		view := toPostView(post, buildCommentTree(post.Author.UserID, comments, viewerID), viewerID)
 		invite, err := s.store.GetPlazaGroupInviteByPost(ctx, nil, post.ID)
 		if err == nil {
 			applications, listErr := s.store.ListPlazaGroupApplications(ctx, nil, invite.ID)
 			if listErr != nil {
-				return nil, httpapi.InternalError(listErr)
+				return PostPage{}, httpapi.InternalError(listErr)
 			}
 			summary := plazaGroupInviteSummary(invite, applications, comments, viewerID)
 			view.GroupInvite = &summary
 		} else if err != store.ErrNotFound {
-			return nil, httpapi.InternalError(err)
+			return PostPage{}, httpapi.InternalError(err)
 		}
 		views = append(views, view)
 	}
-	return views, nil
+
+	page := PostPage{Items: views}
+	if hasMore && len(posts) > 0 {
+		last := posts[len(posts)-1]
+		page.NextCursor, err = encodePostCursor(encodedPostCursor{
+			Version:   1,
+			Scope:     scope,
+			Score:     last.LikeCount + last.CommentCount*2,
+			CreatedAt: last.CreatedAt.UTC().Format(time.RFC3339Nano),
+			ID:        last.ID,
+		})
+		if err != nil {
+			return PostPage{}, httpapi.InternalError(err)
+		}
+	}
+	return page, nil
+}
+
+func postCursorScope(topic, query, sortMode string) string {
+	sum := sha256.Sum256([]byte(sortMode + "\x00" + topic + "\x00" + query))
+	return hex.EncodeToString(sum[:8])
+}
+
+func encodePostCursor(cursor encodedPostCursor) (string, error) {
+	raw, err := json.Marshal(cursor)
+	if err != nil {
+		return "", fmt.Errorf("encode playground cursor: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func decodePostCursor(raw, expectedScope string) (store.PlaygroundPostCursor, error) {
+	if len(raw) > maxPostCursorLength {
+		return store.PlaygroundPostCursor{}, fmt.Errorf("playground cursor too long")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return store.PlaygroundPostCursor{}, fmt.Errorf("decode playground cursor: %w", err)
+	}
+	var cursor encodedPostCursor
+	if err := json.Unmarshal(payload, &cursor); err != nil {
+		return store.PlaygroundPostCursor{}, fmt.Errorf("parse playground cursor: %w", err)
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, cursor.CreatedAt)
+	if err != nil || cursor.Version != 1 || cursor.Scope != expectedScope || cursor.ID <= 0 || cursor.Score < 0 {
+		return store.PlaygroundPostCursor{}, fmt.Errorf("invalid playground cursor")
+	}
+	return store.PlaygroundPostCursor{Score: cursor.Score, CreatedAt: createdAt, ID: cursor.ID}, nil
 }
 
 func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePostInput) (PostView, error) {

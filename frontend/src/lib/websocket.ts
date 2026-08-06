@@ -6,6 +6,8 @@ export interface WSEnvelope {
 }
 
 export type WSEventHandler = (envelope: WSEnvelope) => void
+export type WSConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+export type WSConnectionHandler = (state: WSConnectionState) => void
 
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30000
@@ -13,14 +15,23 @@ const RECONNECT_MAX_MS = 30000
 export class SoulinkWebSocket {
   private ws: WebSocket | null = null
   private handlers: WSEventHandler[] = []
+  private connectionHandlers: WSConnectionHandler[] = []
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectDelay = RECONNECT_BASE_MS
   private intentionallyClosed = false
+  private connectionState: WSConnectionState = 'disconnected'
 
   connect() {
     this.intentionallyClosed = false
     const session = getAuthSession()
     if (!session?.token) return
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
+      return
+    }
+
+    this.setConnectionState(
+      this.reconnectDelay > RECONNECT_BASE_MS ? 'reconnecting' : 'connecting',
+    )
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
@@ -29,12 +40,14 @@ export class SoulinkWebSocket {
     try {
       this.ws = new WebSocket(url)
     } catch {
+      this.setConnectionState('reconnecting')
       this.scheduleReconnect()
       return
     }
 
     this.ws.onopen = () => {
       this.reconnectDelay = RECONNECT_BASE_MS
+      this.setConnectionState('connected')
     }
 
     this.ws.onmessage = (event) => {
@@ -49,7 +62,9 @@ export class SoulinkWebSocket {
     }
 
     this.ws.onclose = () => {
+      this.ws = null
       if (!this.intentionallyClosed) {
+        this.setConnectionState('reconnecting')
         this.scheduleReconnect()
       }
     }
@@ -67,6 +82,7 @@ export class SoulinkWebSocket {
     }
     this.ws?.close()
     this.ws = null
+    this.setConnectionState('disconnected')
   }
 
   send(envelope: WSEnvelope) {
@@ -104,18 +120,35 @@ export class SoulinkWebSocket {
     }
   }
 
+  onConnectionState(handler: WSConnectionHandler) {
+    this.connectionHandlers.push(handler)
+    handler(this.connectionState)
+    return () => {
+      this.connectionHandlers = this.connectionHandlers.filter((item) => item !== handler)
+    }
+  }
+
   get isConnected() {
     return this.ws?.readyState === WebSocket.OPEN
   }
 
   private scheduleReconnect() {
-    if (this.intentionallyClosed) return
+    if (this.intentionallyClosed || this.reconnectTimer) return
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
       this.connect()
     }, this.reconnectDelay)
     this.reconnectDelay = Math.min(
       this.reconnectDelay * 2,
       RECONNECT_MAX_MS,
     )
+  }
+
+  private setConnectionState(state: WSConnectionState) {
+    if (this.connectionState === state) return
+    this.connectionState = state
+    for (const handler of this.connectionHandlers) {
+      handler(state)
+    }
   }
 }

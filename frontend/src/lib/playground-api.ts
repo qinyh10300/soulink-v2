@@ -43,6 +43,11 @@ export interface PlaygroundPost {
   groupInvite?: PlazaGroupInviteSummary
 }
 
+export interface PlaygroundPostPage {
+  items: PlaygroundPost[]
+  nextCursor?: string
+}
+
 export type PlazaGroupInviteType = 'event' | 'group'
 export type PlazaGroupRevealStrategy = 'on_accept' | 'on_form'
 export type PlazaGroupInviteStatus =
@@ -118,13 +123,17 @@ export function fetchPlaygroundPosts(options: {
   topic?: PlaygroundTopic
   sort?: PlaygroundSort
   query?: string
+  cursor?: string
+  limit?: number
 } = {}) {
   const params = new URLSearchParams()
   if (options.topic) params.set('topic', options.topic)
   if (options.sort) params.set('sort', options.sort)
   if (options.query?.trim()) params.set('q', options.query.trim())
+  if (options.cursor) params.set('cursor', options.cursor)
+  if (options.limit) params.set('limit', String(options.limit))
   const query = params.size > 0 ? `?${params.toString()}` : ''
-  return apiRequest<PlaygroundPost[]>(`/playground/posts${query}`, { auth: true })
+  return apiRequest<PlaygroundPostPage>(`/playground/posts/page${query}`, { auth: true })
 }
 
 export function createPlaygroundPost(input: {

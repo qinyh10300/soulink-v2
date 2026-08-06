@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -13,7 +14,11 @@ import {
   type MessageItem,
 } from '@/lib/chat-api'
 import { fetchReceivedRequests } from '@/lib/friend-api'
-import { SoulinkWebSocket, type WSEnvelope } from '@/lib/websocket'
+import {
+  SoulinkWebSocket,
+  type WSConnectionState,
+  type WSEnvelope,
+} from '@/lib/websocket'
 import { useEngagement } from '@/contexts/engagement-context'
 
 interface ChatContextValue {
@@ -25,6 +30,8 @@ interface ChatContextValue {
   lastMessage: MessageItem | null
   lastGroupMessage: GroupMessageItem | null
   conversationVersion: number
+  connectionState: WSConnectionState
+  reconnectVersion: number
 }
 
 const ChatContext = createContext<ChatContextValue>({
@@ -36,6 +43,8 @@ const ChatContext = createContext<ChatContextValue>({
   lastMessage: null,
   lastGroupMessage: null,
   conversationVersion: 0,
+  connectionState: 'disconnected',
+  reconnectVersion: 0,
 })
 
 export function ChatProvider({ children }: { children: ReactNode }) {
@@ -46,6 +55,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [lastMessage, setLastMessage] = useState<MessageItem | null>(null)
   const [lastGroupMessage, setLastGroupMessage] = useState<GroupMessageItem | null>(null)
   const [conversationVersion, setConversationVersion] = useState(0)
+  const [connectionState, setConnectionState] = useState<WSConnectionState>('disconnected')
+  const [reconnectVersion, setReconnectVersion] = useState(0)
+  const connectedOnce = useRef(false)
 
   const refreshUnread = useCallback(() => {
     fetchUnreadCount()
@@ -62,9 +74,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const instance = new SoulinkWebSocket()
     setWs(instance)
-    instance.connect()
     refreshUnread()
     refreshPendingRequests()
+
+    const unsubscribeConnection = instance.onConnectionState((state) => {
+      setConnectionState(state)
+      if (state !== 'connected') return
+      refreshUnread()
+      refreshPendingRequests()
+      void refreshNotifications()
+      if (connectedOnce.current) {
+        setReconnectVersion((current) => current + 1)
+        setConversationVersion((current) => current + 1)
+      }
+      connectedOnce.current = true
+    })
 
     const unsubscribe = instance.onEvent((env: WSEnvelope) => {
       if (env.type === 'message') {
@@ -89,11 +113,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setConversationVersion((current) => current + 1)
       }
     })
+    instance.connect()
 
     return () => {
       unsubscribe()
+      unsubscribeConnection()
       instance.disconnect()
       setWs(null)
+      connectedOnce.current = false
     }
   }, [refreshNotifications, refreshUnread, refreshPendingRequests])
 
@@ -108,6 +135,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         lastMessage,
         lastGroupMessage,
         conversationVersion,
+        connectionState,
+        reconnectVersion,
       }}
     >
       {children}

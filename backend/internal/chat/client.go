@@ -168,8 +168,8 @@ func (c *Client) handleSendMessage(ctx context.Context, data json.RawMessage) {
 	msgData, _ := json.Marshal(msgView)
 	outEnv := WSEnvelope{Type: "message", Data: msgData}
 
-	// Send to the sender (confirmation) and the recipient.
-	c.Send(outEnv)
+	// Send to every active tab for the sender and the recipient.
+	c.hub.SendToUser(c.userID, outEnv)
 	conv, err := c.service.store.GetConversation(ctx, nil, payload.ConversationID)
 	if err == nil {
 		peerID := conv.User1ID
@@ -197,6 +197,7 @@ func (c *Client) handleMarkRead(ctx context.Context, data json.RawMessage) {
 		"readAt":         time.Now().Format(time.RFC3339),
 	})
 	outEnv := WSEnvelope{Type: "read", Data: readData}
+	c.hub.SendToUser(c.userID, outEnv)
 
 	conv, err := c.service.store.GetConversation(ctx, nil, payload.ConversationID)
 	if err == nil {
@@ -224,5 +225,5 @@ func (c *Client) handleMarkGroupRead(ctx context.Context, data json.RawMessage) 
 		"userId":  c.userID,
 		"readAt":  time.Now().Format(time.RFC3339),
 	})
-	c.Send(WSEnvelope{Type: "group_read", Data: readData})
+	c.hub.SendToUser(c.userID, WSEnvelope{Type: "group_read", Data: readData})
 }

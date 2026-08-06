@@ -199,6 +199,7 @@ function TopicTag({ topic }: { topic: PlaygroundTopic }) {
 
 export function PlaygroundPage() {
   const [posts, setPosts] = useState<PlaygroundPost[]>([])
+  const [nextCursor, setNextCursor] = useState<string | undefined>()
   const [content, setContent] = useState('')
   const [composerTopic, setComposerTopic] = useState<PlaygroundTopic>('campus')
   const [imageInput, setImageInput] = useState('')
@@ -213,6 +214,7 @@ export function PlaygroundPage() {
   const [replyText, setReplyText] = useState('')
   const [notice, setNotice] = useState('正在加载树洞...')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [createInvitePostId, setCreateInvitePostId] = useState<number | null>(null)
   const [activeInviteId, setActiveInviteId] = useState<number | null>(null)
@@ -221,19 +223,45 @@ export function PlaygroundPage() {
   const loadPosts = useCallback(async () => {
     try {
       setLoading(true)
-      const nextPosts = await fetchPlaygroundPosts({
+      const page = await fetchPlaygroundPosts({
         topic: selectedTopic || undefined,
         sort,
         query,
+        limit: 12,
       })
-      setPosts(nextPosts)
-      setNotice(nextPosts.length > 0 ? '' : '这里暂时还没有内容。')
+      setPosts(page.items)
+      setNextCursor(page.nextCursor)
+      setNotice(page.items.length > 0 ? '' : '这里暂时还没有内容。')
     } catch (error) {
       setNotice(getErrorMessage(error, '树洞加载失败，请稍后重试'))
     } finally {
       setLoading(false)
     }
   }, [query, selectedTopic, sort])
+
+  const handleLoadMore = async () => {
+    if (!nextCursor || loadingMore) return
+    try {
+      setLoadingMore(true)
+      const page = await fetchPlaygroundPosts({
+        topic: selectedTopic || undefined,
+        sort,
+        query,
+        cursor: nextCursor,
+        limit: 12,
+      })
+      setPosts((current) => {
+        const known = new Set(current.map((post) => post.id))
+        return [...current, ...page.items.filter((post) => !known.has(post.id))]
+      })
+      setNextCursor(page.nextCursor)
+      setNotice('')
+    } catch (error) {
+      setNotice(getErrorMessage(error, '更多树洞加载失败，请稍后重试'))
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     void loadPosts()
@@ -655,6 +683,17 @@ export function PlaygroundPage() {
               )
             })}
           </section>
+          {nextCursor ? (
+            <button
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#cfd2ce] bg-[#fafaf8] text-sm font-medium text-[#4e625a] hover:bg-white disabled:opacity-50"
+              disabled={loadingMore}
+              onClick={() => void handleLoadMore()}
+              type="button"
+            >
+              <RefreshCw className={cn('h-4 w-4', loadingMore && 'animate-spin')} />
+              {loadingMore ? '加载中' : '加载更多'}
+            </button>
+          ) : null}
         </div>
 
         <aside className="hidden lg:block">

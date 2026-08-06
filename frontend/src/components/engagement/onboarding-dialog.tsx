@@ -112,7 +112,13 @@ export function OnboardingDialog() {
     setSystemNotifications(preferences.permissionState === 'granted')
   }, [detectedTimezone, preferences])
 
-  if (loading || !preferences || preferences.onboardingCompleted || dismissed) {
+  if (
+    loading ||
+    !preferences ||
+    preferences.isAdmin ||
+    preferences.onboardingCompleted ||
+    dismissed
+  ) {
     return null
   }
 

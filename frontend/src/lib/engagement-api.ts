@@ -8,6 +8,7 @@ export type NotificationPermissionState =
   | 'unavailable'
 
 export interface EngagementPreferences {
+  isAdmin: boolean
   notificationsEnabled: boolean
   newMessages: boolean
   meetupInvites: boolean

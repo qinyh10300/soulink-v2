@@ -58,6 +58,7 @@ func (h *Handler) GetPreferences(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, err)
 		return
 	}
+	preferences.IsAdmin = h.service.isAdmin(user.Email)
 	httpapi.OK(w, preferences)
 }
 
@@ -88,6 +89,7 @@ func (h *Handler) UpdateNotificationPreferences(w http.ResponseWriter, r *http.R
 		httpapi.Error(w, err)
 		return
 	}
+	preferences.IsAdmin = h.service.isAdmin(user.Email)
 	httpapi.OK(w, preferences)
 }
 
@@ -108,6 +110,7 @@ func (h *Handler) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, err)
 		return
 	}
+	preferences.IsAdmin = h.service.isAdmin(user.Email)
 	httpapi.OK(w, preferences)
 }
 

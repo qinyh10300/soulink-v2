@@ -65,6 +65,36 @@ func (h *Handler) ListPosts(w http.ResponseWriter, r *http.Request) {
 	httpapi.OK(w, posts)
 }
 
+func (h *Handler) ListPostPage(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+
+	limit := defaultPostPageSize
+	if rawLimit := strings.TrimSpace(r.URL.Query().Get("limit")); rawLimit != "" {
+		parsed, err := strconv.Atoi(rawLimit)
+		if err != nil || parsed < 1 || parsed > maxPostPageSize {
+			httpapi.Error(w, invalidParams())
+			return
+		}
+		limit = parsed
+	}
+	page, err := h.service.ListPostPage(r.Context(), user.ID, ListPostsInput{
+		Topic:  strings.TrimSpace(r.URL.Query().Get("topic")),
+		Query:  strings.TrimSpace(r.URL.Query().Get("q")),
+		Sort:   strings.TrimSpace(r.URL.Query().Get("sort")),
+		Cursor: strings.TrimSpace(r.URL.Query().Get("cursor")),
+		Limit:  limit,
+	})
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, page)
+}
+
 func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
