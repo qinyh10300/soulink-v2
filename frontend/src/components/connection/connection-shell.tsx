@@ -386,7 +386,7 @@ export function ConnectionShell() {
             <div className="flex items-center gap-1">
               <Link
                 aria-label="发布新意图"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#263b35] text-white"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#263b35] text-white"
                 title="开始新对话"
                 to="/intents/new"
               >
@@ -394,7 +394,7 @@ export function ConnectionShell() {
               </Link>
               <button
                 aria-label={mobileMenuOpen ? "关闭菜单" : "打开菜单"}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#5f5b55] hover:bg-[#efede9]"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen((open) => !open)}
                 type="button"
               >
@@ -404,9 +404,16 @@ export function ConnectionShell() {
           </header>
 
           {mobileMenuOpen ? (
-            <div className="fixed inset-x-0 top-15 z-30 border-b border-[#dfdcd6] bg-[#fbfaf8] p-3 shadow-[0_12px_32px_rgba(35,33,31,0.08)] lg:hidden">
+            <>
+              <button
+                aria-label="关闭菜单"
+                className="fixed inset-0 top-15 z-20 cursor-default bg-black/10 lg:hidden"
+                onClick={() => setMobileMenuOpen(false)}
+                type="button"
+              />
+              <div className="fixed inset-x-0 top-15 z-30 border-b border-[#dfdcd6] bg-[#fbfaf8] p-3 shadow-[0_12px_32px_rgba(35,33,31,0.08)] lg:hidden">
               <Link
-                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
                 to="/calendar"
               >
@@ -414,7 +421,7 @@ export function ConnectionShell() {
                 时间表
               </Link>
               <Link
-                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
                 to="/intents"
               >
@@ -422,7 +429,7 @@ export function ConnectionShell() {
                 我的意图
               </Link>
               <Link
-                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
                 to="/matches"
               >
@@ -430,7 +437,7 @@ export function ConnectionShell() {
                 连接房间
               </Link>
               <Link
-                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
                 to="/account"
               >
@@ -438,7 +445,7 @@ export function ConnectionShell() {
                 账户设置
               </Link>
               <button
-                className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm text-[#8b3f3f] hover:bg-[#f5eaea]"
+                className="flex h-11 w-full items-center gap-3 rounded-md px-3 text-sm text-[#8b3f3f] hover:bg-[#f5eaea]"
                 disabled={loggingOut}
                 onClick={() => void handleLogout()}
                 type="button"
@@ -446,16 +453,17 @@ export function ConnectionShell() {
                 <LogOut size={17} />
                 {loggingOut ? "正在退出..." : "退出登录"}
               </button>
-            </div>
+              </div>
+            </>
           ) : null}
 
-          <main className="min-h-screen pb-20 lg:h-screen lg:min-h-0 lg:pb-0">
+          <main className="min-h-[calc(100dvh_-_3.75rem)] pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:h-screen lg:min-h-0 lg:pb-0">
             <Outlet />
           </main>
 
           <nav
             aria-label="移动端导航"
-            className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem_+_env(safe-area-inset-bottom))] grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
           >
             {navItems
               .filter((item) => item.mobile)
@@ -470,12 +478,13 @@ export function ConnectionShell() {
                       )
                     }
                     key={item.to}
+                    onClick={() => setMobileMenuOpen(false)}
                     to={item.to}
                   >
                     <Icon size={18} strokeWidth={1.8} />
                     <span className="truncate">{item.mobileLabel}</span>
                     {item.to === "/chat" && totalUnread > 0 ? (
-                      <span className="absolute ml-5 mt-[-20px] inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#d95656] px-1 text-[9px] font-semibold text-white">
+                      <span className="absolute left-1/2 top-1 ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#d95656] px-1 text-[9px] font-semibold text-white">
                         {totalUnread > 9 ? "9+" : totalUnread}
                       </span>
                     ) : null}

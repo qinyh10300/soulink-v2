@@ -513,7 +513,7 @@ export function ConnectionHomePage() {
   );
 
   return (
-    <div className="h-[calc(100dvh-8.75rem)] overflow-hidden bg-[#f7f6f3] lg:h-screen">
+    <div className="h-[calc(100dvh_-_7.75rem_-_env(safe-area-inset-bottom))] overflow-hidden bg-[#f7f6f3] lg:h-screen">
       {isWideWorkspace ? (
         <Group
           className="h-full w-full"

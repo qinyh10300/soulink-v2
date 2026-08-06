@@ -437,7 +437,7 @@ export function ChatPage() {
   const showList = !activeKey
 
   return (
-    <div className="relative flex h-[calc(100dvh-7.75rem)] min-h-[520px] overflow-hidden bg-[#f2f3f1] lg:h-screen">
+    <div className="relative flex h-[calc(100dvh_-_7.75rem_-_env(safe-area-inset-bottom))] min-h-[520px] overflow-hidden bg-[#f2f3f1] lg:h-screen">
       <aside
         className={cn(
           'h-full w-full shrink-0 border-r border-[#d5d8d4] bg-[#f7f8f6] md:w-[330px]',
