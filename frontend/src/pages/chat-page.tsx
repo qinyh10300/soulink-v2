@@ -380,6 +380,10 @@ export function ChatPage() {
     }
   }, [])
 
+  const handleThreadRead = useCallback(() => {
+    void loadAll()
+  }, [loadAll])
+
   useEffect(() => {
     void loadAll()
   }, [loadAll, conversationVersion, lastGroupMessage, lastMessage])
@@ -531,7 +535,7 @@ export function ChatPage() {
             </button>
             <div className="min-h-0 flex-1">
               <ChatWindow
-                onRead={() => void loadAll()}
+                onRead={handleThreadRead}
                 thread={{
                   id: activeConversation.id,
                   kind: 'direct',
@@ -556,7 +560,7 @@ export function ChatPage() {
             <div className="min-h-0 flex-1">
               <ChatWindow
                 onOpenGroupInfo={() => setGroupInfoOpen(true)}
-                onRead={() => void loadAll()}
+                onRead={handleThreadRead}
                 thread={{
                   id: activeGroup.id,
                   kind: 'group',
