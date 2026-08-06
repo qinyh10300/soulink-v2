@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"soulink-backend/internal/ai"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/store"
 )
@@ -25,6 +25,7 @@ const (
 type Service struct {
 	store       *store.Store
 	interpreter *Interpreter
+	generator   ai.Generator
 	nowFunc     func() time.Time
 }
 
@@ -35,16 +36,17 @@ func NewService(dataStore *store.Store, interpreter *Interpreter) *Service {
 	return &Service{
 		store:       dataStore,
 		interpreter: interpreter,
+		generator:   interpreter.generator,
 		nowFunc:     time.Now,
 	}
 }
 
-func (s *Service) Interpret(raw string) (IntentInterpretation, error) {
+func (s *Service) Interpret(ctx context.Context, raw string) (IntentInterpretation, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || utf8.RuneCountInString(raw) > maxIntentDescriptionLength {
 		return IntentInterpretation{}, invalidParams("请用一句话描述你想认识谁")
 	}
-	return s.interpreter.Interpret(raw), nil
+	return s.interpreter.InterpretContext(ctx, raw), nil
 }
 
 func (s *Service) GetMatchingProfile(ctx context.Context, userID int64) (MatchingProfileView, error) {
@@ -212,6 +214,13 @@ func (s *Service) GetIntent(ctx context.Context, viewerID, intentID int64) (Inte
 		if blocked {
 			return IntentView{}, forbidden("这个意图当前不可见")
 		}
+		reported, err := s.store.UsersHaveActiveSafetyReport(ctx, nil, viewerID, intent.AuthorID)
+		if err != nil {
+			return IntentView{}, httpapi.InternalError(err)
+		}
+		if reported {
+			return IntentView{}, forbidden("这个意图当前不可见")
+		}
 		if intent.Status != StatusActive || intent.Visibility == VisibilityPrivate ||
 			(intent.ExpiresAt.Valid && !intent.ExpiresAt.Time.After(s.now())) {
 			return IntentView{}, forbidden("这个意图当前不可见")
@@ -269,7 +278,20 @@ func (s *Service) SetIntentSaved(ctx context.Context, userID, intentID int64, sa
 	if intent.IsOwner {
 		return IntentView{}, invalidParams("无需收藏自己的意图")
 	}
-	if err := s.store.SetIntentSaved(ctx, nil, intentID, userID, saved, s.now()); err != nil {
+	record, err := s.store.GetConnectionIntent(ctx, nil, userID, intentID)
+	if err != nil {
+		return IntentView{}, mapStoreError(err, "找不到这个意图")
+	}
+	now := s.now()
+	if err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.store.SetIntentSaved(ctx, tx, intentID, userID, saved, now); err != nil {
+			return err
+		}
+		if saved {
+			return s.recordRecommendationSignal(ctx, tx, userID, record, "saved", 1, now)
+		}
+		return s.store.RevokeRecommendationInteractionSignal(ctx, tx, userID, intentID, "saved", now)
+	}); err != nil {
 		return IntentView{}, httpapi.InternalError(err)
 	}
 	return s.GetIntent(ctx, userID, intentID)
@@ -286,12 +308,25 @@ func (s *Service) DismissIntent(ctx context.Context, userID, intentID int64) err
 	if intent.InterestState == "interested" || intent.InterestState == "accepted" {
 		return invalidParams("已回应的意图不能忽略")
 	}
+	record, err := s.store.GetConnectionIntent(ctx, nil, userID, intentID)
+	if err != nil {
+		return mapStoreError(err, "找不到这个意图")
+	}
 	now := s.now()
 	if err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
 		if err := s.store.DismissIntent(ctx, tx, intentID, userID, now); err != nil {
 			return err
 		}
-		return s.store.SetIntentSaved(ctx, tx, intentID, userID, false, now)
+		if err := s.store.SetIntentSaved(ctx, tx, intentID, userID, false, now); err != nil {
+			return err
+		}
+		if err := s.store.RevokeRecommendationInteractionSignal(ctx, tx, userID, intentID, "saved", now); err != nil {
+			return err
+		}
+		if err := s.recordRecommendationSignal(ctx, tx, userID, record, "dismissed", -2, now); err != nil {
+			return err
+		}
+		return s.store.ExpireActiveDailyRecommendations(ctx, tx, userID, 0, now)
 	}); err != nil {
 		return httpapi.InternalError(err)
 	}
@@ -322,7 +357,20 @@ func (s *Service) SetIntentInterest(ctx context.Context, userID, intentID int64,
 			return IntentView{}, forbidden("请先在资料中主动开启认真关系匹配")
 		}
 	}
-	if err := s.store.SetIntentInterest(ctx, nil, intentID, userID, "interested", message, s.now()); err != nil {
+	record, err := s.store.GetConnectionIntent(ctx, nil, userID, intentID)
+	if err != nil {
+		return IntentView{}, mapStoreError(err, "找不到这个意图")
+	}
+	now := s.now()
+	if err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.store.SetIntentInterest(ctx, tx, intentID, userID, "interested", message, now); err != nil {
+			return err
+		}
+		if err := s.store.RevokeRecommendationInteractionSignal(ctx, tx, userID, intentID, "withdrawn", now); err != nil {
+			return err
+		}
+		return s.recordRecommendationSignal(ctx, tx, userID, record, "interested", 3, now)
+	}); err != nil {
 		return IntentView{}, httpapi.InternalError(err)
 	}
 	return s.GetIntent(ctx, userID, intentID)
@@ -332,7 +380,20 @@ func (s *Service) WithdrawIntentInterest(ctx context.Context, userID, intentID i
 	if _, err := s.GetIntent(ctx, userID, intentID); err != nil {
 		return IntentView{}, err
 	}
-	if err := s.store.SetIntentInterest(ctx, nil, intentID, userID, "withdrawn", "", s.now()); err != nil {
+	record, err := s.store.GetConnectionIntent(ctx, nil, userID, intentID)
+	if err != nil {
+		return IntentView{}, mapStoreError(err, "找不到这个意图")
+	}
+	now := s.now()
+	if err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.store.SetIntentInterest(ctx, tx, intentID, userID, "withdrawn", "", now); err != nil {
+			return err
+		}
+		if err := s.store.RevokeRecommendationInteractionSignal(ctx, tx, userID, intentID, "interested", now); err != nil {
+			return err
+		}
+		return s.recordRecommendationSignal(ctx, tx, userID, record, "withdrawn", -1, now)
+	}); err != nil {
 		return IntentView{}, httpapi.InternalError(err)
 	}
 	return s.GetIntent(ctx, userID, intentID)
@@ -374,6 +435,18 @@ func (s *Service) RespondToInterest(ctx context.Context, ownerID, intentID, cand
 		return nil, err
 	}
 
+	starters := []string{}
+	starterInference := InferenceView{
+		Source:        "deterministic",
+		Confidence:    0.74,
+		PromptVersion: "deterministic-starters-v2",
+		Editable:      true,
+	}
+	if accepted {
+		if source, sourceErr := s.store.GetConnectionIntent(ctx, nil, ownerID, intentID); sourceErr == nil && source.AuthorID == ownerID {
+			starters, starterInference = s.conversationStarterDrafts(ctx, source)
+		}
+	}
 	var roomID int64
 	err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
 		intent, err := s.store.GetConnectionIntent(ctx, tx, ownerID, intentID)
@@ -415,6 +488,19 @@ func (s *Service) RespondToInterest(ctx context.Context, ownerID, intentID, cand
 		if err := s.store.UpdateIntentInterestStatus(ctx, tx, intentID, candidateID, status, s.now()); err != nil {
 			return mapStoreError(err, "这个回应已被处理或不存在")
 		}
+		signalType := "declined_candidate"
+		signalWeight := -1
+		if accepted {
+			signalType = "accepted_candidate"
+			signalWeight = 3
+		}
+		if err := s.recordRecommendationSignal(ctx, tx, ownerID, store.ConnectionIntent{
+			ID:       intent.ID,
+			AuthorID: candidateID,
+			Category: intent.Category,
+		}, signalType, signalWeight, s.now()); err != nil {
+			return err
+		}
 		if !accepted {
 			return nil
 		}
@@ -426,6 +512,9 @@ func (s *Service) RespondToInterest(ctx context.Context, ownerID, intentID, cand
 		if intent.Location != "" {
 			contextItems = append(contextItems, intent.Location)
 		}
+		if len(starters) == 0 {
+			starters = startersForCategory(intent.Category, intent.Title)
+		}
 		roomID, err = s.store.CreateMatchRoom(ctx, tx, store.CreateMatchRoomParams{
 			IntentID:             intent.ID,
 			OwnerID:              ownerID,
@@ -433,8 +522,12 @@ func (s *Service) RespondToInterest(ctx context.Context, ownerID, intentID, cand
 			FitReason:            "对方主动回应了你的「" + intent.Title + "」，而你也愿意进一步了解。这次连接来自明确的共同意愿。",
 			Uncertainty:          "SouLink 只确认了双方愿意见面；具体节奏和边界仍需要你们亲自沟通。",
 			SharedContext:        contextItems,
-			ConversationStarters: startersForCategory(intent.Category, intent.Title),
+			ConversationStarters: starters,
 			SuggestedPlaces:      placesForIntent(intent.Location),
+			AssistantSource:      starterInference.Source,
+			AssistantModel:       starterInference.Model,
+			AssistantConfidence:  starterInference.Confidence,
+			AssistantPrompt:      starterInference.PromptVersion,
 			Now:                  s.now(),
 		})
 		if err != nil {
@@ -482,34 +575,7 @@ func (s *Service) Recommendations(ctx context.Context, userID, intentID int64) (
 		}
 	}
 
-	candidates, err := s.store.ListRecommendationCandidates(ctx, nil, userID, source.Category, 60)
-	if err != nil {
-		return nil, httpapi.InternalError(err)
-	}
-	recommendations := make([]RecommendationView, 0, len(candidates))
-	for _, candidate := range candidates {
-		if !recommendationCategoryEligible(source.Category, candidate.Category) {
-			continue
-		}
-		score, reason, uncertainty, shared := scoreRecommendation(source, candidate)
-		recommendations = append(recommendations, RecommendationView{
-			Intent:        toIntentView(candidate, userID),
-			Score:         score,
-			FitReason:     reason,
-			Uncertainty:   uncertainty,
-			SharedContext: shared,
-		})
-	}
-	sort.SliceStable(recommendations, func(i, j int) bool {
-		if recommendations[i].Score == recommendations[j].Score {
-			return recommendations[i].Intent.UpdatedAt.After(recommendations[j].Intent.UpdatedAt)
-		}
-		return recommendations[i].Score > recommendations[j].Score
-	})
-	if len(recommendations) > 3 {
-		recommendations = recommendations[:3]
-	}
-	return recommendations, nil
+	return s.recommendationsForSource(ctx, userID, source, 3, false)
 }
 
 func (s *Service) ListMatchRooms(ctx context.Context, userID int64) ([]MatchRoomView, error) {
@@ -1090,12 +1156,19 @@ func toMatchRoomView(room store.MatchRoom, viewerID int64) MatchRoomView {
 		Uncertainty:          room.Uncertainty,
 		SharedContext:        nonNilStrings(room.SharedContext),
 		ConversationStarters: nonNilStrings(room.ConversationStarters),
-		SuggestedPlaces:      nonNilStrings(room.SuggestedPlaces),
-		SelectedPlace:        room.SelectedPlace,
-		MyContactShared:      myShared,
-		OtherContactShared:   otherShared,
-		CreatedAt:            room.CreatedAt,
-		UpdatedAt:            room.UpdatedAt,
+		Assistant: InferenceView{
+			Source:        room.AssistantSource,
+			Model:         room.AssistantModel,
+			Confidence:    room.AssistantConfidence,
+			PromptVersion: room.AssistantPromptVersion,
+			Editable:      true,
+		},
+		SuggestedPlaces:    nonNilStrings(room.SuggestedPlaces),
+		SelectedPlace:      room.SelectedPlace,
+		MyContactShared:    myShared,
+		OtherContactShared: otherShared,
+		CreatedAt:          room.CreatedAt,
+		UpdatedAt:          room.UpdatedAt,
 	}
 	if room.ScheduledAt.Valid {
 		value := room.ScheduledAt.Time

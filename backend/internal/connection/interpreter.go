@@ -1,10 +1,13 @@
 package connection
 
 import (
+	"context"
 	"net/mail"
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"soulink-backend/internal/ai"
 )
 
 type ClarifyingQuestion struct {
@@ -34,15 +37,53 @@ type IntentInterpretation struct {
 	Inferences      []string             `json:"inferences"`
 	Safety          SafetyAssessment     `json:"safety"`
 	Engine          string               `json:"engine"`
+	Source          string               `json:"source"`
+	Model           string               `json:"model,omitempty"`
+	PromptVersion   string               `json:"promptVersion"`
+	Editable        bool                 `json:"editable"`
+	FallbackReason  string               `json:"fallbackReason,omitempty"`
 }
 
-type Interpreter struct{}
+type Interpreter struct {
+	generator ai.Generator
+}
 
 func NewInterpreter() *Interpreter {
 	return &Interpreter{}
 }
 
+func NewInterpreterWithGenerator(generator ai.Generator) *Interpreter {
+	return &Interpreter{generator: generator}
+}
+
 func (i *Interpreter) Interpret(raw string) IntentInterpretation {
+	return i.InterpretContext(context.Background(), raw)
+}
+
+func (i *Interpreter) InterpretContext(ctx context.Context, raw string) IntentInterpretation {
+	result := interpretDeterministic(raw)
+	if i == nil || i.generator == nil {
+		result.FallbackReason = "model_not_configured"
+		return result
+	}
+	prompt, ok := ai.PromptFor(ai.TaskIntentClarification)
+	if !ok {
+		result.FallbackReason = "prompt_not_configured"
+		return result
+	}
+
+	var modelResult modelIntentInterpretation
+	metadata, err := i.generator.Generate(ctx, prompt, map[string]string{
+		"text": strings.TrimSpace(raw),
+	}, &modelResult)
+	if err != nil || !validModelInterpretation(modelResult) {
+		result.FallbackReason = "model_invalid_or_unavailable"
+		return result
+	}
+	return mergeModelInterpretation(result, modelResult, metadata)
+}
+
+func interpretDeterministic(raw string) IntentInterpretation {
 	description := strings.TrimSpace(raw)
 	category, categoryConfidence := inferCategory(description)
 	location := inferLocation(description)
@@ -132,8 +173,97 @@ func (i *Interpreter) Interpret(raw string) IntentInterpretation {
 		Questions:       questions,
 		Inferences:      inferences,
 		Safety:          assessSafety(description),
-		Engine:          "soulink-intent-engine-v1",
+		Engine:          "soulink-intent-engine-v2",
+		Source:          "deterministic",
+		PromptVersion:   "deterministic-intent-v2",
+		Editable:        true,
 	}
+}
+
+type modelIntentInterpretation struct {
+	Category        string               `json:"category"`
+	Title           string               `json:"title"`
+	Goal            string               `json:"goal"`
+	TimeWindow      string               `json:"timeWindow"`
+	Location        string               `json:"location"`
+	Constraints     []string             `json:"constraints"`
+	DesiredNextStep string               `json:"desiredNextStep"`
+	Questions       []ClarifyingQuestion `json:"questions"`
+	Inferences      []string             `json:"inferences"`
+	Confidence      float64              `json:"confidence"`
+}
+
+func validModelInterpretation(result modelIntentInterpretation) bool {
+	if !validCategory(strings.TrimSpace(result.Category)) || result.Confidence < 0 || result.Confidence > 1 {
+		return false
+	}
+	if !validModelText(result.Title, 80) || !validModelText(result.Goal, 200) ||
+		!validOptionalModelText(result.TimeWindow, 200) || !validOptionalModelText(result.Location, 200) ||
+		!validModelText(result.DesiredNextStep, 200) {
+		return false
+	}
+	if len(result.Constraints) > 6 || len(result.Questions) > 3 || len(result.Inferences) > 5 {
+		return false
+	}
+	for _, value := range append(append([]string{}, result.Constraints...), result.Inferences...) {
+		if !validModelText(value, 120) {
+			return false
+		}
+	}
+	for _, question := range result.Questions {
+		if !validModelText(question.ID, 40) || !validModelText(question.Prompt, 160) ||
+			len(question.Options) == 0 || len(question.Options) > 3 {
+			return false
+		}
+		for _, option := range question.Options {
+			if !validModelText(option, 60) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func validModelText(value string, maxLength int) bool {
+	value = strings.TrimSpace(value)
+	return value != "" && utf8.RuneCountInString(value) <= maxLength
+}
+
+func validOptionalModelText(value string, maxLength int) bool {
+	return utf8.RuneCountInString(strings.TrimSpace(value)) <= maxLength
+}
+
+func mergeModelInterpretation(
+	base IntentInterpretation,
+	modelResult modelIntentInterpretation,
+	metadata ai.Metadata,
+) IntentInterpretation {
+	base.Category = strings.TrimSpace(modelResult.Category)
+	base.Title = strings.TrimSpace(modelResult.Title)
+	base.Goal = strings.TrimSpace(modelResult.Goal)
+	base.TimeWindow = strings.TrimSpace(modelResult.TimeWindow)
+	base.Location = strings.TrimSpace(modelResult.Location)
+	base.Constraints = uniqueStrings(modelResult.Constraints, 6)
+	base.DesiredNextStep = strings.TrimSpace(modelResult.DesiredNextStep)
+	base.Questions = append([]ClarifyingQuestion(nil), modelResult.Questions...)
+	base.Inferences = uniqueStrings(modelResult.Inferences, 5)
+	base.Confidence = modelResult.Confidence
+	base.Visibility = VisibilityFeed
+	if base.Category == CategoryRomantic {
+		base.Visibility = VisibilityCandidates
+	}
+	if base.Category == CategoryProject || base.Category == CategoryCofounder {
+		base.ProjectMemo = inferProjectMemo(base.Description, base.Category)
+	} else {
+		base.ProjectMemo = nil
+	}
+	base.Engine = "soulink-model-assisted-v1"
+	base.Source = metadata.Source
+	base.Model = metadata.Model
+	base.PromptVersion = metadata.PromptVersion
+	base.Editable = true
+	base.FallbackReason = ""
+	return base
 }
 
 func inferProjectMemo(text, category string) *ProjectMemo {

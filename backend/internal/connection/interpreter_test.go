@@ -1,9 +1,31 @@
 package connection
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
+
+	"soulink-backend/internal/ai"
 )
+
+type interpreterGenerator struct {
+	response string
+	err      error
+}
+
+func (generator interpreterGenerator) Generate(
+	_ context.Context,
+	prompt ai.Prompt,
+	_ any,
+	output any,
+) (ai.Metadata, error) {
+	if generator.err != nil {
+		return ai.Metadata{Source: "model", Model: "test-model", PromptVersion: prompt.Version}, generator.err
+	}
+	return ai.Metadata{Source: "model", Model: "test-model", PromptVersion: prompt.Version}, json.Unmarshal([]byte(generator.response), output)
+}
 
 func TestInterpreterUnderstandsCampusMealIntent(t *testing.T) {
 	t.Parallel()
@@ -103,5 +125,50 @@ func TestInterpreterFlagsPublicContactDetails(t *testing.T) {
 	}
 	if !strings.Contains(result.Safety.Notice, "联系方式") {
 		t.Fatalf("safety notice = %q, want contact warning", result.Safety.Notice)
+	}
+}
+
+func TestInterpreterUsesValidatedModelOutputWithoutGrantingVisibility(t *testing.T) {
+	t.Parallel()
+
+	interpreter := NewInterpreterWithGenerator(interpreterGenerator{response: `{
+		"category":"romantic",
+		"title":"认真认识一位新朋友",
+		"goal":"先在双方愿意的情况下轻松交流",
+		"timeWindow":"本周",
+		"location":"图书馆",
+		"constraints":["低压力"],
+		"desiredNextStep":"双方同意后再开聊",
+		"questions":[],
+		"inferences":["用户明确表达了认真认识的目标"],
+		"confidence":0.88
+	}`})
+	result := interpreter.Interpret("本周想在图书馆认真认识一个人")
+
+	if result.Source != "model" || result.Model != "test-model" {
+		t.Fatalf("model metadata = %#v", result)
+	}
+	if result.Visibility != VisibilityCandidates {
+		t.Fatalf("visibility = %q, want candidates enforced by service", result.Visibility)
+	}
+	if !result.Editable || result.PromptVersion != "intent-clarification-v2" {
+		t.Fatalf("inference controls = %#v", result)
+	}
+}
+
+func TestInterpreterFallsBackWhenModelFailsOrReturnsInvalidCategory(t *testing.T) {
+	t.Parallel()
+
+	for _, generator := range []interpreterGenerator{
+		{err: errors.New("provider down")},
+		{response: `{"category":"bypass","title":"x","goal":"x","timeWindow":"","location":"","constraints":[],"desiredNextStep":"x","questions":[],"inferences":[],"confidence":0.9}`},
+	} {
+		result := NewInterpreterWithGenerator(generator).Interpret("今晚在紫荆找饭搭子")
+		if result.Source != "deterministic" || result.Category != CategoryMeal {
+			t.Fatalf("fallback result = %#v", result)
+		}
+		if result.FallbackReason == "" {
+			t.Fatal("fallback reason is empty")
+		}
 	}
 }

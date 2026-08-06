@@ -19,6 +19,7 @@ type Config struct {
 	Mail           MailConfig
 	Match          MatchConfig
 	Questionnaire  QuestionnaireConfig
+	AI             AIConfig
 	Safety         SafetyConfig
 	Demo           DemoConfig
 }
@@ -63,6 +64,15 @@ type QuestionnaireConfig struct {
 
 type MatchConfig struct {
 	ResultCacheTTL time.Duration
+}
+
+type AIConfig struct {
+	Provider   string
+	BaseURL    string
+	APIKey     string
+	Model      string
+	Timeout    time.Duration
+	MaxRetries int
 }
 
 type SafetyConfig struct {
@@ -121,6 +131,17 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	aiTimeout, err := envDuration("AI_TIMEOUT", 8*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	aiMaxRetries, err := envInt("AI_MAX_RETRIES", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if aiMaxRetries < 0 || aiMaxRetries > 3 {
+		return Config{}, fmt.Errorf("AI_MAX_RETRIES must be between 0 and 3")
+	}
 	soulAgentEnabled, err := envBool("SOULAGENT_ENABLED", true)
 	if err != nil {
 		return Config{}, err
@@ -169,6 +190,14 @@ func Load() (Config, error) {
 		},
 		Match: MatchConfig{
 			ResultCacheTTL: resultCacheTTL,
+		},
+		AI: AIConfig{
+			Provider:   strings.ToLower(envString("AI_PROVIDER", "disabled")),
+			BaseURL:    envString("AI_BASE_URL", "https://api.openai.com/v1"),
+			APIKey:     envString("AI_API_KEY", ""),
+			Model:      envString("AI_MODEL", ""),
+			Timeout:    aiTimeout,
+			MaxRetries: aiMaxRetries,
 		},
 		Safety: SafetyConfig{
 			AdminEmails: normalizeEmails(splitCSV(envString("ADMIN_EMAILS", ""))),

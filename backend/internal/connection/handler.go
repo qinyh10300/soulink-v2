@@ -54,7 +54,7 @@ func (h *Handler) Interpret(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, err)
 		return
 	}
-	result, err := h.service.Interpret(req.Text)
+	result, err := h.service.Interpret(r.Context(), req.Text)
 	if err != nil {
 		httpapi.Error(w, err)
 		return
@@ -305,6 +305,63 @@ func (h *Handler) Recommendations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := h.service.Recommendations(r.Context(), userID, intentID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
+func (h *Handler) DailyRecommendations(w http.ResponseWriter, r *http.Request) {
+	userID, ok := currentUserID(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.service.DailyRecommendations(r.Context(), userID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
+func (h *Handler) GetRecommendationPreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := currentUserID(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetRecommendationPreferences(r.Context(), userID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
+func (h *Handler) UpdateRecommendationPreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := currentUserID(w, r)
+	if !ok {
+		return
+	}
+	var req RecommendationPreferenceInput
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	result, err := h.service.UpdateRecommendationPreferences(r.Context(), userID, req)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
+func (h *Handler) ResetRecommendationPreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := currentUserID(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.service.ResetRecommendationPreferences(r.Context(), userID)
 	if err != nil {
 		httpapi.Error(w, err)
 		return

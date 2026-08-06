@@ -140,6 +140,80 @@ func TestLoadReadsMatchConfig(t *testing.T) {
 	}
 }
 
+func TestLoadReadsAIConfig(t *testing.T) {
+	preserveEnvironment(t, "AI_PROVIDER", "AI_BASE_URL", "AI_API_KEY", "AI_MODEL", "AI_TIMEOUT", "AI_MAX_RETRIES")
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	contents := "AI_PROVIDER=openai-compatible\nAI_BASE_URL=https://model.example/v1\nAI_API_KEY=test-key\nAI_MODEL=test-model\nAI_TIMEOUT=4s\nAI_MAX_RETRIES=1\n"
+	if err := os.WriteFile(envPath, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get wd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.AI.Provider != "openai-compatible" || cfg.AI.BaseURL != "https://model.example/v1" {
+		t.Fatalf("AI provider config = %#v", cfg.AI)
+	}
+	if cfg.AI.APIKey != "test-key" || cfg.AI.Model != "test-model" {
+		t.Fatalf("AI credentials/model config = %#v", cfg.AI)
+	}
+	if cfg.AI.Timeout != 4*time.Second || cfg.AI.MaxRetries != 1 {
+		t.Fatalf("AI reliability config = %#v", cfg.AI)
+	}
+}
+
+func TestLoadRejectsInvalidAIRetries(t *testing.T) {
+	preserveEnvironment(t, "AI_MAX_RETRIES")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("AI_MAX_RETRIES=9\n"), 0o600); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get wd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted AI_MAX_RETRIES outside the supported range")
+	}
+}
+
+func preserveEnvironment(t *testing.T, keys ...string) {
+	t.Helper()
+	type value struct {
+		text string
+		set  bool
+	}
+	previous := make(map[string]value, len(keys))
+	for _, key := range keys {
+		text, set := os.LookupEnv(key)
+		previous[key] = value{text: text, set: set}
+	}
+	t.Cleanup(func() {
+		for _, key := range keys {
+			item := previous[key]
+			if item.set {
+				_ = os.Setenv(key, item.text)
+			} else {
+				_ = os.Unsetenv(key)
+			}
+		}
+	})
+}
+
 func TestLoadReadsQuestionnaireConfig(t *testing.T) {
 	dir := t.TempDir()
 	envPath := filepath.Join(dir, ".env")

@@ -114,11 +114,55 @@ type IntentView struct {
 }
 
 type RecommendationView struct {
-	Intent        IntentView `json:"intent"`
-	Score         int        `json:"score"`
-	FitReason     string     `json:"fitReason"`
-	Uncertainty   string     `json:"uncertainty"`
-	SharedContext []string   `json:"sharedContext"`
+	Intent        IntentView    `json:"intent"`
+	Score         int           `json:"score"`
+	FitReason     string        `json:"fitReason"`
+	Uncertainty   string        `json:"uncertainty"`
+	SharedContext []string      `json:"sharedContext"`
+	Inference     InferenceView `json:"inference"`
+}
+
+type InferenceView struct {
+	Source        string  `json:"source"`
+	Model         string  `json:"model,omitempty"`
+	Confidence    float64 `json:"confidence"`
+	PromptVersion string  `json:"promptVersion"`
+	Editable      bool    `json:"editable"`
+}
+
+type DailyRecommendationsView struct {
+	SourceIntentID int64                `json:"sourceIntentId,omitempty"`
+	GeneratedAt    *time.Time           `json:"generatedAt,omitempty"`
+	RefreshAt      *time.Time           `json:"refreshAt,omitempty"`
+	Algorithm      string               `json:"algorithm"`
+	Items          []RecommendationView `json:"items"`
+}
+
+type RecommendationPreferenceInput struct {
+	LearningEnabled bool `json:"learningEnabled"`
+}
+
+type RecommendationAffinityView struct {
+	Category string `json:"category"`
+	Weight   int    `json:"weight"`
+	Signals  int    `json:"signals"`
+	Summary  string `json:"summary"`
+}
+
+type RecommendationSignalView struct {
+	Type       string    `json:"type"`
+	Category   string    `json:"category"`
+	Impact     int       `json:"impact"`
+	Source     string    `json:"source"`
+	OccurredAt time.Time `json:"occurredAt"`
+}
+
+type RecommendationPreferencesView struct {
+	LearningEnabled bool                         `json:"learningEnabled"`
+	Affinities      []RecommendationAffinityView `json:"affinities"`
+	RecentSignals   []RecommendationSignalView   `json:"recentSignals"`
+	LearningResetAt *time.Time                   `json:"learningResetAt,omitempty"`
+	UpdatedAt       *time.Time                   `json:"updatedAt,omitempty"`
 }
 
 type InterestView struct {
@@ -160,6 +204,7 @@ type MatchRoomView struct {
 	Uncertainty          string              `json:"uncertainty"`
 	SharedContext        []string            `json:"sharedContext"`
 	ConversationStarters []string            `json:"conversationStarters"`
+	Assistant            InferenceView       `json:"assistant"`
 	SuggestedPlaces      []string            `json:"suggestedPlaces"`
 	ScheduledAt          *time.Time          `json:"scheduledAt,omitempty"`
 	SelectedPlace        string              `json:"selectedPlace"`

@@ -1,11 +1,14 @@
 package connection
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
+	"soulink-backend/internal/ai"
 	"soulink-backend/internal/store"
 )
 
@@ -169,5 +172,72 @@ func TestValidRoomStatusTargetRejectsReopening(t *testing.T) {
 	}
 	if validRoomStatusTarget(RoomStatusOpen) {
 		t.Fatal("clients must not be able to reopen a room")
+	}
+}
+
+func TestLearningAdjustmentRewardsPositiveFeedbackAndPenalizesNegativeFeedback(t *testing.T) {
+	t.Parallel()
+	candidate := store.ConnectionIntent{AuthorID: 42, Category: CategoryStudy}
+	positive := store.RecommendationLearningSnapshot{
+		CategoryWeights: map[string]int{CategoryStudy: 3},
+		UserWeights:     map[int64]int{42: 4},
+	}
+	negative := store.RecommendationLearningSnapshot{
+		CategoryWeights: map[string]int{CategoryStudy: -3},
+		UserWeights:     map[int64]int{42: -4},
+	}
+
+	positiveScore, positiveReason := applyLearningToRecommendation(70, "基础匹配。", candidate, positive)
+	negativeScore, _ := applyLearningToRecommendation(70, "基础匹配。", candidate, negative)
+	if positiveScore <= negativeScore {
+		t.Fatalf("positive score = %d, negative score = %d", positiveScore, negativeScore)
+	}
+	if !strings.Contains(positiveReason, "最近") || !strings.Contains(positiveReason, "这位同学") {
+		t.Fatalf("positive reason = %q", positiveReason)
+	}
+}
+
+type recommendationGenerator struct {
+	response string
+}
+
+func (generator recommendationGenerator) Generate(
+	_ context.Context,
+	prompt ai.Prompt,
+	_ any,
+	output any,
+) (ai.Metadata, error) {
+	return ai.Metadata{Source: "model", Model: "test-model", PromptVersion: prompt.Version}, json.Unmarshal([]byte(generator.response), output)
+}
+
+func TestModelRecommendationCannotInjectUnauthorizedCandidate(t *testing.T) {
+	t.Parallel()
+	service := &Service{generator: recommendationGenerator{response: `{
+		"items":[
+			{"candidateId":999,"fitReason":"越权候选","uncertainty":"无","confidence":1},
+			{"candidateId":7,"fitReason":"共同时间明确。","uncertainty":"仍需确认见面节奏。","confidence":0.84}
+		]
+	}`}}
+	recommendations := []RecommendationView{{
+		Intent:      IntentView{ID: 7},
+		FitReason:   "fallback",
+		Uncertainty: "fallback",
+		Inference:   InferenceView{Source: "deterministic"},
+	}}
+
+	result := service.enhanceRecommendationExplanations(t.Context(), store.ConnectionIntent{}, recommendations)
+	if len(result) != 1 || result[0].Intent.ID != 7 {
+		t.Fatalf("result = %#v, model must not add candidates", result)
+	}
+	if result[0].Inference.Source != "model" || result[0].FitReason != "共同时间明确。" {
+		t.Fatalf("allowed explanation was not applied: %#v", result[0])
+	}
+}
+
+func TestModelInputHidesContactDetails(t *testing.T) {
+	t.Parallel()
+	result := modelSafeText("微信 13800138000，邮箱 demo@example.com", 120)
+	if strings.Contains(result, "13800138000") || strings.Contains(result, "demo@example.com") {
+		t.Fatalf("model input leaked contact details: %q", result)
 	}
 }

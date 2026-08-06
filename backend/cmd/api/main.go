@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"soulink-backend/internal/ai"
 	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/app"
 	"soulink-backend/internal/auth"
@@ -132,7 +133,28 @@ func main() {
 	feedbackService := feedback.NewService(dataStore, logger)
 	profileService := profile.NewService(dataStore)
 	playgroundService := playground.NewService(dataStore)
-	connectionService := connection.NewService(dataStore, connection.NewInterpreter())
+	var modelGenerator ai.Generator
+	if cfg.AI.Provider == "openai-compatible" {
+		provider := ai.NewOpenAICompatible(ai.OpenAICompatibleConfig{
+			BaseURL:    cfg.AI.BaseURL,
+			APIKey:     cfg.AI.APIKey,
+			Model:      cfg.AI.Model,
+			Timeout:    cfg.AI.Timeout,
+			MaxRetries: cfg.AI.MaxRetries,
+		})
+		if provider.Enabled() {
+			modelGenerator = provider
+			logger.Info("AI provider enabled", "provider", cfg.AI.Provider, "model", cfg.AI.Model)
+		} else {
+			logger.Info("AI provider incomplete; deterministic fallback enabled")
+		}
+	} else if cfg.AI.Provider != "disabled" && cfg.AI.Provider != "" {
+		logger.Warn("unsupported AI provider; deterministic fallback enabled", "provider", cfg.AI.Provider)
+	}
+	connectionService := connection.NewService(
+		dataStore,
+		connection.NewInterpreterWithGenerator(modelGenerator),
+	)
 	adminEmails := append([]string(nil), cfg.Safety.AdminEmails...)
 	if cfg.Demo.Enabled && cfg.Demo.AdminEmail != "" {
 		adminEmails = append(adminEmails, cfg.Demo.AdminEmail)

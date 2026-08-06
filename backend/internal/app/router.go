@@ -147,6 +147,10 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Post("/intent-interpretations", deps.ConnectionHandler.Interpret)
 				r.Get("/users/me/matching-profile", deps.ConnectionHandler.GetMatchingProfile)
 				r.Put("/users/me/matching-profile", deps.ConnectionHandler.UpdateMatchingProfile)
+				r.Get("/users/me/recommendation-preferences", deps.ConnectionHandler.GetRecommendationPreferences)
+				r.Put("/users/me/recommendation-preferences", deps.ConnectionHandler.UpdateRecommendationPreferences)
+				r.Post("/users/me/recommendation-preferences/reset", deps.ConnectionHandler.ResetRecommendationPreferences)
+				r.With(track(analytics.EventRecommendationsViewed, "", "")).Get("/recommendations/daily", deps.ConnectionHandler.DailyRecommendations)
 
 				r.Route("/intents", func(r chi.Router) {
 					r.Get("/feed", deps.ConnectionHandler.ListFeed)

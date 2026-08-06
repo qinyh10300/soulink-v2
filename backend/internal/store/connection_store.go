@@ -148,6 +148,10 @@ type CreateMatchRoomParams struct {
 	SharedContext        []string
 	ConversationStarters []string
 	SuggestedPlaces      []string
+	AssistantSource      string
+	AssistantModel       string
+	AssistantConfidence  float64
+	AssistantPrompt      string
 	Now                  time.Time
 }
 
@@ -170,6 +174,10 @@ type MatchRoom struct {
 	SharedContext          []string
 	ConversationStarters   []string
 	SuggestedPlaces        []string
+	AssistantSource        string
+	AssistantModel         string
+	AssistantConfidence    float64
+	AssistantPromptVersion string
 	ScheduledAt            sql.NullTime
 	SelectedPlace          string
 	OwnerContactShared     bool
@@ -429,6 +437,15 @@ func (s *Store) ListFeedConnectionIntents(ctx context.Context, tx *sql.Tx, viewe
 			WHERE (b.blocker_id = $1 AND b.blocked_id = i.author_id)
 			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
 		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM safety_reports report
+			WHERE report.status <> 'dismissed'
+			  AND (
+			    (report.reporter_id = $1 AND report.reported_user_id = i.author_id)
+			    OR (report.reporter_id = i.author_id AND report.reported_user_id = $1)
+			  )
+		  )
 		ORDER BY i.published_at DESC NULLS LAST, i.id DESC
 		LIMIT $3
 	`, viewerID, category, normalizeConnectionLimit(limit))
@@ -451,6 +468,15 @@ func (s *Store) ListSavedConnectionIntents(ctx context.Context, tx *sql.Tx, view
 			FROM user_blocks b
 			WHERE (b.blocker_id = $1 AND b.blocked_id = i.author_id)
 			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM safety_reports report
+			WHERE report.status <> 'dismissed'
+			  AND (
+			    (report.reporter_id = $1 AND report.reported_user_id = i.author_id)
+			    OR (report.reporter_id = i.author_id AND report.reported_user_id = $1)
+			  )
 		  )
 		ORDER BY saved.created_at DESC, i.id DESC
 		LIMIT $3
@@ -484,6 +510,15 @@ func (s *Store) ListRecommendationCandidates(ctx context.Context, tx *sql.Tx, vi
 			FROM user_blocks b
 			WHERE (b.blocker_id = $1 AND b.blocked_id = i.author_id)
 			   OR (b.blocker_id = i.author_id AND b.blocked_id = $1)
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM safety_reports report
+			WHERE report.status <> 'dismissed'
+			  AND (
+			    (report.reporter_id = $1 AND report.reported_user_id = i.author_id)
+			    OR (report.reporter_id = i.author_id AND report.reported_user_id = $1)
+			  )
 		  )
 		ORDER BY i.updated_at DESC, i.id DESC
 		LIMIT $3
@@ -673,12 +708,18 @@ func (s *Store) CreateMatchRoom(ctx context.Context, tx *sql.Tx, params CreateMa
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		INSERT INTO match_rooms (
 			intent_id, owner_id, candidate_id, status, fit_reason, uncertainty,
-			shared_context, conversation_starters, suggested_places, created_at, updated_at
-		) VALUES ($1, $2, $3, 'open', $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $9)
+			shared_context, conversation_starters, suggested_places,
+			assistant_source, assistant_model, assistant_confidence,
+			assistant_prompt_version, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, 'open', $4, $5, $6::jsonb, $7::jsonb, $8::jsonb,
+			$9, $10, $11, $12, $13, $13
+		)
 		ON CONFLICT (intent_id, candidate_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
 		RETURNING id
 	`, params.IntentID, params.OwnerID, params.CandidateID, params.FitReason,
-		params.Uncertainty, sharedContext, starters, places, params.Now)
+		params.Uncertainty, sharedContext, starters, places, params.AssistantSource,
+		params.AssistantModel, params.AssistantConfidence, params.AssistantPrompt, params.Now)
 
 	var roomID int64
 	if err := row.Scan(&roomID); err != nil {
@@ -860,6 +901,8 @@ const matchRoomSelect = `
 	       r.candidate_id, candidate.nickname, candidate.department, candidate.grade,
 	       r.status, r.fit_reason, r.uncertainty, r.shared_context::text,
 	       r.conversation_starters::text, r.suggested_places::text,
+	       r.assistant_source, r.assistant_model, r.assistant_confidence::float8,
+	       r.assistant_prompt_version,
 	       r.scheduled_at, r.selected_place,
 	       r.owner_contact_shared, r.candidate_contact_shared,
 	       COALESCE(owner.contact_type, ''), COALESCE(owner.contact_value, ''),
@@ -943,7 +986,9 @@ func scanMatchRoom(row rowScanner) (MatchRoom, error) {
 		&room.OwnerID, &room.OwnerNickname, &room.OwnerDepartment, &room.OwnerGrade,
 		&room.CandidateID, &room.CandidateNickname, &room.CandidateDepartment,
 		&room.CandidateGrade, &room.Status, &room.FitReason, &room.Uncertainty,
-		&rawContext, &rawStarters, &rawPlaces, &room.ScheduledAt, &room.SelectedPlace,
+		&rawContext, &rawStarters, &rawPlaces, &room.AssistantSource,
+		&room.AssistantModel, &room.AssistantConfidence, &room.AssistantPromptVersion,
+		&room.ScheduledAt, &room.SelectedPlace,
 		&room.OwnerContactShared, &room.CandidateContactShared,
 		&room.OwnerContactType, &room.OwnerContactValue,
 		&room.CandidateContactType, &room.CandidateContactValue,

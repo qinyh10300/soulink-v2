@@ -190,6 +190,30 @@ func (s *Store) UsersBlocked(
 	return blocked, nil
 }
 
+func (s *Store) UsersHaveActiveSafetyReport(
+	ctx context.Context,
+	tx *sql.Tx,
+	leftUserID int64,
+	rightUserID int64,
+) (bool, error) {
+	row := executor(s.db, tx).QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM safety_reports report
+			WHERE report.status <> 'dismissed'
+			  AND (
+			    (report.reporter_id = $1 AND report.reported_user_id = $2)
+			    OR (report.reporter_id = $2 AND report.reported_user_id = $1)
+			  )
+		)
+	`, leftUserID, rightUserID)
+	var exists bool
+	if err := row.Scan(&exists); err != nil {
+		return false, fmt.Errorf("check active safety reports: %w", err)
+	}
+	return exists, nil
+}
+
 func (s *Store) CloseMatchRoomsBetweenUsers(
 	ctx context.Context,
 	tx *sql.Tx,
