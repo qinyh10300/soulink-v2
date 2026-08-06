@@ -1,8 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 
 export function ScrollManager() {
   const { hash, pathname } = useLocation()
+
+  useLayoutEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration
+    }
+  }, [])
 
   useEffect(() => {
     if (hash) {
@@ -18,7 +27,16 @@ export function ScrollManager() {
       return
     }
 
-    window.scrollTo({ top: 0, behavior: 'auto' })
+    const resetScroll = () => window.scrollTo({ top: 0, behavior: 'auto' })
+    resetScroll()
+
+    const animationFrame = window.requestAnimationFrame(resetScroll)
+    const timeout = window.setTimeout(resetScroll, 120)
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      window.clearTimeout(timeout)
+    }
   }, [hash, pathname])
 
   return null
