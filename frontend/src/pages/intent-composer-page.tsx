@@ -6,6 +6,7 @@ import {
   LoaderCircle,
   PanelLeftClose,
   PanelRightClose,
+  PencilLine,
   RotateCcw,
   Send,
   ShieldCheck,
@@ -27,6 +28,7 @@ import {
   IntentCategoryIcon,
   intentCategoryMeta,
 } from "@/components/connection/intent-category";
+import { InferenceBadge } from "@/components/connection/inference-badge";
 import { IntentReviewPanel } from "@/components/connection/intent-review-panel";
 import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
 import { WorkspaceResizeHandle } from "@/components/workspace/workspace-resize-handle";
@@ -584,6 +586,35 @@ export function IntentComposerPage() {
                         ))}
                     </div>
                   ) : null}
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <InferenceBadge
+                      inference={{
+                        source: interpretation.source,
+                        model: interpretation.model,
+                        confidence: interpretation.confidence,
+                        promptVersion: interpretation.promptVersion,
+                        editable: interpretation.editable,
+                      }}
+                    />
+                    {interpretation.editable ? (
+                      <button
+                        className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-[#5f655f] hover:bg-[#edf1ef] hover:text-[#315c4d]"
+                        onClick={() => {
+                          if (isWideWorkspace) {
+                            reviewPanelRef.current?.expand();
+                          } else {
+                            setMobileReviewOpen(true);
+                          }
+                        }}
+                        title="检查并编辑意图草稿"
+                        type="button"
+                      >
+                        <PencilLine size={12} />
+                        检查草稿
+                      </button>
+                    ) : null}
+                  </div>
                 </AssistantMessage>
 
                 {interpretation.questions.map((question) => {

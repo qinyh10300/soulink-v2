@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { getErrorMessage } from '@/lib/api'
+import { RecommendationPreferencesCard } from '@/components/connection/recommendation-preferences-card'
 import {
   fetchMatchingProfile,
   updateMatchingProfile,
@@ -522,6 +523,8 @@ export function ConnectionProfilePage() {
               </div>
             </div>
           </section>
+
+          <RecommendationPreferencesCard />
 
           <section className="rounded-lg border border-[#dfdcd6] bg-[#f5f3ef]">
             <Link

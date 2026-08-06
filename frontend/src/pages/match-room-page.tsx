@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { IntentCategoryIcon } from '@/components/connection/intent-category'
+import { InferenceBadge } from '@/components/connection/inference-badge'
 import { MeetupContextPanel } from '@/components/meetup/meetup-context-panel'
 import { getErrorMessage } from '@/lib/api'
 import {
@@ -380,10 +381,17 @@ export function MatchRoomPage() {
 
         <section className="flex min-h-[620px] min-w-0 flex-col rounded-lg border border-[#dfdcd6] bg-white">
           <div className="border-b border-[#e4e1dc] px-4 py-4 sm:px-5">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[#37332f]">
-              <MessageCircle size={16} />
-              和 {room.other.nickname} 先聊几句
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[#37332f]">
+                <MessageCircle size={16} />
+                和 {room.other.nickname} 先聊几句
+              </h2>
+              <InferenceBadge
+                compact
+                editTo="/profile"
+                inference={room.assistant}
+              />
+            </div>
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {room.conversationStarters.map((starter) => (
                 <button

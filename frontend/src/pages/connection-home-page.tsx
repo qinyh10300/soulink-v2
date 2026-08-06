@@ -19,6 +19,7 @@ import {
   IntentCategoryIcon,
   intentCategoryMeta,
 } from "@/components/connection/intent-category";
+import { InferenceBadge } from "@/components/connection/inference-badge";
 import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
 import { WorkspaceResizeHandle } from "@/components/workspace/workspace-resize-handle";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -26,12 +27,12 @@ import { usePersistentPanelLayout } from "@/hooks/use-persistent-panel-layout";
 import { getErrorMessage } from "@/lib/api";
 import {
   fetchIntentFeed,
-  fetchIntentRecommendations,
+  fetchDailyRecommendations,
   fetchMatchRooms,
   fetchMyIntents,
   type ConnectionIntent,
+  type DailyRecommendations,
   type IntentCategory,
-  type IntentRecommendation,
   type MatchRoom,
 } from "@/lib/connection-api";
 import { getStoredUserProfile } from "@/lib/user-profile-storage";
@@ -84,6 +85,84 @@ function formatMeetingTime(value?: string) {
   }).format(new Date(value));
 }
 
+function formatRefreshTime(value?: string) {
+  if (!value) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function DailyRecommendationList({
+  daily,
+  mobile = false,
+}: {
+  daily: DailyRecommendations;
+  mobile?: boolean;
+}) {
+  if (daily.items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      className={
+        mobile
+          ? "mt-8 w-full max-w-2xl border-t border-[#dedad4] pt-5 text-left xl:hidden"
+          : "border-b border-[#e2dfd9] px-5 py-5"
+      }
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-xs font-semibold text-[#5f5b55]">今日精选</h3>
+        {daily.refreshAt ? (
+          <span className="text-[10px] text-[#8a867f]">
+            {formatRefreshTime(daily.refreshAt)} 更新
+          </span>
+        ) : null}
+      </div>
+      <div className={mobile ? "mt-3 grid gap-2 sm:grid-cols-3" : "mt-3 space-y-4"}>
+        {daily.items.map((recommendation, index) => (
+          <article
+            className={
+              mobile
+                ? "min-w-0 rounded-md border border-[#dedad4] bg-[#fbfaf8] p-3"
+                : "min-w-0 border-l-2 border-[#b9cbc4] pl-3"
+            }
+            key={recommendation.intent.id}
+          >
+            <div className="flex items-start gap-2">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#e9efec] text-[10px] font-semibold text-[#46675b]">
+                {index + 1}
+              </span>
+              <Link
+                className="min-w-0 flex-1 truncate text-xs font-semibold text-[#45413d] hover:text-[#315c4d]"
+                to={`/intents/${recommendation.intent.id}`}
+              >
+                {recommendation.intent.title}
+              </Link>
+              <span className="shrink-0 text-[10px] font-semibold text-[#5b3477]">
+                {recommendation.score}%
+              </span>
+            </div>
+            <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-[#817d76]">
+              {recommendation.fitReason}
+            </p>
+            <InferenceBadge
+              className="mt-2"
+              compact
+              editTo="/profile"
+              inference={recommendation.inference}
+            />
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function ConnectionHomePage() {
   const navigate = useNavigate();
   const profile = useMemo(() => getStoredUserProfile(), []);
@@ -91,9 +170,8 @@ export function ConnectionHomePage() {
   const [feed, setFeed] = useState<ConnectionIntent[]>([]);
   const [myIntents, setMyIntents] = useState<ConnectionIntent[]>([]);
   const [rooms, setRooms] = useState<MatchRoom[]>([]);
-  const [recommendations, setRecommendations] = useState<
-    IntentRecommendation[]
-  >([]);
+  const [dailyRecommendations, setDailyRecommendations] =
+    useState<DailyRecommendations | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const isWideWorkspace = useMediaQuery("(min-width: 1280px)");
@@ -123,9 +201,13 @@ export function ConnectionHomePage() {
     const load = async () => {
       setLoading(true);
       setNotice("");
-      const [feedResult, intentsResult, roomsResult] = await Promise.allSettled(
-        [fetchIntentFeed(), fetchMyIntents(), fetchMatchRooms()],
-      );
+      const [feedResult, intentsResult, roomsResult, dailyResult] =
+        await Promise.allSettled([
+          fetchIntentFeed(),
+          fetchMyIntents(),
+          fetchMatchRooms(),
+          fetchDailyRecommendations(),
+        ]);
 
       if (cancelled) {
         return;
@@ -141,27 +223,15 @@ export function ConnectionHomePage() {
       setFeed(nextFeed);
       setMyIntents(nextIntents);
       setRooms(nextRooms);
-
-      const activeIntent = nextIntents.find(
-        (intent) => intent.status === "active",
+      setDailyRecommendations(
+        dailyResult.status === "fulfilled" ? dailyResult.value : null,
       );
-      if (activeIntent) {
-        try {
-          const result = await fetchIntentRecommendations(activeIntent.id);
-          if (!cancelled) {
-            setRecommendations(result);
-          }
-        } catch {
-          if (!cancelled) {
-            setRecommendations([]);
-          }
-        }
-      }
 
       if (
         feedResult.status === "rejected" &&
         intentsResult.status === "rejected" &&
-        roomsResult.status === "rejected"
+        roomsResult.status === "rejected" &&
+        dailyResult.status === "rejected"
       ) {
         setNotice(getErrorMessage(feedResult.reason, "首页暂时无法加载"));
       }
@@ -326,6 +396,10 @@ export function ConnectionHomePage() {
             })}
           </div>
 
+          {dailyRecommendations ? (
+            <DailyRecommendationList daily={dailyRecommendations} mobile />
+          ) : null}
+
           {notice ? (
             <p className="mt-5 text-xs text-[#8c463d]">{notice}</p>
           ) : null}
@@ -418,26 +492,8 @@ export function ConnectionHomePage() {
         )}
       </section>
 
-      {recommendations.length > 0 ? (
-        <section className="border-b border-[#e2dfd9] px-5 py-5">
-          <h3 className="text-xs font-semibold text-[#5f5b55]">值得聊聊</h3>
-          <div className="mt-3 space-y-3">
-            {recommendations.slice(0, 2).map((recommendation) => (
-              <Link
-                className="block border-l-2 border-[#b9cbc4] pl-3"
-                key={recommendation.intent.id}
-                to={`/intents/${recommendation.intent.id}`}
-              >
-                <span className="block truncate text-xs font-semibold text-[#45413d]">
-                  {recommendation.intent.title}
-                </span>
-                <span className="mt-1 line-clamp-2 text-[11px] leading-4 text-[#817d76]">
-                  {recommendation.fitReason}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
+      {dailyRecommendations ? (
+        <DailyRecommendationList daily={dailyRecommendations} />
       ) : null}
 
       <section className="border-b border-[#e2dfd9] px-5 py-5">

@@ -39,6 +39,19 @@ export interface IntentInterpretation {
     notice: string
   }
   engine: string
+	 source: 'model' | 'deterministic'
+	 model?: string
+	 promptVersion: string
+	 editable: boolean
+	 fallbackReason?: string
+}
+
+export interface InferenceMetadata {
+	 source: 'model' | 'deterministic'
+	 model?: string
+	 confidence: number
+	 promptVersion: string
+	 editable: boolean
 }
 
 export interface MatchingProfile {
@@ -109,6 +122,38 @@ export interface IntentRecommendation {
   fitReason: string
   uncertainty: string
   sharedContext: string[]
+	 inference: InferenceMetadata
+}
+
+export interface DailyRecommendations {
+	 sourceIntentId?: number
+	 generatedAt?: string
+	 refreshAt?: string
+	 algorithm: string
+	 items: IntentRecommendation[]
+}
+
+export interface RecommendationAffinity {
+	 category: IntentCategory
+	 weight: number
+	 signals: number
+	 summary: string
+}
+
+export interface RecommendationSignal {
+	 type: string
+	 category: IntentCategory
+	 impact: number
+	 source: 'interaction' | 'meetup'
+	 occurredAt: string
+}
+
+export interface RecommendationPreferences {
+	 learningEnabled: boolean
+	 affinities: RecommendationAffinity[]
+	 recentSignals: RecommendationSignal[]
+	 learningResetAt?: string
+	 updatedAt?: string
 }
 
 export interface IntentInterest {
@@ -148,6 +193,7 @@ export interface MatchRoom {
   uncertainty: string
   sharedContext: string[]
   conversationStarters: string[]
+	 assistant: InferenceMetadata
   suggestedPlaces: string[]
   scheduledAt?: string
   selectedPlace: string
@@ -291,6 +337,40 @@ export function fetchIntentRecommendations(intentId: number) {
     `/intents/${intentId}/recommendations`,
     { auth: true },
   )
+}
+
+export function fetchDailyRecommendations() {
+	return apiRequest<DailyRecommendations>('/recommendations/daily', {
+		auth: true,
+	})
+}
+
+export function fetchRecommendationPreferences() {
+	return apiRequest<RecommendationPreferences>(
+		'/users/me/recommendation-preferences',
+		{ auth: true },
+	)
+}
+
+export function updateRecommendationPreferences(learningEnabled: boolean) {
+	return apiRequest<RecommendationPreferences>(
+		'/users/me/recommendation-preferences',
+		{
+			method: 'PUT',
+			auth: true,
+			body: { learningEnabled },
+		},
+	)
+}
+
+export function resetRecommendationPreferences() {
+	return apiRequest<RecommendationPreferences>(
+		'/users/me/recommendation-preferences/reset',
+		{
+			method: 'POST',
+			auth: true,
+		},
+	)
 }
 
 export function fetchMatchRooms() {

@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { IntentCategoryIcon, intentCategoryMeta } from '@/components/connection/intent-category'
+import { InferenceBadge } from '@/components/connection/inference-badge'
 import { getErrorMessage } from '@/lib/api'
 import {
   expressIntentInterest,
@@ -464,6 +465,11 @@ export function IntentDetailPage() {
                               <p className="mt-2 text-sm leading-6 text-[#625e58]">
                                 {recommendation.fitReason}
                               </p>
+                              <InferenceBadge
+                                className="mt-2"
+                                editTo="/profile"
+                                inference={recommendation.inference}
+                              />
                             </div>
                           </div>
                           <span className="shrink-0 text-sm font-bold text-[#5b3477]">
