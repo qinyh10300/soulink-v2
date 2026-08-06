@@ -28,6 +28,8 @@ SouLink V2 是一个仅面向清华大学的 AI 原生校内匹配平台。用�
 docker compose up -d --build
 ```
 
+重置、健康检查、运行指标和生产边界见 [本地部署与验收指南](docs/LOCAL_DEPLOYMENT.md)。
+
 服务启动后访问：
 
 | 服务 | 地址 |
@@ -44,6 +46,8 @@ docker compose up -d --build
 账号：demo@mails.tsinghua.edu.cn
 密码：Soulink2026!
 ```
+
+仅本地使用的 Hack 管理员账号为 `hack@mails.tsinghua.edu.cn`，密码为 `SoulinkHack2026!`。
 
 登录页可以一键填入演示账号。演示工作区包含完整资料、意图 Feed、项目 memo、候选推荐、待处理申请、已建立的匹配房间、会面计划和聊天记录。种子数据是幂等的，重复启动不会复制记录。
 

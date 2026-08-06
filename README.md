@@ -28,6 +28,8 @@ From the repository root:
 docker compose up -d --build
 ```
 
+See the [local deployment and acceptance guide](docs/LOCAL_DEPLOYMENT.md) for reset, health, observability, and production notes.
+
 Open the services:
 
 | Service | URL |
@@ -44,6 +46,8 @@ The local stack applies all migrations and creates an idempotent Tsinghua demo w
 Email: demo@mails.tsinghua.edu.cn
 Password: Soulink2026!
 ```
+
+The local-only Hack administrator is `hack@mails.tsinghua.edu.cn` with password `SoulinkHack2026!`.
 
 The login page can fill these credentials automatically. The workspace includes profiles, intent opportunities, a structured project memo, CTO candidates, a pending application, a mutual match room, a meeting plan, and messages.
 
