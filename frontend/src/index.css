@@ -21,25 +21,25 @@
     sans-serif;
   --font-serif:
     'Newsreader', 'Source Han Serif SC', 'Songti SC', 'Noto Serif SC', serif;
-  --shadow-soft: 0 20px 60px rgba(35, 33, 31, 0.08);
-  --shadow-card: 0 10px 28px rgba(35, 33, 31, 0.06);
+  --shadow-soft: 0 20px 60px rgba(9, 9, 11, 0.08);
+  --shadow-card: 0 10px 28px rgba(9, 9, 11, 0.06);
 }
 
 :root {
-  --background: #f7f6f3;
-  --foreground: #23211f;
+  --background: #ffffff;
+  --foreground: #09090b;
   --card: #ffffff;
-  --card-foreground: #23211f;
-  --muted: #efede9;
-  --muted-foreground: #706c65;
-  --border: #dfdcd6;
-  --primary: #5b3477;
+  --card-foreground: #09090b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+  --primary: #1447e6;
   --primary-foreground: #ffffff;
   --secondary: #ffffff;
-  --secondary-foreground: #302e2b;
-  --accent: #eee8f2;
-  --accent-foreground: #4d2d66;
-  --ring: rgba(91, 52, 119, 0.18);
+  --secondary-foreground: #18181b;
+  --accent: #eff4ff;
+  --accent-foreground: #103bc4;
+  --ring: rgba(20, 71, 230, 0.2);
 }
 
 @layer base {
@@ -80,5 +80,30 @@
 
   .text-balance {
     text-wrap: balance;
+  }
+
+  .soulink-marquee-track {
+    animation: soulink-marquee 28s linear infinite;
+    will-change: transform;
+  }
+
+  .soulink-marquee-track:hover {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes soulink-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-50% - 6px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soulink-marquee-track {
+    animation-play-state: paused;
   }
 }
