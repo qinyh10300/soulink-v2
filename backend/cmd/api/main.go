@@ -163,6 +163,7 @@ func main() {
 	safetyService := safety.NewService(dataStore, adminEmails)
 	analyticsService := analytics.NewService(dataStore, adminEmails)
 	connectionService.WithEventRecorder(analyticsService)
+	playgroundService.WithEventRecorder(analyticsService)
 	questionnaireService := questionnaire.NewService(
 		dataStore,
 		questionnaireCatalog,

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -24,6 +25,21 @@ type createPostRequest struct {
 type createCommentRequest struct {
 	Content         string `json:"content"`
 	ParentCommentID int64  `json:"parentCommentId"`
+}
+
+type createPlazaGroupInviteRequest struct {
+	InviteType     string `json:"inviteType"`
+	Title          string `json:"title"`
+	Summary        string `json:"summary"`
+	MinMembers     int    `json:"minMembers"`
+	MaxMembers     int    `json:"maxMembers"`
+	RevealStrategy string `json:"revealStrategy"`
+	Deadline       string `json:"deadline"`
+	GroupExpiresAt string `json:"groupExpiresAt"`
+}
+
+type respondPlazaGroupApplicationRequest struct {
+	Status string `json:"status"`
 }
 
 func NewHandler(service *Service) *Handler {
@@ -121,6 +137,167 @@ func (h *Handler) UnlikeComment(w http.ResponseWriter, r *http.Request) {
 	h.setCommentLike(w, r, false)
 }
 
+func (h *Handler) CreateGroupInvite(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	postID, err := parseRouteID(r, "postId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	var req createPlazaGroupInviteRequest
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	deadline, err := parseOptionalRFC3339(req.Deadline)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	groupExpiresAt, err := parseOptionalRFC3339(req.GroupExpiresAt)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	invite, err := h.service.CreatePlazaGroupInvite(r.Context(), user.ID, CreatePlazaGroupInviteInput{
+		PostID: postID, InviteType: req.InviteType,
+		Title: req.Title, Summary: req.Summary,
+		MinMembers: req.MinMembers, MaxMembers: req.MaxMembers,
+		RevealStrategy: req.RevealStrategy,
+		Deadline:       deadline, GroupExpiresAt: groupExpiresAt,
+	})
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.Respond(w, http.StatusCreated, "plaza group invite created", invite)
+}
+
+func (h *Handler) ListMyGroupInvites(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	invites, err := h.service.ListMyPlazaGroupInvites(r.Context(), user.ID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, invites)
+}
+
+func (h *Handler) GetGroupInvite(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	inviteID, err := parseRouteID(r, "inviteId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	invite, err := h.service.GetPlazaGroupInvite(r.Context(), user.ID, inviteID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, invite)
+}
+
+func (h *Handler) ApplyToGroupInvite(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	inviteID, err := parseRouteID(r, "inviteId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	invite, err := h.service.ApplyToPlazaGroup(r.Context(), user.ID, inviteID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.Respond(w, http.StatusCreated, "plaza group application created", invite)
+}
+
+func (h *Handler) RespondToGroupApplication(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	inviteID, err := parseRouteID(r, "inviteId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	applicationID, err := parseRouteID(r, "applicationId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	var req respondPlazaGroupApplicationRequest
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	invite, err := h.service.RespondToPlazaGroupApplication(
+		r.Context(), user.ID, inviteID, applicationID, req.Status,
+	)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, invite)
+}
+
+func (h *Handler) FormGroupInvite(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	inviteID, err := parseRouteID(r, "inviteId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	invite, err := h.service.FormPlazaGroup(r.Context(), user.ID, inviteID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, invite)
+}
+
+func (h *Handler) KeepGroupInvite(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+	inviteID, err := parseRouteID(r, "inviteId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	invite, err := h.service.KeepPlazaGroup(r.Context(), user.ID, inviteID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, invite)
+}
+
 func (h *Handler) setPostLike(w http.ResponseWriter, r *http.Request, liked bool) {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
@@ -169,4 +346,16 @@ func parseRouteID(r *http.Request, key string) (int64, error) {
 		return 0, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "invalid params")
 	}
 	return value, nil
+}
+
+func parseOptionalRFC3339(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, httpapi.NewError(http.StatusBadRequest, httpapi.CodeInvalidParams, "invalid time")
+	}
+	return parsed, nil
 }

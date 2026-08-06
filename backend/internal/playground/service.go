@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/store"
 )
@@ -31,7 +32,9 @@ var allowedTopics = map[string]struct{}{
 }
 
 type Service struct {
-	store *store.Store
+	store    *store.Store
+	recorder analytics.EventRecorder
+	nowFunc  func() time.Time
 }
 
 type CreatePostInput struct {
@@ -73,16 +76,17 @@ type CommentView struct {
 }
 
 type PostView struct {
-	ID           int64         `json:"id"`
-	Author       AuthorView    `json:"author"`
-	Topic        string        `json:"topic"`
-	Content      string        `json:"content"`
-	ImageURLs    []string      `json:"imageUrls"`
-	LikeCount    int           `json:"likeCount"`
-	CommentCount int           `json:"commentCount"`
-	LikedByMe    bool          `json:"likedByMe"`
-	CreatedAt    string        `json:"createdAt"`
-	Comments     []CommentView `json:"comments"`
+	ID           int64                    `json:"id"`
+	Author       AuthorView               `json:"author"`
+	Topic        string                   `json:"topic"`
+	Content      string                   `json:"content"`
+	ImageURLs    []string                 `json:"imageUrls"`
+	LikeCount    int                      `json:"likeCount"`
+	CommentCount int                      `json:"commentCount"`
+	LikedByMe    bool                     `json:"likedByMe"`
+	CreatedAt    string                   `json:"createdAt"`
+	Comments     []CommentView            `json:"comments"`
+	GroupInvite  *PlazaGroupInviteSummary `json:"groupInvite,omitempty"`
 }
 
 type LikeResult struct {
@@ -91,7 +95,12 @@ type LikeResult struct {
 }
 
 func NewService(dataStore *store.Store) *Service {
-	return &Service{store: dataStore}
+	return &Service{store: dataStore, nowFunc: time.Now}
+}
+
+func (s *Service) WithEventRecorder(recorder analytics.EventRecorder) *Service {
+	s.recorder = recorder
+	return s
 }
 
 func (s *Service) ListPosts(ctx context.Context, viewerID int64, input ListPostsInput) ([]PostView, error) {
@@ -115,6 +124,9 @@ func (s *Service) ListPosts(ctx context.Context, viewerID int64, input ListPosts
 	if sortMode != "latest" && sortMode != "hot" {
 		return nil, invalidParams()
 	}
+	if err := s.expirePlazaGroups(ctx); err != nil {
+		return nil, err
+	}
 
 	posts, err := s.store.ListPlaygroundPosts(ctx, nil, viewerID, store.PlaygroundPostFilter{
 		Topic: topic,
@@ -132,7 +144,19 @@ func (s *Service) ListPosts(ctx context.Context, viewerID int64, input ListPosts
 		if err != nil {
 			return nil, httpapi.InternalError(err)
 		}
-		views = append(views, toPostView(post, buildCommentTree(post.Author.UserID, comments, viewerID), viewerID))
+		view := toPostView(post, buildCommentTree(post.Author.UserID, comments, viewerID), viewerID)
+		invite, err := s.store.GetPlazaGroupInviteByPost(ctx, nil, post.ID)
+		if err == nil {
+			applications, listErr := s.store.ListPlazaGroupApplications(ctx, nil, invite.ID)
+			if listErr != nil {
+				return nil, httpapi.InternalError(listErr)
+			}
+			summary := plazaGroupInviteSummary(invite, applications, comments, viewerID)
+			view.GroupInvite = &summary
+		} else if err != store.ErrNotFound {
+			return nil, httpapi.InternalError(err)
+		}
+		views = append(views, view)
 	}
 	return views, nil
 }
@@ -144,6 +168,9 @@ func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePo
 
 	topic, content, imageURLs, err := normalizePostInput(input)
 	if err != nil {
+		return PostView{}, err
+	}
+	if err := validatePlazaContent(content); err != nil {
 		return PostView{}, err
 	}
 
@@ -227,6 +254,9 @@ func (s *Service) CreateComment(ctx context.Context, authorID int64, input Creat
 	content := strings.TrimSpace(input.Content)
 	if content == "" || utf8.RuneCountInString(content) > maxCommentContentLength {
 		return CommentView{}, invalidParams()
+	}
+	if err := validatePlazaContent(content); err != nil {
+		return CommentView{}, err
 	}
 
 	var comment store.PlaygroundComment
