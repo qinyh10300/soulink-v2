@@ -76,6 +76,9 @@ func ensureDemoProductFeatures(
 			result.PostsCreated++
 		}
 	}
+	if err := ensureDemoPlazaInvite(ctx, dataStore, users, demoPosts[0], now); err != nil {
+		return featureSeedResult{}, err
+	}
 
 	owner := users[DemoEmail]
 	if adminEmail != "" {
@@ -123,6 +126,39 @@ func ensureDemoProductFeatures(
 	}
 	result.EventsCreated = eventsCreated
 	return result, nil
+}
+
+func ensureDemoPlazaInvite(
+	ctx context.Context,
+	dataStore *store.Store,
+	users map[string]store.User,
+	postSeed demoPostSeed,
+	now time.Time,
+) error {
+	owner := users[postSeed.AuthorEmail]
+	postID, err := dataStore.FindPlaygroundPostID(ctx, nil, owner.ID, postSeed.Content)
+	if err != nil {
+		return fmt.Errorf("find demo plaza group post: %w", err)
+	}
+	if _, err := dataStore.GetPlazaGroupInviteByPost(ctx, nil, postID); err == nil {
+		return nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("find demo plaza group invite: %w", err)
+	}
+	_, err = dataStore.CreatePlazaGroupInvite(ctx, nil, store.CreatePlazaGroupInviteParams{
+		PostID: postID, OwnerID: owner.ID, InviteType: "event",
+		Title:         "大礼堂晚风散步小组",
+		Summary:       "从树洞讨论整理出的校内散步活动。先在匿名区确认时间，成组后再揭示身份并进入临时群。",
+		ExtractedTime: "今天 19:30", ExtractedLocation: "大礼堂西侧",
+		MinMembers: 3, MaxMembers: 5, RevealStrategy: "on_form",
+		Deadline: now.Add(7 * 24 * time.Hour), GroupExpiresAt: now.Add(14 * 24 * time.Hour),
+		InferenceSource: "deterministic", InferenceConfidence: 0.78,
+		PromptVersion: "plaza-group-draft-v1", Now: now,
+	})
+	if err != nil {
+		return fmt.Errorf("create demo plaza group invite: %w", err)
+	}
+	return nil
 }
 
 func ensureDemoPost(
