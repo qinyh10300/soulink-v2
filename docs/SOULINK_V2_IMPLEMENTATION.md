@@ -1,7 +1,7 @@
 # SouLink V2 Implementation
 
-Version: v0.1  
-Date: 2026-07-30  
+Version: v0.2
+Date: 2026-08-06
 Reference: [SouLink V2 Web Design Requirements](SOULINK_V2_WEB_DESIGN_REQUIREMENTS.md)
 
 ## Release Shape
@@ -31,13 +31,13 @@ The authenticated home page is the working product surface. It starts with â€œä»
 | Requirement | Implementation | Status |
 | --- | --- | --- |
 | Tsinghua-only registration | Registration accepts Tsinghua domains only; legacy school URLs redirect to the V2 landing page | Complete |
-| Profile and privacy | Skills, interests, availability, scenes, collaboration style, boundaries, AI portrait approval, romantic opt-in, matching pause, account controls | Complete |
+| Profile and privacy | Skills, interests, availability, scenes, collaboration style, boundaries, AI portrait approval, romantic opt-in, category controls, matching pause, account controls | Complete |
 | AI intent composer | Natural-language interpretation, inferred fields, confidence, safety notice, up to three clarifying questions, editable structured preview | Complete |
 | Intent visibility | Private search, recommended candidates only, or opportunity Feed | Complete |
-| Calm opportunity Feed | Finite intent cards with category filters, save, interest, privacy-safe author preview | Complete |
+| Calm opportunity Feed | Finite intent cards with category filters, saved view, persistent dismiss, interest, privacy-safe author preview | Complete |
 | Three recommendations | Ranked candidates with fit reason, uncertainty, shared context, and profile-aware signals | Complete |
 | Mutual interest | Express, withdraw, accept, and decline interest with explicit state transitions | Complete |
-| Match room | Fit explanation, icebreakers, campus places, meeting time, status, two-party contact controls | Complete |
+| Match room | Fit explanation, icebreakers, campus places, meeting time, met/closed lifecycle, two-party contact controls | Complete |
 | Messaging | Lightweight room messages after mutual consent | Complete |
 | Match feedback | Context-linked feedback form accessible from a match room | Complete |
 | Safety | Report intent or room, optionally block a user, close unsafe rooms, hide blocked users, delete account | Complete |
@@ -93,7 +93,7 @@ Migration `000016_v2_intent_matching.sql` adds:
 - `match_rooms`;
 - `match_room_messages`.
 
-Migration `000017_safety_moderation.sql` adds:
+Migration `000017_safety_reports.sql` adds:
 
 - `user_blocks`;
 - `safety_reports`.
@@ -106,6 +106,16 @@ Migration `000018_project_memos.sql` adds a validated JSON object to each intent
 - required and optional skills;
 - working style;
 - risk appetite.
+
+Migration `000019_intent_preferences.sql` adds:
+
+- persistent category visibility controls;
+- per-user intent dismissals used by Feed and recommendations.
+
+Migration `000020_safety_review_workflow.sql` adds:
+
+- report assignment and reviewer identity;
+- durable review notes and update timestamps.
 
 ## AI Boundary
 
@@ -124,12 +134,14 @@ This is the fallback contract future model providers must preserve. A model may 
 A clean local startup must satisfy:
 
 1. `docker compose up -d --build` reaches healthy status.
-2. Database migrations run through `000018`.
-3. The demo account can sign in from the browser.
-4. Demo data contains five users, eight intents, one mutual room, and two messages.
-5. The demo account sees four public opportunities, one owned CTO intent, and three recommendations.
-6. Repeated API startup creates no duplicate demo users, intents, or rooms.
-7. Web production build, ESLint, Go tests, and `go vet` pass.
+2. Database migrations run through `000020`.
+3. The demo and local Hack administrator accounts can sign in from the browser.
+4. A clean demo workspace contains seven users, ten intents, two mutual rooms, and three messages.
+5. Save, dismiss, category visibility, and global matching pause affect subsequent Feed and recommendation requests.
+6. A match room can move from open to met to closed; closed rooms reject messages and retract contact sharing.
+7. The Hack administrator can take a report, persist review notes, resolve or dismiss it, and filter the queue by status.
+8. Repeated API startup creates no duplicate demo users, intents, rooms, or administrator accounts.
+9. Web production build, ESLint, Go tests, and `go vet` pass.
 
 ## Deliberate Legacy Compatibility
 
