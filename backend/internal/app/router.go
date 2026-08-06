@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/auth"
 	"soulink-backend/internal/calendar"
 	"soulink-backend/internal/chat"
@@ -27,6 +28,8 @@ type Dependencies struct {
 	AllowedOrigins       []string
 	AuthMiddleware       func(http.Handler) http.Handler
 	MatchWriteGuard      func(http.Handler) http.Handler
+	EventRecorder        analytics.EventRecorder
+	AnalyticsHandler     *analytics.Handler
 	AuthHandler          *auth.Handler
 	CalendarHandler      *calendar.Handler
 	FeedbackHandler      *feedback.Handler
@@ -51,6 +54,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	matchWriteGuard := deps.MatchWriteGuard
 	if matchWriteGuard == nil {
 		matchWriteGuard = passthroughMiddleware
+	}
+	track := func(eventName string, subjectType string, subjectParam string) func(http.Handler) http.Handler {
+		return analytics.Track(deps.EventRecorder, deps.Logger, eventName, subjectType, subjectParam)
 	}
 
 	r := chi.NewRouter()
@@ -96,6 +102,9 @@ func NewRouter(deps Dependencies) http.Handler {
 
 		api.Group(func(r chi.Router) {
 			r.Use(authMiddleware)
+			if deps.AnalyticsHandler != nil {
+				r.Get("/admin/product-metrics", deps.AnalyticsHandler.Dashboard)
+			}
 
 			r.Post("/auth/logout", deps.AuthHandler.Logout)
 			r.Get("/auth/me", deps.AuthHandler.Me)
@@ -124,19 +133,22 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/feed", deps.ConnectionHandler.ListFeed)
 					r.Get("/saved", deps.ConnectionHandler.ListSaved)
 					r.Get("/mine", deps.ConnectionHandler.ListMine)
-					r.Post("/", deps.ConnectionHandler.CreateIntent)
+					r.With(track(analytics.EventIntentCreated, "", "")).Post("/", deps.ConnectionHandler.CreateIntent)
 					r.Get("/{intentId}", deps.ConnectionHandler.GetIntent)
 					r.Put("/{intentId}", deps.ConnectionHandler.UpdateIntent)
 					r.Delete("/{intentId}", deps.ConnectionHandler.ExpireIntent)
 					r.Post("/{intentId}/save", deps.ConnectionHandler.SaveIntent)
 					r.Delete("/{intentId}/save", deps.ConnectionHandler.UnsaveIntent)
 					r.Post("/{intentId}/dismiss", deps.ConnectionHandler.DismissIntent)
-					r.Post("/{intentId}/interest", deps.ConnectionHandler.ExpressInterest)
+					r.With(track(analytics.EventInterestExpressed, "intent", "intentId")).Post("/{intentId}/interest", deps.ConnectionHandler.ExpressInterest)
 					r.Delete("/{intentId}/interest", deps.ConnectionHandler.WithdrawInterest)
 					r.Get("/{intentId}/interests", deps.ConnectionHandler.ListInterests)
-					r.Post("/{intentId}/interests/{candidateId}/accept", deps.ConnectionHandler.AcceptInterest)
+					r.With(
+						track(analytics.EventInterestAccepted, "intent", "intentId"),
+						track(analytics.EventMatchCreated, "intent", "intentId"),
+					).Post("/{intentId}/interests/{candidateId}/accept", deps.ConnectionHandler.AcceptInterest)
 					r.Post("/{intentId}/interests/{candidateId}/decline", deps.ConnectionHandler.DeclineInterest)
-					r.Get("/{intentId}/recommendations", deps.ConnectionHandler.Recommendations)
+					r.With(track(analytics.EventRecommendationsViewed, "intent", "intentId")).Get("/{intentId}/recommendations", deps.ConnectionHandler.Recommendations)
 				})
 
 				r.Route("/match-rooms", func(r chi.Router) {
@@ -152,7 +164,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			if deps.SafetyHandler != nil {
 				r.Get("/safety/capabilities", deps.SafetyHandler.Capabilities)
-				r.Post("/safety/reports", deps.SafetyHandler.SubmitReport)
+				r.With(track(analytics.EventSafetyReportSubmitted, "", "")).Post("/safety/reports", deps.SafetyHandler.SubmitReport)
 				r.Get("/admin/safety-reports", deps.SafetyHandler.ListReports)
 				r.Put("/admin/safety-reports/{reportId}", deps.SafetyHandler.UpdateReport)
 			}

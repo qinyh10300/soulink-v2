@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/app"
 	"soulink-backend/internal/auth"
 	"soulink-backend/internal/calendar"
@@ -136,6 +137,7 @@ func main() {
 		adminEmails = append(adminEmails, cfg.Demo.AdminEmail)
 	}
 	safetyService := safety.NewService(dataStore, adminEmails)
+	analyticsService := analytics.NewService(dataStore, adminEmails)
 	questionnaireService := questionnaire.NewService(
 		dataStore,
 		questionnaireCatalog,
@@ -164,6 +166,8 @@ func main() {
 		AllowedOrigins:       cfg.AllowedOrigins,
 		AuthMiddleware:       auth.Middleware(dataStore, tokenManager),
 		MatchWriteGuard:      app.MatchWriteGuard(logger, gateService),
+		EventRecorder:        analyticsService,
+		AnalyticsHandler:     analytics.NewHandler(analyticsService),
 		AuthHandler:          auth.NewHandler(authService),
 		CalendarHandler:      calendar.NewHandler(calendarService),
 		FeedbackHandler:      feedback.NewHandler(feedbackService),
