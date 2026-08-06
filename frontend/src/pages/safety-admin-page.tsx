@@ -4,7 +4,9 @@ import {
   Clock3,
   LoaderCircle,
   RefreshCw,
+  Save,
   ShieldCheck,
+  UserCheck,
   UserRound,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -13,7 +15,7 @@ import { Link } from 'react-router-dom'
 import { getErrorMessage } from '@/lib/api'
 import {
   fetchSafetyReports,
-  updateSafetyReportStatus,
+  updateSafetyReport,
   type SafetyReport,
   type SafetyReportStatus,
 } from '@/lib/safety-api'
@@ -61,13 +63,20 @@ export function SafetyAdminPage() {
   const [reports, setReports] = useState<SafetyReport[]>([])
   const [loading, setLoading] = useState(true)
   const [updatingID, setUpdatingID] = useState<number | null>(null)
+  const [draftNotes, setDraftNotes] = useState<Record<number, string>>({})
   const [notice, setNotice] = useState('')
 
   const load = async (nextStatus = status) => {
     setLoading(true)
     setNotice('')
     try {
-      setReports(await fetchSafetyReports(nextStatus))
+      const nextReports = await fetchSafetyReports(nextStatus)
+      setReports(nextReports)
+      setDraftNotes(
+        Object.fromEntries(
+          nextReports.map((report) => [report.id, report.reviewNotes]),
+        ),
+      )
     } catch (error) {
       setNotice(getErrorMessage(error, '安全工单暂时无法加载'))
     } finally {
@@ -81,22 +90,32 @@ export function SafetyAdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
-  const updateStatus = async (
+  const persistReport = async (
     report: SafetyReport,
-    nextStatus: SafetyReportStatus,
+    input: { status?: SafetyReportStatus; assignToMe?: boolean } = {},
   ) => {
-    if (updatingID || nextStatus === report.status) {
+    if (updatingID) {
       return
     }
     setUpdatingID(report.id)
     setNotice('')
     try {
-      const updated = await updateSafetyReportStatus(report.id, nextStatus)
+      const updated = await updateSafetyReport(report.id, {
+        status: input.status ?? report.status,
+        reviewNotes: draftNotes[report.id] ?? report.reviewNotes,
+        assignToMe: input.assignToMe ?? false,
+      })
       setReports((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
+        status && updated.status !== status
+          ? current.filter((item) => item.id !== updated.id)
+          : current.map((item) => (item.id === updated.id ? updated : item)),
       )
+      setDraftNotes((current) => ({
+        ...current,
+        [updated.id]: updated.reviewNotes,
+      }))
     } catch (error) {
-      setNotice(getErrorMessage(error, '工单状态暂时无法更新'))
+      setNotice(getErrorMessage(error, '工单暂时无法更新'))
     } finally {
       setUpdatingID(null)
     }
@@ -213,18 +232,44 @@ export function SafetyAdminPage() {
                     </div>
                   </div>
 
-                  <label className="w-full shrink-0 text-[11px] font-medium text-[#77736c] lg:w-36">
-                    处理状态
-                    <span className="relative mt-2 block">
+                  <div className="w-full shrink-0 border-t border-[#eeebe7] pt-4 lg:w-80 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                    <div className="flex min-h-9 items-center justify-between gap-3">
+                      <span className="text-[11px] font-medium text-[#77736c]">
+                        负责人
+                      </span>
+                      {report.assignedTo ? (
+                        <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-[#4f4b46]">
+                          <UserCheck className="shrink-0 text-[#527164]" size={14} />
+                          <span className="truncate">
+                            {report.assignedToNickname || `管理员 #${report.assignedTo}`}
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d8d4cd] bg-white px-2.5 text-xs font-medium text-[#5b3477] hover:bg-[#f4f0f6] disabled:opacity-60"
+                          disabled={updatingID === report.id}
+                          onClick={() =>
+                            void persistReport(report, { assignToMe: true })
+                          }
+                          type="button"
+                        >
+                          <UserCheck size={14} />
+                          接手工单
+                        </button>
+                      )}
+                    </div>
+
+                    <label className="mt-3 block text-[11px] font-medium text-[#77736c]">
+                      处理状态
+                      <span className="relative mt-2 block">
                       <select
                         aria-label={`更新 ${report.ticketId} 的状态`}
                         className="h-9 w-full rounded-md border border-[#d8d4cd] bg-[#fbfaf8] px-2 text-xs text-[#4f4b46] outline-none focus:border-[#7a5a8e] disabled:opacity-60"
                         disabled={updatingID === report.id}
                         onChange={(event) =>
-                          void updateStatus(
-                            report,
-                            event.target.value as SafetyReportStatus,
-                          )
+                          void persistReport(report, {
+                            status: event.target.value as SafetyReportStatus,
+                          })
                         }
                         value={report.status}
                       >
@@ -245,8 +290,49 @@ export function SafetyAdminPage() {
                           size={14}
                         />
                       ) : null}
-                    </span>
-                  </label>
+                      </span>
+                    </label>
+
+                    <label className="mt-3 block text-[11px] font-medium text-[#77736c]">
+                      审核备注
+                      <textarea
+                        aria-label={`编辑 ${report.ticketId} 的审核备注`}
+                        className="mt-2 min-h-24 w-full resize-y rounded-md border border-[#d8d4cd] bg-[#fbfaf8] px-3 py-2 text-xs leading-5 text-[#4f4b46] outline-none focus:border-[#7a5a8e] disabled:opacity-60"
+                        disabled={updatingID === report.id}
+                        maxLength={2000}
+                        onChange={(event) =>
+                          setDraftNotes((current) => ({
+                            ...current,
+                            [report.id]: event.target.value,
+                          }))
+                        }
+                        placeholder="记录核查依据、处理动作和后续事项"
+                        value={draftNotes[report.id] ?? report.reviewNotes}
+                      />
+                    </label>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="text-[10px] text-[#918d86]">
+                        {(draftNotes[report.id] ?? report.reviewNotes).length}/2000
+                      </span>
+                      <button
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#5b3477] px-3 text-xs font-semibold text-white hover:bg-[#4c2b65] disabled:cursor-not-allowed disabled:opacity-45"
+                        disabled={
+                          updatingID === report.id ||
+                          (draftNotes[report.id] ?? report.reviewNotes) ===
+                            report.reviewNotes
+                        }
+                        onClick={() => void persistReport(report)}
+                        type="button"
+                      >
+                        {updatingID === report.id ? (
+                          <LoaderCircle className="animate-spin" size={14} />
+                        ) : (
+                          <Save size={14} />
+                        )}
+                        保存备注
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </article>
             ))}

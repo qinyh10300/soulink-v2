@@ -32,7 +32,11 @@ export interface SafetyReport {
   category: SafetyReportCategory
   details: string
   status: SafetyReportStatus
+  assignedTo?: number
+  assignedToNickname?: string
+  reviewNotes: string
   createdAt: string
+  updatedAt: string
   resolvedAt?: string
   resolvedBy?: number
 }
@@ -64,13 +68,17 @@ export function fetchSafetyReports(status: SafetyReportStatus | '') {
   })
 }
 
-export function updateSafetyReportStatus(
+export function updateSafetyReport(
   reportId: number,
-  status: SafetyReportStatus,
+  input: {
+    status: SafetyReportStatus
+    reviewNotes: string
+    assignToMe: boolean
+  },
 ) {
   return apiRequest<SafetyReport>(`/admin/safety-reports/${reportId}`, {
     method: 'PUT',
     auth: true,
-    body: { status },
+    body: input,
   })
 }

@@ -179,30 +179,41 @@ func (s *Service) ListReports(
 	return views, nil
 }
 
-func (s *Service) UpdateReportStatus(
+func (s *Service) UpdateReport(
 	ctx context.Context,
 	adminID int64,
 	adminEmail string,
 	reportID int64,
-	status string,
+	input ReportUpdateInput,
 ) (ReportView, error) {
 	if !s.isAdmin(adminEmail) {
 		return ReportView{}, forbidden("仅安全管理员可以处理举报")
 	}
-	status = strings.TrimSpace(strings.ToLower(status))
-	if _, ok := reportStatuses[status]; !ok {
+	input.Status = strings.TrimSpace(strings.ToLower(input.Status))
+	input.ReviewNotes = strings.TrimSpace(input.ReviewNotes)
+	if _, ok := reportStatuses[input.Status]; !ok {
 		return ReportView{}, invalidParams("未知的处理状态")
 	}
 	if reportID <= 0 {
 		return ReportView{}, invalidParams("无效的举报编号")
 	}
-	if err := s.store.UpdateSafetyReportStatus(
+	if utf8.RuneCountInString(input.ReviewNotes) > 2000 {
+		return ReportView{}, invalidParams("审核备注不能超过 2000 个字")
+	}
+	if s.store == nil {
+		return ReportView{}, httpapi.FeatureNotReady("safety")
+	}
+	if err := s.store.UpdateSafetyReport(
 		ctx,
 		nil,
-		reportID,
-		status,
-		adminID,
-		s.now(),
+		store.UpdateSafetyReportParams{
+			ReportID:    reportID,
+			Status:      input.Status,
+			ReviewNotes: input.ReviewNotes,
+			AssignToMe:  input.AssignToMe,
+			AdminID:     adminID,
+			Now:         s.now(),
+		},
 	); err != nil {
 		return ReportView{}, mapStoreError(err, "找不到这条举报")
 	}
@@ -242,7 +253,10 @@ func toReportView(record store.SafetyReport) ReportView {
 		Category:             record.Category,
 		Details:              record.Details,
 		Status:               record.Status,
+		AssignedToNickname:   record.AssignedToNickname,
+		ReviewNotes:          record.ReviewNotes,
 		CreatedAt:            record.CreatedAt,
+		UpdatedAt:            record.UpdatedAt,
 	}
 	if record.IntentID.Valid {
 		view.ContextType = ContextIntent
@@ -258,6 +272,10 @@ func toReportView(record store.SafetyReport) ReportView {
 	if record.ResolvedBy.Valid {
 		resolvedBy := record.ResolvedBy.Int64
 		view.ResolvedBy = &resolvedBy
+	}
+	if record.AssignedTo.Valid {
+		assignedTo := record.AssignedTo.Int64
+		view.AssignedTo = &assignedTo
 	}
 	return view
 }

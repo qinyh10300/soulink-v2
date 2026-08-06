@@ -15,6 +15,12 @@ type ReportInput struct {
 	BlockUser   bool
 }
 
+type ReportUpdateInput struct {
+	Status      string
+	ReviewNotes string
+	AssignToMe  bool
+}
+
 type ReportResult struct {
 	ID        int64     `json:"id"`
 	TicketID  string    `json:"ticketId"`
@@ -41,7 +47,11 @@ type ReportView struct {
 	Category             string     `json:"category"`
 	Details              string     `json:"details"`
 	Status               string     `json:"status"`
+	AssignedTo           *int64     `json:"assignedTo,omitempty"`
+	AssignedToNickname   string     `json:"assignedToNickname,omitempty"`
+	ReviewNotes          string     `json:"reviewNotes"`
 	CreatedAt            time.Time  `json:"createdAt"`
+	UpdatedAt            time.Time  `json:"updatedAt"`
 	ResolvedAt           *time.Time `json:"resolvedAt,omitempty"`
 	ResolvedBy           *int64     `json:"resolvedBy,omitempty"`
 }

@@ -21,7 +21,11 @@ type SafetyReport struct {
 	Category             string
 	Details              string
 	Status               string
+	AssignedTo           sql.NullInt64
+	AssignedToNickname   string
+	ReviewNotes          string
 	CreatedAt            time.Time
+	UpdatedAt            time.Time
 	ResolvedAt           sql.NullTime
 	ResolvedBy           sql.NullInt64
 }
@@ -36,6 +40,15 @@ type CreateSafetyReportParams struct {
 	Now            time.Time
 }
 
+type UpdateSafetyReportParams struct {
+	ReportID    int64
+	Status      string
+	ReviewNotes string
+	AssignToMe  bool
+	AdminID     int64
+	Now         time.Time
+}
+
 func (s *Store) CreateSafetyReport(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -44,8 +57,8 @@ func (s *Store) CreateSafetyReport(
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		INSERT INTO safety_reports (
 			reporter_id, reported_user_id, intent_id, room_id,
-			category, details, status, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, 'open', $7)
+				category, details, status, created_at, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, $7)
 		RETURNING id
 	`, params.ReporterID, params.ReportedUserID, nullableSQLInt64(params.IntentID),
 		nullableSQLInt64(params.RoomID), params.Category, params.Details, params.Now)
@@ -104,29 +117,33 @@ func (s *Store) ListSafetyReports(
 	return reports, nil
 }
 
-func (s *Store) UpdateSafetyReportStatus(
+func (s *Store) UpdateSafetyReport(
 	ctx context.Context,
 	tx *sql.Tx,
-	reportID int64,
-	status string,
-	resolvedBy int64,
-	now time.Time,
+	params UpdateSafetyReportParams,
 ) error {
 	result, err := executor(s.db, tx).ExecContext(ctx, `
 		UPDATE safety_reports
 		SET status = $2::varchar,
-		    resolved_at = CASE
-				WHEN $2::varchar IN ('resolved', 'dismissed') THEN $4::timestamptz
-				ELSE NULL::timestamptz
+		    review_notes = $3::text,
+		    assigned_to = CASE
+				WHEN $4::boolean THEN $5::bigint
+				WHEN assigned_to IS NULL AND $2::varchar <> 'open' THEN $5::bigint
+				ELSE assigned_to
 			END,
+		    resolved_at = CASE
+					WHEN $2::varchar IN ('resolved', 'dismissed') THEN $6::timestamptz
+					ELSE NULL::timestamptz
+				END,
 		    resolved_by = CASE
-				WHEN $2::varchar IN ('resolved', 'dismissed') THEN $3::bigint
-				ELSE NULL::bigint
-			END
+					WHEN $2::varchar IN ('resolved', 'dismissed') THEN $5::bigint
+					ELSE NULL::bigint
+				END,
+		    updated_at = $6::timestamptz
 		WHERE id = $1
-	`, reportID, status, resolvedBy, now)
+	`, params.ReportID, params.Status, params.ReviewNotes, params.AssignToMe, params.AdminID, params.Now)
 	if err != nil {
-		return fmt.Errorf("update safety report status: %w", err)
+		return fmt.Errorf("update safety report: %w", err)
 	}
 	return requireRowsAffected(result)
 }
@@ -204,13 +221,16 @@ const safetyReportSelect = `
 	       r.reported_user_id, reported.nickname, reported.email,
 	       r.intent_id, r.room_id,
 	       COALESCE(i.title, room_intent.title, ''),
-	       r.category, r.details, r.status, r.created_at, r.resolved_at, r.resolved_by
+		       r.category, r.details, r.status,
+		       r.assigned_to, COALESCE(assignee.nickname, ''), r.review_notes,
+		       r.created_at, r.updated_at, r.resolved_at, r.resolved_by
 	FROM safety_reports r
 	JOIN users reporter ON reporter.id = r.reporter_id
 	JOIN users reported ON reported.id = r.reported_user_id
 	LEFT JOIN connection_intents i ON i.id = r.intent_id
 	LEFT JOIN match_rooms room ON room.id = r.room_id
 	LEFT JOIN connection_intents room_intent ON room_intent.id = room.intent_id
+	LEFT JOIN users assignee ON assignee.id = r.assigned_to
 `
 
 func scanSafetyReport(row rowScanner) (SafetyReport, error) {
@@ -229,7 +249,11 @@ func scanSafetyReport(row rowScanner) (SafetyReport, error) {
 		&report.Category,
 		&report.Details,
 		&report.Status,
+		&report.AssignedTo,
+		&report.AssignedToNickname,
+		&report.ReviewNotes,
 		&report.CreatedAt,
+		&report.UpdatedAt,
 		&report.ResolvedAt,
 		&report.ResolvedBy,
 	); err != nil {

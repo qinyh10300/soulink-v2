@@ -23,7 +23,9 @@ type submitReportRequest struct {
 }
 
 type updateReportRequest struct {
-	Status string `json:"status"`
+	Status      string `json:"status"`
+	ReviewNotes string `json:"reviewNotes"`
+	AssignToMe  bool   `json:"assignToMe"`
 }
 
 func NewHandler(service *Service) *Handler {
@@ -94,12 +96,16 @@ func (h *Handler) UpdateReport(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, err)
 		return
 	}
-	report, err := h.service.UpdateReportStatus(
+	report, err := h.service.UpdateReport(
 		r.Context(),
 		user.ID,
 		user.Email,
 		reportID,
-		req.Status,
+		ReportUpdateInput{
+			Status:      req.Status,
+			ReviewNotes: req.ReviewNotes,
+			AssignToMe:  req.AssignToMe,
+		},
 	)
 	if err != nil {
 		httpapi.Error(w, err)
