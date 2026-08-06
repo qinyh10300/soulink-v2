@@ -54,9 +54,9 @@ SouLink V2.2 不继续堆叠孤立页面，而是把“找人、匹配、开聊�
 ### M0：计划与工程基线
 
 - [x] 将产品优化方向整理为本地 Markdown 开发文档。
-- [ ] 建立关键业务事件与北极星指标的数据字典。
-- [ ] 为新增能力确定迁移编号、API 命名、隐私边界和测试基线。
-- [ ] 保留并验证无外部模型密钥时的完整本地运行能力。
+- [x] 建立关键业务事件与北极星指标的数据字典。
+- [x] 为新增能力确定迁移编号、API 命名、隐私边界和测试基线。
+- [x] 保留并验证无外部模型密钥时的完整本地运行能力。
 
 ### M1：指标与运营质量看板
 
@@ -185,4 +185,60 @@ SouLink V2.2 不继续堆叠孤立页面，而是把“找人、匹配、开聊�
 
 | 日期 | 里程碑 | 结果 | Commit |
 | --- | --- | --- | --- |
-| 2026-08-07 | M0 开发计划 | 已创建任务、验收、隐私和完成定义 | 待提交 |
+| 2026-08-07 | M0 开发计划 | 已创建任务、验收、隐私和完成定义 | `8d1afb3` |
+| 2026-08-07 | M0 工程基线 | 测试、事件字典、迁移与 API 约定完成 | 待提交 |
+
+## 9. 产品事件数据字典
+
+事件只由通过鉴权和业务校验后的服务端动作写入。浏览、展示类事件可以由对应 GET API 成功响应记录，客户端不能自行提交任意事件名。
+
+| 事件名 | 触发时机 | 主体 | 北极星用途 |
+| --- | --- | --- | --- |
+| `intent_created` | 意图创建成功 | `intent` | 意图漏斗起点 |
+| `intent_published` | 意图首次进入 active | `intent` | 有效供给 |
+| `recommendations_viewed` | 推荐成功返回 | `intent` | 推荐到达率 |
+| `interest_expressed` | 用户表达兴趣 | `intent` | 兴趣转化 |
+| `interest_accepted` | 意图所有者接受申请 | `intent` | 双向同意 |
+| `match_created` | 接受申请并建立匹配房间 | `match_room` | 匹配转化 |
+| `meetup_proposed` | 创建约见提议 | `meetup` | 线下漏斗 |
+| `meetup_confirmed` | 参与者全部接受 | `meetup` | 北极星前置指标 |
+| `meetup_completed` | 约见标记为完成 | `meetup` | 北极星主指标 |
+| `meetup_no_show` | 约见反馈包含爽约 | `meetup` | 质量指标 |
+| `meeting_feedback_submitted` | 提交私密见后反馈 | `meetup` | 推荐学习覆盖率 |
+| `plaza_group_created` | 树洞转为临时群 | `plaza_post` | 内容到连接转化 |
+| `group_match_created` | AI 组队成立 | `group_match` | 群组匹配转化 |
+| `safety_report_submitted` | 举报成功 | `safety_report` | 安全率 |
+| `user_blocked` | 用户执行拉黑 | `user` | 安全率 |
+
+公共属性只允许低敏感结构化值，例如 `category`、`source`、`memberCount`、`status` 和算法版本。禁止写入消息正文、意图正文、邮箱、联系方式、日历标题、精确位置、举报详情和模型完整提示词。
+
+## 10. 工程约定
+
+### 10.1 迁移编号
+
+- `000024_product_analytics.sql`：产品事件与聚合索引。
+- `000025_meetup_workflow.sql`：可约时间、约见状态机与反馈。
+- `000026_ai_preferences.sql`：推荐反馈、AI 记忆与每日精选。
+- `000027_group_matching.sql`：群组意图、候选组与成员确认。
+- `000028_plaza_groups.sql`：树洞临时活动与群组关联。
+- `000029_trust_and_notifications.sql`：信任审核、提醒与安全分享。
+
+如一个里程碑需要拆分迁移，使用后续连续编号，不修改已经应用的迁移文件。
+
+### 10.2 API 命名
+
+- 用户资源：`/api/v1/users/me/...`。
+- 约见资源：`/api/v1/meetups` 与 `/api/v1/meetups/{meetupId}/...`。
+- AI 建议：挂在实际上下文下的 `/assistant/...`，只返回草稿。
+- 管理员聚合：`/api/v1/admin/product-metrics`。
+- 列表新增能力默认使用 `limit` 与 `cursor`，不暴露数据库偏移细节。
+
+### 10.3 测试基线
+
+2026-08-07 已验证：
+
+- `go test ./...` 通过。
+- `go vet ./...` 通过。
+- `npm run build` 通过。
+- `npm run lint -- --quiet` 通过，0 error。
+- 无 `SOULAGENT_API_KEY` 或其他模型密钥时，确定性意图解释和推荐流程可运行。
