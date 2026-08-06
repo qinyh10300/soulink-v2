@@ -1,20 +1,24 @@
-import { CalendarClock, Sparkles, Users } from 'lucide-react'
+import { CalendarClock, Flag, Sparkles, Users } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { ChatInput } from '@/components/chat/chat-input'
 import { ChatAssistantPanel } from '@/components/chat/chat-assistant-panel'
 import { MessageBubble } from '@/components/chat/message-bubble'
+import { MessageRiskReviewDialog } from '@/components/chat/message-risk-review-dialog'
 import { TimeSeparator } from '@/components/chat/time-separator'
 import { MeetupWorkflowDialog } from '@/components/meetup/meetup-context-panel'
 import { useChat } from '@/contexts/chat-context'
 import {
   fetchGroupMessages,
   fetchMessages,
+  checkMessageSafety,
   markConversationRead,
   markGroupRead,
   sendConversationMessage,
   sendGroupMessage,
   type AssistantActionCard,
+  type MessageSafetyAssessment,
 } from '@/lib/chat-api'
 import { getAuthSession } from '@/lib/user-profile-storage'
 import { cn } from '@/lib/utils'
@@ -45,7 +49,7 @@ interface Props {
 }
 
 export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
-  const { ws, lastMessage, lastGroupMessage, refreshUnread } = useChat()
+  const { lastMessage, lastGroupMessage, refreshUnread } = useChat()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -55,6 +59,11 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
   const [composerDraft, setComposerDraft] = useState('')
   const [composerRevision, setComposerRevision] = useState(0)
   const [meetupDraftTitle, setMeetupDraftTitle] = useState('')
+  const [riskReview, setRiskReview] = useState<{
+    content: string
+    assessment: MessageSafetyAssessment
+  } | null>(null)
+  const [riskSending, setRiskSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
@@ -160,23 +169,35 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
     return () => container.removeEventListener('scroll', onScroll)
   }, [handleLoadMore])
 
-  const handleSend = async (content: string) => {
-    if (!currentUserId || !thread.canSend) return
+  const sendCheckedMessage = async (content: string, riskAcknowledged: boolean) => {
+    if (!currentUserId || !thread.canSend) return false
     setSendNotice('')
-    if (ws?.isConnected) {
-      if (thread.kind === 'group') ws.sendGroupMessage(thread.id, content)
-      else ws.sendMessage(thread.id, content)
-      return
-    }
     try {
       const message = thread.kind === 'group'
-        ? await sendGroupMessage(thread.id, content)
-        : await sendConversationMessage(thread.id, content)
-      setMessages((current) => [...current, message])
+        ? await sendGroupMessage(thread.id, content, riskAcknowledged)
+        : await sendConversationMessage(thread.id, content, riskAcknowledged)
+      setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message])
       onRead?.()
+      return true
     } catch {
       setSendNotice('消息发送失败，请稍后重试')
+      return false
     }
+  }
+
+  const handleSend = async (content: string) => {
+    if (!currentUserId || !thread.canSend) return false
+    try {
+      const assessment = await checkMessageSafety(thread.kind, thread.id, content)
+      if (assessment.level !== 'clear') {
+        setRiskReview({ content, assessment })
+        return false
+      }
+    } catch {
+      setSendNotice('消息安全检查失败，请稍后重试')
+      return false
+    }
+    return sendCheckedMessage(content, false)
   }
 
   return (
@@ -207,6 +228,16 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
         >
           <CalendarClock className="h-5 w-5" />
         </button>
+        {thread.kind === 'direct' ? (
+          <Link
+            aria-label="举报当前会话"
+            className="inline-flex h-9 w-9 items-center justify-center rounded text-[#626761] hover:bg-[#f1e6e8] hover:text-[#8d465d]"
+            title="举报当前会话"
+            to={`/feedback?category=report&contextType=direct&contextId=${thread.id}&subject=${encodeURIComponent(thread.title)}`}
+          >
+            <Flag className="h-4.5 w-4.5" />
+          </Link>
+        ) : null}
         {thread.kind === 'group' ? (
           <button
             aria-label="群聊信息"
@@ -253,7 +284,7 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
         disabled={!thread.canSend}
         initialText={composerDraft}
         key={`${thread.kind}:${thread.id}:${composerRevision}`}
-        onSend={(content) => void handleSend(content)}
+        onSend={handleSend}
       />
       {meetupsOpen ? (
         <MeetupWorkflowDialog
@@ -284,6 +315,25 @@ export function ChatWindow({ thread, onOpenGroupInfo, onRead }: Props) {
             setComposerRevision((current) => current + 1)
             setAssistantOpen(false)
           }}
+        />
+      ) : null}
+      {riskReview ? (
+        <MessageRiskReviewDialog
+          assessment={riskReview.assessment}
+          content={riskReview.content}
+          onCancel={() => setRiskReview(null)}
+          onConfirm={() => {
+            void (async () => {
+              setRiskSending(true)
+              const sent = await sendCheckedMessage(riskReview.content, true)
+              setRiskSending(false)
+              if (!sent) return
+              setRiskReview(null)
+              setComposerDraft('')
+              setComposerRevision((current) => current + 1)
+            })()
+          }}
+          sending={riskSending}
         />
       ) : null}
     </div>

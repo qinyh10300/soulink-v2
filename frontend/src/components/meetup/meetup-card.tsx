@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   RefreshCw,
   RotateCcw,
+  ShieldCheck,
   UserRoundCheck,
   UserRoundX,
   X,
@@ -17,6 +18,7 @@ import {
 import { useState } from 'react'
 
 import { getErrorMessage } from '@/lib/api'
+import { MeetupSafetyShareDialog } from '@/components/meetup/meetup-safety-share-dialog'
 import {
   cancelMeetup,
   completeMeetup,
@@ -63,6 +65,7 @@ export function MeetupCard({ meetup, onReschedule, onUpdated, compact = false }:
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [notice, setNotice] = useState('')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [safetyShareOpen, setSafetyShareOpen] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackInput>({
     attendance: meetup.status === 'no_show' ? 'no_show' : 'attended',
     rating: null,
@@ -441,6 +444,16 @@ export function MeetupCard({ meetup, onReschedule, onUpdated, compact = false }:
               私密反馈
             </button>
           ) : null}
+          {meetup.status === 'confirmed' && meetup.myStatus === 'accepted' ? (
+            <button
+              className="inline-flex h-8 items-center gap-1.5 rounded px-2 text-xs text-[#37624f] hover:bg-[#edf5f0]"
+              onClick={() => setSafetyShareOpen(true)}
+              type="button"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              安全分享
+            </button>
+          ) : null}
           {meetup.canCancel ? (
             <button
               className="ml-auto h-8 rounded px-2 text-xs text-[#7b7067] hover:bg-[#f2efeb]"
@@ -452,6 +465,9 @@ export function MeetupCard({ meetup, onReschedule, onUpdated, compact = false }:
           ) : null}
         </div>
       )}
+      {safetyShareOpen ? (
+        <MeetupSafetyShareDialog meetup={meetup} onClose={() => setSafetyShareOpen(false)} />
+      ) : null}
     </article>
   )
 }

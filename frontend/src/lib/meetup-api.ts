@@ -126,6 +126,30 @@ export interface FeedbackInput {
   privateNotes: string
 }
 
+export interface TrustedContact {
+  id: number
+  label: string
+  contactType: 'email' | 'phone' | 'wechat' | 'other'
+  contactValue: string
+  updatedAt: string
+}
+
+export interface MeetupSafetyShare {
+  id: number
+  trustedContact: TrustedContact
+  summary: {
+    meetupId: number
+    startsAt: string
+    endsAt: string
+    location: string
+    participantCount: number
+    status: string
+  }
+  deliveryStatus: 'sent' | 'recorded' | 'failed'
+  manualText?: string
+  createdAt: string
+}
+
 export function fetchAvailability() {
   return apiRequest<AvailabilityWindow[]>('/users/me/availability', { auth: true })
 }
@@ -233,5 +257,36 @@ export function revokeMeetupFeedback(meetupId: number) {
   return apiRequest<Meetup>(`/meetups/${meetupId}/feedback`, {
     method: 'DELETE',
     auth: true,
+  })
+}
+
+export function fetchTrustedContacts() {
+  return apiRequest<TrustedContact[]>('/users/me/trusted-contacts', { auth: true })
+}
+
+export function createTrustedContact(input: {
+  label: string
+  contactType: TrustedContact['contactType']
+  contactValue: string
+}) {
+  return apiRequest<TrustedContact>('/users/me/trusted-contacts', {
+    method: 'POST',
+    auth: true,
+    body: input,
+  })
+}
+
+export function deleteTrustedContact(contactId: number) {
+  return apiRequest<null>(`/users/me/trusted-contacts/${contactId}`, {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
+export function shareMeetupSafetySummary(meetupId: number, trustedContactId: number) {
+  return apiRequest<MeetupSafetyShare>(`/meetups/${meetupId}/safety-share`, {
+    method: 'POST',
+    auth: true,
+    body: { trustedContactId },
   })
 }

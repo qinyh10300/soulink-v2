@@ -28,6 +28,17 @@ export interface MessagesResult {
   hasMore: boolean
 }
 
+export interface MessageSafetyAssessment {
+  level: 'clear' | 'caution' | 'high'
+  categories: Array<'spam' | 'contact_inducement' | 'harassment' | 'threat' | 'privacy' | 'coercion'>
+  reasons: string[]
+  requiresConfirmation: boolean
+  inferenceSource: 'model' | 'deterministic'
+  inferenceModel?: string
+  confidence: number
+  promptVersion: string
+}
+
 export interface GroupMemberItem {
   userId: number
   nickname: string
@@ -162,11 +173,15 @@ export function markConversationRead(conversationId: number) {
   })
 }
 
-export function sendConversationMessage(conversationId: number, content: string) {
+export function sendConversationMessage(
+  conversationId: number,
+  content: string,
+  riskAcknowledged = false,
+) {
   return apiRequest<MessageItem>(`/conversations/${conversationId}/messages`, {
     method: 'POST',
     auth: true,
-    body: { content, contentType: 'text' },
+    body: { content, contentType: 'text', riskAcknowledged },
   })
 }
 
@@ -222,11 +237,26 @@ export function fetchGroupMessages(
   })
 }
 
-export function sendGroupMessage(groupId: number, content: string) {
+export function sendGroupMessage(groupId: number, content: string, riskAcknowledged = false) {
   return apiRequest<GroupMessageItem>(`/chat-groups/${groupId}/messages`, {
     method: 'POST',
     auth: true,
-    body: { content, contentType: 'text' },
+    body: { content, contentType: 'text', riskAcknowledged },
+  })
+}
+
+export function checkMessageSafety(
+  kind: 'direct' | 'group',
+  contextId: number,
+  content: string,
+) {
+  const path = kind === 'group'
+    ? `/chat-groups/${contextId}/safety-check`
+    : `/conversations/${contextId}/safety-check`
+  return apiRequest<MessageSafetyAssessment>(path, {
+    method: 'POST',
+    auth: true,
+    body: { content },
   })
 }
 
