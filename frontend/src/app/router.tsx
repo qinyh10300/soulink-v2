@@ -15,6 +15,10 @@ const ConnectionProfilePage = lazy(async () => {
   const module = await import('@/pages/connection-profile-page')
   return { default: module.ConnectionProfilePage }
 })
+const ChatPage = lazy(async () => {
+  const module = await import('@/pages/chat-page')
+  return { default: module.ChatPage }
+})
 const FeedbackPage = lazy(async () => {
   const module = await import('@/pages/feedback-page')
   return { default: module.FeedbackPage }
@@ -167,11 +171,19 @@ export const router = createBrowserRouter([
           },
           {
             path: '/chat',
-            element: <Navigate replace to="/matches" />,
+            element: withSuspense(<ChatPage />),
           },
           {
             path: '/chat/:conversationId',
-            element: <Navigate replace to="/matches" />,
+            element: withSuspense(<ChatPage />),
+          },
+          {
+            path: '/chat/direct/:conversationId',
+            element: withSuspense(<ChatPage />),
+          },
+          {
+            path: '/chat/group/:groupId',
+            element: withSuspense(<ChatPage />),
           },
           {
             path: '/friends',

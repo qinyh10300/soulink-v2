@@ -112,10 +112,38 @@ func (c *Client) handleIncoming(ctx context.Context, env WSEnvelope) {
 	switch env.Type {
 	case "message":
 		c.handleSendMessage(ctx, env.Data)
+	case "group_message":
+		c.handleSendGroupMessage(ctx, env.Data)
 	case "read":
 		c.handleMarkRead(ctx, env.Data)
+	case "group_read":
+		c.handleMarkGroupRead(ctx, env.Data)
 	default:
 		c.logger.Warn("ws unknown message type", "type", env.Type, "userId", c.userID)
+	}
+}
+
+func (c *Client) handleSendGroupMessage(ctx context.Context, data json.RawMessage) {
+	var payload struct {
+		GroupID     int64  `json:"groupId"`
+		Content     string `json:"content"`
+		ContentType string `json:"contentType"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		c.logger.Warn("ws invalid group message payload", "userId", c.userID, "error", err)
+		return
+	}
+
+	message, memberIDs, err := c.service.SendGroupMessage(ctx, c.userID, payload.GroupID, payload.Content, payload.ContentType)
+	if err != nil {
+		c.logger.Warn("ws send group message failed", "userId", c.userID, "error", err)
+		return
+	}
+
+	messageData, _ := json.Marshal(ToGroupMessageView(message))
+	envelope := WSEnvelope{Type: "group_message", Data: messageData}
+	for _, memberID := range memberIDs {
+		c.hub.SendToUser(memberID, envelope)
 	}
 }
 
@@ -178,4 +206,23 @@ func (c *Client) handleMarkRead(ctx context.Context, data json.RawMessage) {
 		}
 		c.hub.SendToUser(peerID, outEnv)
 	}
+}
+
+func (c *Client) handleMarkGroupRead(ctx context.Context, data json.RawMessage) {
+	var payload struct {
+		GroupID int64 `json:"groupId"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return
+	}
+	if err := c.service.MarkGroupRead(ctx, c.userID, payload.GroupID); err != nil {
+		return
+	}
+
+	readData, _ := json.Marshal(map[string]any{
+		"groupId": payload.GroupID,
+		"userId":  c.userID,
+		"readAt":  time.Now().Format(time.RFC3339),
+	})
+	c.Send(WSEnvelope{Type: "group_read", Data: readData})
 }

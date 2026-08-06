@@ -167,7 +167,11 @@ func (s *Service) GetUnreadCount(ctx context.Context, userID int64) (int, error)
 	if err != nil {
 		return 0, httpapi.InternalError(err)
 	}
-	return count, nil
+	groupCount, err := s.store.GetChatGroupUnreadCount(ctx, nil, userID)
+	if err != nil {
+		return 0, httpapi.InternalError(err)
+	}
+	return count + groupCount, nil
 }
 
 func toMessageView(m store.Message) MessageView {

@@ -174,9 +174,23 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Delete("/friends/{friendshipId}", deps.FriendHandler.RemoveFriend)
 
 			r.Get("/conversations", deps.ChatHandler.ListConversations)
+			r.Post("/conversations", deps.ChatHandler.CreateConversation)
 			r.Get("/conversations/{conversationId}/messages", deps.ChatHandler.ListMessages)
+			r.Post("/conversations/{conversationId}/messages", deps.ChatHandler.CreateMessage)
 			r.Post("/conversations/{conversationId}/read", deps.ChatHandler.MarkRead)
 			r.Get("/conversations/unread-count", deps.ChatHandler.GetUnreadCount)
+
+			r.Route("/chat-groups", func(r chi.Router) {
+				r.Get("/", deps.ChatHandler.ListGroups)
+				r.Post("/", deps.ChatHandler.CreateGroup)
+				r.Get("/{groupId}", deps.ChatHandler.GetGroup)
+				r.Put("/{groupId}", deps.ChatHandler.UpdateGroup)
+				r.Post("/{groupId}/members", deps.ChatHandler.AddGroupMembers)
+				r.Delete("/{groupId}/members/{userId}", deps.ChatHandler.RemoveGroupMember)
+				r.Get("/{groupId}/messages", deps.ChatHandler.ListGroupMessages)
+				r.Post("/{groupId}/messages", deps.ChatHandler.CreateGroupMessage)
+				r.Post("/{groupId}/read", deps.ChatHandler.MarkGroupRead)
+			})
 
 			if deps.PlaygroundHandler != nil {
 				r.Get("/playground/posts", deps.PlaygroundHandler.ListPosts)

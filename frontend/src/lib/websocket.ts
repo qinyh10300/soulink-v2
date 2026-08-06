@@ -82,8 +82,19 @@ export class SoulinkWebSocket {
     })
   }
 
+  sendGroupMessage(groupId: number, content: string) {
+    this.send({
+      type: 'group_message',
+      data: { groupId, content, contentType: 'text' },
+    })
+  }
+
   sendRead(conversationId: number) {
     this.send({ type: 'read', data: { conversationId } })
+  }
+
+  sendGroupRead(groupId: number) {
+    this.send({ type: 'group_read', data: { groupId } })
   }
 
   onEvent(handler: WSEventHandler) {

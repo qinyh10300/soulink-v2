@@ -7,7 +7,11 @@ import {
   type ReactNode,
 } from 'react'
 
-import { fetchUnreadCount, type MessageItem } from '@/lib/chat-api'
+import {
+  fetchUnreadCount,
+  type GroupMessageItem,
+  type MessageItem,
+} from '@/lib/chat-api'
 import { fetchReceivedRequests } from '@/lib/friend-api'
 import { SoulinkWebSocket, type WSEnvelope } from '@/lib/websocket'
 
@@ -18,6 +22,7 @@ interface ChatContextValue {
   refreshUnread: () => void
   refreshPendingRequests: () => void
   lastMessage: MessageItem | null
+  lastGroupMessage: GroupMessageItem | null
   conversationVersion: number
 }
 
@@ -28,6 +33,7 @@ const ChatContext = createContext<ChatContextValue>({
   refreshUnread: () => {},
   refreshPendingRequests: () => {},
   lastMessage: null,
+  lastGroupMessage: null,
   conversationVersion: 0,
 })
 
@@ -36,6 +42,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [totalUnread, setTotalUnread] = useState(0)
   const [pendingRequests, setPendingRequests] = useState(0)
   const [lastMessage, setLastMessage] = useState<MessageItem | null>(null)
+  const [lastGroupMessage, setLastGroupMessage] = useState<GroupMessageItem | null>(null)
   const [conversationVersion, setConversationVersion] = useState(0)
 
   const refreshUnread = useCallback(() => {
@@ -63,13 +70,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setLastMessage(msg)
         refreshUnread()
       }
+      if (env.type === 'group_message') {
+        const message = env.data as GroupMessageItem
+        setLastGroupMessage(message)
+        refreshUnread()
+      }
       if (env.type === 'read') {
         refreshUnread()
       }
       if (env.type === 'friend_request' || env.type === 'friend_accepted') {
         refreshPendingRequests()
       }
-      if (env.type === 'conversation_updated') {
+      if (env.type === 'conversation_updated' || env.type === 'group_updated') {
         setConversationVersion((current) => current + 1)
       }
     })
@@ -90,6 +102,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         refreshUnread,
         refreshPendingRequests,
         lastMessage,
+        lastGroupMessage,
         conversationVersion,
       }}
     >

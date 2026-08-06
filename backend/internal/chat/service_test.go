@@ -77,3 +77,19 @@ func TestServiceSendMessageRejectsDisabledConversationForPeer(t *testing.T) {
 		t.Fatalf("sql expectations: %v", err)
 	}
 }
+
+func TestNormalizeMemberIDsDeduplicatesAndExcludesOwner(t *testing.T) {
+	members, err := normalizeMemberIDs(1, []int64{3, 2, 3, 1})
+	if err != nil {
+		t.Fatalf("normalizeMemberIDs() error: %v", err)
+	}
+	if len(members) != 2 || members[0] != 2 || members[1] != 3 {
+		t.Fatalf("normalizeMemberIDs() = %v, want [2 3]", members)
+	}
+}
+
+func TestNormalizeGroupNameRejectsBlankName(t *testing.T) {
+	if _, err := normalizeGroupName("  "); err == nil {
+		t.Fatal("normalizeGroupName() expected error")
+	}
+}
