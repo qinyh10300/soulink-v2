@@ -166,7 +166,7 @@ func demoAdminUser(email string) userSeed {
 		Email:              email,
 		Nickname:           "Hack 管理员",
 		Department:         "SouLink 运营",
-		Grade:              "本地演示账号",
+		Grade:              "不方便透露",
 		ContactValue:       "soulink_hack_admin",
 		Bio:                "用于本地验收、内容安全审核和完整产品流程测试的 SouLink 管理员账号。",
 		Skills:             []string{"产品运营", "内容安全", "用户研究"},
@@ -628,6 +628,20 @@ func ensureUser(
 	}
 	if err := dataStore.UpdateUserPassword(ctx, nil, user.ID, passwordHash, now); err != nil {
 		return store.User{}, false, fmt.Errorf("refresh demo password %s: %w", seed.Email, err)
+	}
+	if user.Grade == "本地演示账号" {
+		user, err = dataStore.UpdateUserProfile(ctx, nil, store.UpdateProfileParams{
+			UserID:       user.ID,
+			Nickname:     user.Nickname,
+			Department:   user.Department,
+			Grade:        seed.Grade,
+			ContactType:  user.ContactType,
+			ContactValue: user.ContactValue,
+			Now:          now,
+		})
+		if err != nil {
+			return store.User{}, false, fmt.Errorf("repair demo grade %s: %w", seed.Email, err)
+		}
 	}
 	if user.ContactValue == "" {
 		user, err = dataStore.UpdateUserProfile(ctx, nil, store.UpdateProfileParams{

@@ -57,6 +57,8 @@ export function ProfilePage() {
   })
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null)
   const [removeAvatar, setRemoveAvatar] = useState(false)
+  const [privacySaving, setPrivacySaving] = useState(false)
+  const [privacyNotice, setPrivacyNotice] = useState('设置尚未同步')
 
   useEffect(() => {
     let cancelled = false
@@ -91,6 +93,7 @@ export function ProfilePage() {
 
         setProfile(nextProfile)
         setPrivacy(profileData.privacy)
+        setPrivacyNotice('隐私设置已同步')
         saveUserProfile(nextProfile)
         setNotice('您可以随时更新公开给匹配对象的信息。')
       } catch (error) {
@@ -179,7 +182,6 @@ export function ProfilePage() {
         contactValue: profile.contactValue.trim(),
       })
 
-      const updatedPrivacy = await updateMyProfilePrivacy(privacy)
       let avatar = profile.avatar
       if (pendingAvatar) {
         const uploaded = await uploadMyAvatar(pendingAvatar)
@@ -201,11 +203,24 @@ export function ProfilePage() {
       }
 
       setProfile(nextProfile)
-      setPrivacy(updatedPrivacy)
       saveUserProfile(nextProfile)
       window.location.reload()
     } catch (error) {
       setNotice(getErrorMessage(error, '保存失败，请稍后重试'))
+    }
+  }
+
+  const handlePrivacySave = async () => {
+    try {
+      setPrivacySaving(true)
+      setPrivacyNotice('正在保存...')
+      const updated = await updateMyProfilePrivacy(privacy)
+      setPrivacy(updated)
+      setPrivacyNotice('隐私设置已保存')
+    } catch (error) {
+      setPrivacyNotice(getErrorMessage(error, '隐私设置保存失败'))
+    } finally {
+      setPrivacySaving(false)
     }
   }
 
@@ -248,7 +263,16 @@ export function ProfilePage() {
             profile={profile}
           />
 
-          <ProfilePrivacyPanel onChange={setPrivacy} value={privacy} />
+          <ProfilePrivacyPanel
+            notice={privacyNotice}
+            onChange={(next) => {
+              setPrivacy(next)
+              setPrivacyNotice('有未保存的更改')
+            }}
+            onSave={() => void handlePrivacySave()}
+            saving={privacySaving}
+            value={privacy}
+          />
 
           <TrustVerificationPanel />
 

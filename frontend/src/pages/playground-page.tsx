@@ -688,7 +688,7 @@ export function PlaygroundPage() {
                             className={cn(
                               'block overflow-hidden rounded-md border border-[#deddd9] bg-[#eceeeb] text-left',
                               post.imageUrls.length === 1
-                                ? 'max-h-[34rem] max-w-2xl'
+                                ? 'w-fit max-w-full'
                                 : 'aspect-square',
                             )}
                             key={imageUrl}
@@ -698,8 +698,10 @@ export function PlaygroundPage() {
                             <AuthenticatedImage
                               alt="树洞配图"
                               className={cn(
-                                'w-full object-cover',
-                                post.imageUrls.length === 1 ? 'max-h-[34rem]' : 'h-full',
+                                'object-cover',
+                                post.imageUrls.length === 1
+                                  ? 'max-h-[34rem] min-h-32 min-w-32 w-auto max-w-full object-contain'
+                                  : 'h-full w-full',
                               )}
                               loading="lazy"
                               src={imageUrl}

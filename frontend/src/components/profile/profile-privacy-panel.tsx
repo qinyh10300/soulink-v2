@@ -1,11 +1,14 @@
-import { CalendarDays, Eye, Sparkles } from 'lucide-react'
+import { CalendarDays, Eye, Save, Sparkles } from 'lucide-react'
 
 import type { ProfilePrivacy } from '@/lib/profile-api'
 import { cn } from '@/lib/utils'
 
 interface ProfilePrivacyPanelProps {
   value: ProfilePrivacy
+  notice: string
+  saving: boolean
   onChange: (value: ProfilePrivacy) => void
+  onSave: () => void
 }
 
 interface PrivacySwitchProps {
@@ -40,7 +43,13 @@ function PrivacySwitch({ checked, disabled, label, onChange }: PrivacySwitchProp
   )
 }
 
-export function ProfilePrivacyPanel({ value, onChange }: ProfilePrivacyPanelProps) {
+export function ProfilePrivacyPanel({
+  value,
+  notice,
+  saving,
+  onChange,
+  onSave,
+}: ProfilePrivacyPanelProps) {
   const rows = [
     {
       key: 'profilePublic' as const,
@@ -99,6 +108,18 @@ export function ProfilePrivacyPanel({ value, onChange }: ProfilePrivacyPanelProp
             />
           </div>
         ))}
+      </div>
+      <div className="flex items-center justify-between gap-4 border-t border-[#e8e3dd] bg-[#faf9f7] px-6 py-4">
+        <p className="text-xs text-[#79736d]">{notice}</p>
+        <button
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-[#315f50] px-4 text-sm font-semibold text-white hover:bg-[#284f43] disabled:cursor-wait disabled:opacity-60"
+          disabled={saving}
+          onClick={onSave}
+          type="button"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? '保存中' : '保存隐私设置'}
+        </button>
       </div>
     </section>
   )
