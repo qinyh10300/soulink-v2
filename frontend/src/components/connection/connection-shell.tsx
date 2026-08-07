@@ -11,6 +11,7 @@ import {
   PanelLeftClose,
   Plus,
   RotateCcw,
+  Share2,
   ShieldCheck,
   Sparkles,
   UserRound,
@@ -29,6 +30,8 @@ import {
 import logoUrl from "@/assets/soulink-logo-icon.png";
 import { ConnectionJourneyNav } from "@/components/connection/connection-journey-nav";
 import { NotificationCenter } from "@/components/engagement/notification-center";
+import { AuthenticatedImage } from "@/components/media/authenticated-image";
+import { ProfileShareDrawer } from "@/components/profile/profile-share-drawer";
 import { OnboardingDialog } from "@/components/engagement/onboarding-dialog";
 import { PWAUpdateBanner } from "@/components/engagement/pwa-update-banner";
 import { logout } from "@/lib/auth-api";
@@ -45,6 +48,7 @@ import { usePersistentPanelLayout } from "@/hooks/use-persistent-panel-layout";
 import {
   clearAuthSession,
   clearUserProfile,
+  getAuthSession,
   getStoredUserProfile,
 } from "@/lib/user-profile-storage";
 import { WorkspaceEdgeButton } from "@/components/workspace/workspace-edge-button";
@@ -74,6 +78,13 @@ const navItems: NavItem[] = [
     match: (pathname) => pathname === "/plaza",
   },
   {
+    label: "时间表",
+    mobileLabel: "时间",
+    to: "/calendar",
+    icon: CalendarDays,
+    match: (pathname) => pathname === "/calendar",
+  },
+  {
     label: "消息",
     mobileLabel: "消息",
     to: "/chat",
@@ -87,8 +98,7 @@ const navItems: NavItem[] = [
     icon: UserRound,
     match: (pathname) =>
       pathname === "/profile" ||
-      pathname === "/account" ||
-      pathname === "/calendar",
+      pathname === "/account",
   },
 ];
 
@@ -113,9 +123,11 @@ export function ConnectionShell() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [shareDrawerOpen, setShareDrawerOpen] = useState(false);
   const [recentIntents, setRecentIntents] = useState<ConnectionIntent[]>([]);
   const { totalUnread } = useChat();
   const profile = useMemo(() => getStoredUserProfile(), []);
+  const session = useMemo(() => getAuthSession(), []);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const navigationPanelRef = usePanelRef();
   const navigationLayout = usePersistentPanelLayout(
@@ -328,9 +340,17 @@ export function ConnectionShell() {
 
                 <div className="mt-auto border-t border-[#e4e1dc] pt-4">
                   <div className="flex items-center gap-2.5 px-2">
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#e9f1ed] text-sm font-semibold text-[#27614f]">
-                      {(profile.nickname || "同学").slice(0, 1)}
-                    </span>
+                    {profile.avatar ? (
+                      <AuthenticatedImage
+                        alt={profile.nickname || "清华同学"}
+                        className="h-8 w-8 shrink-0 rounded-md bg-[#e9f1ed] object-cover"
+                        src={profile.avatar}
+                      />
+                    ) : (
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#e9f1ed] text-sm font-semibold text-[#27614f]">
+                        {(profile.nickname || "同学").slice(0, 1)}
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-[#302e2b]">
                         {profile.nickname || "清华同学"}
@@ -340,6 +360,15 @@ export function ConnectionShell() {
                         身份已验证
                       </span>
                     </span>
+                    <button
+                      aria-label="分享我的名片"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#817d76] transition-colors hover:bg-[#e7efeb] hover:text-[#315c4d]"
+                      onClick={() => setShareDrawerOpen(true)}
+                      title="分享我的名片"
+                      type="button"
+                    >
+                      <Share2 size={15} />
+                    </button>
                     <button
                       aria-label="退出登录"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#817d76] transition-colors hover:bg-[#eeeae5] hover:text-[#8b3f3f]"
@@ -405,14 +434,17 @@ export function ConnectionShell() {
                 type="button"
               />
               <div className="fixed inset-x-0 top-15 z-30 border-b border-[#dfdcd6] bg-[#fbfaf8] p-3 shadow-[0_12px_32px_rgba(35,33,31,0.08)] lg:hidden">
-              <Link
-                className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
-                onClick={() => setMobileMenuOpen(false)}
-                to="/calendar"
+              <button
+                className="flex h-11 w-full items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setShareDrawerOpen(true);
+                }}
+                type="button"
               >
-                <CalendarDays size={17} />
-                时间表
-              </Link>
+                <Share2 size={17} />
+                分享我的名片
+              </button>
               <Link
                 className="flex h-11 items-center gap-3 rounded-md px-3 text-sm text-[#5f5b55] hover:bg-[#efede9]"
                 onClick={() => setMobileMenuOpen(false)}
@@ -465,7 +497,7 @@ export function ConnectionShell() {
 
           <nav
             aria-label="移动端导航"
-            className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem_+_env(safe-area-inset-bottom))] grid-cols-4 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem_+_env(safe-area-inset-bottom))] grid-cols-5 border-t border-[#dedbd5] bg-[rgba(251,250,248,0.96)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
           >
             {navItems.map((item) => {
                 const Icon = item.icon;
@@ -494,6 +526,11 @@ export function ConnectionShell() {
           </nav>
         </Panel>
       </Group>
+      <ProfileShareDrawer
+        onClose={() => setShareDrawerOpen(false)}
+        open={shareDrawerOpen}
+        userId={session?.userId ?? 0}
+      />
     </div>
   );
 }
