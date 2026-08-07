@@ -132,12 +132,12 @@ export function ProfileFormCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-[#8b7a6f]">{notice}</p>
           <button
             className={cn(
               buttonVariants({ size: 'lg' }),
-              'rounded-full bg-[#8f6548] px-8 text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40]',
+              'w-full shrink-0 whitespace-nowrap rounded-full bg-[#8f6548] px-8 text-white shadow-[0_14px_32px_rgba(105,73,51,0.18)] hover:bg-[#7f5a40] sm:w-auto',
             )}
             onClick={onSubmit}
             type="button"
