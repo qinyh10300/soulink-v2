@@ -17,6 +17,7 @@ import (
 	"soulink-backend/internal/friend"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/match"
+	"soulink-backend/internal/media"
 	"soulink-backend/internal/meetup"
 	"soulink-backend/internal/meta"
 	"soulink-backend/internal/playground"
@@ -41,6 +42,7 @@ type Dependencies struct {
 	MetaHandler          *meta.Handler
 	QuestionnaireHandler *questionnaire.Handler
 	MatchHandler         *match.Handler
+	MediaHandler         *media.Handler
 	MeetupHandler        *meetup.Handler
 	FriendHandler        *friend.Handler
 	ChatHandler          *chat.Handler
@@ -108,6 +110,12 @@ func NewRouter(deps Dependencies) http.Handler {
 
 		api.Group(func(r chi.Router) {
 			r.Use(authMiddleware)
+			if deps.MediaHandler != nil {
+				r.Get("/media/{assetKey}", deps.MediaHandler.Get)
+				r.Post("/playground/media", deps.MediaHandler.UploadPlaza)
+				r.Post("/users/me/avatar", deps.MediaHandler.UploadAvatar)
+				r.Delete("/users/me/avatar", deps.MediaHandler.DeleteAvatar)
+			}
 			if deps.OperationsHandler != nil {
 				r.Get("/admin/operational-metrics", deps.OperationsHandler)
 			}
@@ -315,6 +323,8 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Post("/playground/posts", deps.PlaygroundHandler.CreatePost)
 				r.Post("/playground/posts/{postId}/likes", deps.PlaygroundHandler.LikePost)
 				r.Delete("/playground/posts/{postId}/likes", deps.PlaygroundHandler.UnlikePost)
+				r.Post("/playground/posts/{postId}/favorites", deps.PlaygroundHandler.FavoritePost)
+				r.Delete("/playground/posts/{postId}/favorites", deps.PlaygroundHandler.UnfavoritePost)
 				r.Post("/playground/posts/{postId}/comments", deps.PlaygroundHandler.CreateComment)
 				r.Post("/playground/posts/{postId}/group-invite", deps.PlaygroundHandler.CreateGroupInvite)
 				r.Post("/playground/comments/{commentId}/likes", deps.PlaygroundHandler.LikeComment)

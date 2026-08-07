@@ -128,6 +128,14 @@ func (h *Handler) UnlikePost(w http.ResponseWriter, r *http.Request) {
 	h.setPostLike(w, r, false)
 }
 
+func (h *Handler) FavoritePost(w http.ResponseWriter, r *http.Request) {
+	h.setPostFavorite(w, r, true)
+}
+
+func (h *Handler) UnfavoritePost(w http.ResponseWriter, r *http.Request) {
+	h.setPostFavorite(w, r, false)
+}
+
 func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
@@ -342,6 +350,27 @@ func (h *Handler) setPostLike(w http.ResponseWriter, r *http.Request, liked bool
 	}
 
 	result, err := h.service.SetPostLike(r.Context(), user.ID, postID, liked)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, result)
+}
+
+func (h *Handler) setPostFavorite(w http.ResponseWriter, r *http.Request, favorited bool) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "unauthorized"))
+		return
+	}
+
+	postID, err := parseRouteID(r, "postId")
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+
+	result, err := h.service.SetPostFavorite(r.Context(), user.ID, postID, favorited)
 	if err != nil {
 		httpapi.Error(w, err)
 		return

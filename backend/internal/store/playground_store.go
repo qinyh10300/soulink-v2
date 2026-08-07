@@ -17,16 +17,18 @@ type PlaygroundAuthor struct {
 }
 
 type PlaygroundPost struct {
-	ID           int64
-	Author       PlaygroundAuthor
-	Topic        string
-	Content      string
-	ImageURLs    []string
-	LikeCount    int
-	CommentCount int
-	LikedByMe    bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            int64
+	Author        PlaygroundAuthor
+	Topic         string
+	Content       string
+	ImageURLs     []string
+	LikeCount     int
+	FavoriteCount int
+	CommentCount  int
+	LikedByMe     bool
+	FavoritedByMe bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type PlaygroundComment struct {
@@ -113,11 +115,15 @@ func (s *Store) GetPlaygroundPost(ctx context.Context, tx *sql.Tx, viewerID, pos
 	row := executor(s.db, tx).QueryRowContext(ctx, `
 		SELECT p.id,
 		       u.id, u.nickname, u.email, u.department, u.grade,
-		       p.topic, p.content, p.image_urls::text, p.like_count, p.comment_count,
+		       p.topic, p.content, p.image_urls::text, p.like_count, p.favorite_count, p.comment_count,
 		       EXISTS(
 		         SELECT 1 FROM playground_post_likes l
 		         WHERE l.post_id = p.id AND l.user_id = $1
 		       ) AS liked_by_me,
+		       EXISTS(
+		         SELECT 1 FROM playground_post_favorites f
+		         WHERE f.post_id = p.id AND f.user_id = $1
+		       ) AS favorited_by_me,
 		       p.created_at, p.updated_at
 		FROM playground_posts p
 		JOIN users u ON u.id = p.author_id
@@ -143,11 +149,15 @@ func (s *Store) ListPlaygroundPosts(ctx context.Context, tx *sql.Tx, viewerID in
 	query := `
 		SELECT p.id,
 		       u.id, u.nickname, u.email, u.department, u.grade,
-		       p.topic, p.content, p.image_urls::text, p.like_count, p.comment_count,
+		       p.topic, p.content, p.image_urls::text, p.like_count, p.favorite_count, p.comment_count,
 		       EXISTS(
 		         SELECT 1 FROM playground_post_likes l
 		         WHERE l.post_id = p.id AND l.user_id = $1
 		       ) AS liked_by_me,
+		       EXISTS(
+		         SELECT 1 FROM playground_post_favorites f
+		         WHERE f.post_id = p.id AND f.user_id = $1
+		       ) AS favorited_by_me,
 		       p.created_at, p.updated_at
 		FROM playground_posts p
 		JOIN users u ON u.id = p.author_id
@@ -245,6 +255,49 @@ func (s *Store) AddPlaygroundPostLikeCount(ctx context.Context, tx *sql.Tx, post
 	`, postID, delta)
 	if err != nil {
 		return fmt.Errorf("update playground post like count: %w", err)
+	}
+	return requireRowsAffected(result)
+}
+
+func (s *Store) CreatePlaygroundPostFavorite(ctx context.Context, tx *sql.Tx, postID, userID int64, now time.Time) (bool, error) {
+	result, err := executor(s.db, tx).ExecContext(ctx, `
+		INSERT INTO playground_post_favorites (post_id, user_id, created_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (post_id, user_id) DO NOTHING
+	`, postID, userID, now)
+	if err != nil {
+		return false, fmt.Errorf("create playground post favorite: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("playground post favorite rows affected: %w", err)
+	}
+	return rows > 0, nil
+}
+
+func (s *Store) DeletePlaygroundPostFavorite(ctx context.Context, tx *sql.Tx, postID, userID int64) (bool, error) {
+	result, err := executor(s.db, tx).ExecContext(ctx, `
+		DELETE FROM playground_post_favorites
+		WHERE post_id = $1 AND user_id = $2
+	`, postID, userID)
+	if err != nil {
+		return false, fmt.Errorf("delete playground post favorite: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("playground post unfavorite rows affected: %w", err)
+	}
+	return rows > 0, nil
+}
+
+func (s *Store) AddPlaygroundPostFavoriteCount(ctx context.Context, tx *sql.Tx, postID int64, delta int) error {
+	result, err := executor(s.db, tx).ExecContext(ctx, `
+		UPDATE playground_posts
+		SET favorite_count = GREATEST(0, favorite_count + $2)
+		WHERE id = $1 AND deleted_at IS NULL
+	`, postID, delta)
+	if err != nil {
+		return fmt.Errorf("update playground post favorite count: %w", err)
 	}
 	return requireRowsAffected(result)
 }
@@ -415,8 +468,10 @@ func scanPlaygroundPost(row *sql.Row) (PlaygroundPost, error) {
 		&post.Content,
 		&rawImageURLs,
 		&post.LikeCount,
+		&post.FavoriteCount,
 		&post.CommentCount,
 		&post.LikedByMe,
+		&post.FavoritedByMe,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	)
@@ -446,8 +501,10 @@ func scanPlaygroundPostRows(rows *sql.Rows) (PlaygroundPost, error) {
 		&post.Content,
 		&rawImageURLs,
 		&post.LikeCount,
+		&post.FavoriteCount,
 		&post.CommentCount,
 		&post.LikedByMe,
+		&post.FavoritedByMe,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	); err != nil {

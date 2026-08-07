@@ -14,6 +14,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
 	"soulink-backend/internal/analytics"
 	"soulink-backend/internal/httpapi"
 	"soulink-backend/internal/store"
@@ -85,17 +87,19 @@ type CommentView struct {
 }
 
 type PostView struct {
-	ID           int64                    `json:"id"`
-	Author       AuthorView               `json:"author"`
-	Topic        string                   `json:"topic"`
-	Content      string                   `json:"content"`
-	ImageURLs    []string                 `json:"imageUrls"`
-	LikeCount    int                      `json:"likeCount"`
-	CommentCount int                      `json:"commentCount"`
-	LikedByMe    bool                     `json:"likedByMe"`
-	CreatedAt    string                   `json:"createdAt"`
-	Comments     []CommentView            `json:"comments"`
-	GroupInvite  *PlazaGroupInviteSummary `json:"groupInvite,omitempty"`
+	ID            int64                    `json:"id"`
+	Author        AuthorView               `json:"author"`
+	Topic         string                   `json:"topic"`
+	Content       string                   `json:"content"`
+	ImageURLs     []string                 `json:"imageUrls"`
+	LikeCount     int                      `json:"likeCount"`
+	FavoriteCount int                      `json:"favoriteCount"`
+	CommentCount  int                      `json:"commentCount"`
+	LikedByMe     bool                     `json:"likedByMe"`
+	FavoritedByMe bool                     `json:"favoritedByMe"`
+	CreatedAt     string                   `json:"createdAt"`
+	Comments      []CommentView            `json:"comments"`
+	GroupInvite   *PlazaGroupInviteSummary `json:"groupInvite,omitempty"`
 }
 
 type PostPage struct {
@@ -114,6 +118,11 @@ type encodedPostCursor struct {
 type LikeResult struct {
 	Liked     bool `json:"liked"`
 	LikeCount int  `json:"likeCount"`
+}
+
+type FavoriteResult struct {
+	Favorited     bool `json:"favorited"`
+	FavoriteCount int  `json:"favoriteCount"`
 }
 
 func NewService(dataStore *store.Store) *Service {
@@ -282,15 +291,29 @@ func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePo
 
 	var post store.PlaygroundPost
 	err = s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		now := time.Now()
 		postID, err := s.store.CreatePlaygroundPost(ctx, tx, store.CreatePlaygroundPostParams{
 			AuthorID:  authorID,
 			Topic:     topic,
 			Content:   content,
 			ImageURLs: imageURLs,
-			Now:       time.Now(),
+			Now:       now,
 		})
 		if err != nil {
 			return httpapi.InternalError(err)
+		}
+		for index, imageURL := range imageURLs {
+			assetKey, internal := internalMediaKey(imageURL)
+			if !internal {
+				continue
+			}
+			asset, err := s.store.GetMediaAssetByKey(ctx, tx, assetKey)
+			if err != nil || asset.OwnerID != authorID || asset.Kind != "plaza" {
+				return invalidParams()
+			}
+			if err := s.store.AttachPlaygroundMedia(ctx, tx, postID, asset.ID, index, now); err != nil {
+				return invalidParams()
+			}
 		}
 
 		created, err := s.store.GetPlaygroundPost(ctx, tx, authorID, postID)
@@ -305,6 +328,45 @@ func (s *Service) CreatePost(ctx context.Context, authorID int64, input CreatePo
 	}
 
 	return toPostView(post, nil, authorID), nil
+}
+
+func (s *Service) SetPostFavorite(ctx context.Context, userID, postID int64, favorited bool) (FavoriteResult, error) {
+	if err := s.ensureReady(); err != nil {
+		return FavoriteResult{}, err
+	}
+
+	var post store.PlaygroundPost
+	err := s.store.WithTx(ctx, func(tx *sql.Tx) error {
+		if _, err := s.store.GetPlaygroundPost(ctx, tx, userID, postID); err != nil {
+			return mapPlaygroundStoreError(err)
+		}
+		var changed bool
+		var err error
+		if favorited {
+			changed, err = s.store.CreatePlaygroundPostFavorite(ctx, tx, postID, userID, time.Now())
+			if err == nil && changed {
+				err = s.store.AddPlaygroundPostFavoriteCount(ctx, tx, postID, 1)
+			}
+		} else {
+			changed, err = s.store.DeletePlaygroundPostFavorite(ctx, tx, postID, userID)
+			if err == nil && changed {
+				err = s.store.AddPlaygroundPostFavoriteCount(ctx, tx, postID, -1)
+			}
+		}
+		if err != nil {
+			return httpapi.InternalError(err)
+		}
+		updated, err := s.store.GetPlaygroundPost(ctx, tx, userID, postID)
+		if err != nil {
+			return mapPlaygroundStoreError(err)
+		}
+		post = updated
+		return nil
+	})
+	if err != nil {
+		return FavoriteResult{}, err
+	}
+	return FavoriteResult{Favorited: post.FavoritedByMe, FavoriteCount: post.FavoriteCount}, nil
 }
 
 func (s *Service) SetPostLike(ctx context.Context, userID, postID int64, liked bool) (LikeResult, error) {
@@ -499,9 +561,11 @@ func normalizePostInput(input CreatePostInput) (string, string, []string, error)
 		if utf8.RuneCountInString(imageURL) > maxImageURLLength {
 			return "", "", nil, invalidParams()
 		}
-		parsed, err := url.ParseRequestURI(imageURL)
-		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-			return "", "", nil, invalidParams()
+		if _, internal := internalMediaKey(imageURL); !internal {
+			parsed, err := url.ParseRequestURI(imageURL)
+			if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+				return "", "", nil, invalidParams()
+			}
 		}
 		if _, ok := seen[imageURL]; ok {
 			continue
@@ -518,6 +582,20 @@ func normalizePostInput(input CreatePostInput) (string, string, []string, error)
 	}
 
 	return topic, content, imageURLs, nil
+}
+
+func internalMediaKey(value string) (string, bool) {
+	if !strings.HasPrefix(value, "/media/") {
+		return "", false
+	}
+	key := strings.TrimPrefix(value, "/media/")
+	if strings.Contains(key, "/") {
+		return "", false
+	}
+	if _, err := uuid.Parse(key); err != nil {
+		return "", false
+	}
+	return key, true
 }
 
 type anonymousContext struct {
@@ -591,16 +669,18 @@ func toPostView(post store.PlaygroundPost, comments []CommentView, viewerID int6
 		post.ImageURLs = []string{}
 	}
 	return PostView{
-		ID:           post.ID,
-		Author:       AuthorView{Label: "洞主", IsMe: post.Author.UserID == viewerID, IsOwner: true},
-		Topic:        post.Topic,
-		Content:      post.Content,
-		ImageURLs:    post.ImageURLs,
-		LikeCount:    post.LikeCount,
-		CommentCount: post.CommentCount,
-		LikedByMe:    post.LikedByMe,
-		CreatedAt:    post.CreatedAt.Format(time.RFC3339),
-		Comments:     comments,
+		ID:            post.ID,
+		Author:        AuthorView{Label: "洞主", IsMe: post.Author.UserID == viewerID, IsOwner: true},
+		Topic:         post.Topic,
+		Content:       post.Content,
+		ImageURLs:     post.ImageURLs,
+		LikeCount:     post.LikeCount,
+		FavoriteCount: post.FavoriteCount,
+		CommentCount:  post.CommentCount,
+		LikedByMe:     post.LikedByMe,
+		FavoritedByMe: post.FavoritedByMe,
+		CreatedAt:     post.CreatedAt.Format(time.RFC3339),
+		Comments:      comments,
 	}
 }
 

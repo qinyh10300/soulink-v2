@@ -36,8 +36,10 @@ export interface PlaygroundPost {
   content: string
   imageUrls: string[]
   likeCount: number
+  favoriteCount: number
   commentCount: number
   likedByMe: boolean
+  favoritedByMe: boolean
   createdAt: string
   comments: PlaygroundComment[]
   groupInvite?: PlazaGroupInviteSummary
@@ -119,6 +121,21 @@ export interface PlaygroundLikeResult {
   likeCount: number
 }
 
+export interface PlaygroundFavoriteResult {
+  favorited: boolean
+  favoriteCount: number
+}
+
+export interface UploadedMediaAsset {
+  key: string
+  url: string
+  mimeType: string
+  byteSize: number
+  width: number
+  height: number
+  isAnimated: boolean
+}
+
 export function fetchPlaygroundPosts(options: {
   topic?: PlaygroundTopic
   sort?: PlaygroundSort
@@ -148,6 +165,16 @@ export function createPlaygroundPost(input: {
   })
 }
 
+export function uploadPlaygroundMedia(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiRequest<UploadedMediaAsset>('/playground/media', {
+    method: 'POST',
+    auth: true,
+    body: form,
+  })
+}
+
 export function likePlaygroundPost(postId: number) {
   return apiRequest<PlaygroundLikeResult>(`/playground/posts/${postId}/likes`, {
     method: 'POST',
@@ -157,6 +184,20 @@ export function likePlaygroundPost(postId: number) {
 
 export function unlikePlaygroundPost(postId: number) {
   return apiRequest<PlaygroundLikeResult>(`/playground/posts/${postId}/likes`, {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
+export function favoritePlaygroundPost(postId: number) {
+  return apiRequest<PlaygroundFavoriteResult>(`/playground/posts/${postId}/favorites`, {
+    method: 'POST',
+    auth: true,
+  })
+}
+
+export function unfavoritePlaygroundPost(postId: number) {
+  return apiRequest<PlaygroundFavoriteResult>(`/playground/posts/${postId}/favorites`, {
     method: 'DELETE',
     auth: true,
   })

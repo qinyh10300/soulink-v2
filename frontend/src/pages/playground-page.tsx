@@ -1,4 +1,5 @@
 import {
+  Bookmark,
   CalendarPlus,
   ChevronDown,
   Heart,
@@ -9,10 +10,12 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
+import { AuthenticatedImage } from '@/components/media/authenticated-image'
 import { Button } from '@/components/ui/button'
 import {
   CreatePlazaGroupInviteDialog,
@@ -24,6 +27,7 @@ import {
   applyToPlazaGroupInvite,
   createPlaygroundComment,
   createPlaygroundPost,
+  favoritePlaygroundPost,
   fetchPlaygroundPosts,
   likePlaygroundComment,
   likePlaygroundPost,
@@ -33,6 +37,8 @@ import {
   type PlaygroundTopic,
   unlikePlaygroundComment,
   unlikePlaygroundPost,
+  unfavoritePlaygroundPost,
+  uploadPlaygroundMedia,
 } from '@/lib/playground-api'
 import { cn } from '@/lib/utils'
 
@@ -62,12 +68,15 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-function parseImageUrls(value: string) {
-  return value
-    .split(/[\n,，]/)
-    .map((item) => item.trim())
-    .filter(Boolean)
+interface SelectedMedia {
+  id: string
+  file: File
+  previewURL: string
 }
+
+const maxComposerMedia = 4
+const maxMediaBytes = 8 * 1024 * 1024
+const allowedMediaTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 
 function AnonymousBadge({ label, isMe }: { label: string; isMe: boolean }) {
   return (
@@ -202,8 +211,9 @@ export function PlaygroundPage() {
   const [nextCursor, setNextCursor] = useState<string | undefined>()
   const [content, setContent] = useState('')
   const [composerTopic, setComposerTopic] = useState<PlaygroundTopic>('campus')
-  const [imageInput, setImageInput] = useState('')
-  const [showImageInput, setShowImageInput] = useState(false)
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([])
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const selectedMediaRef = useRef<SelectedMedia[]>([])
   const [selectedTopic, setSelectedTopic] = useState<PlaygroundTopic | ''>('')
   const [sort, setSort] = useState<PlaygroundSort>('latest')
   const [searchDraft, setSearchDraft] = useState('')
@@ -219,6 +229,18 @@ export function PlaygroundPage() {
   const [createInvitePostId, setCreateInvitePostId] = useState<number | null>(null)
   const [activeInviteId, setActiveInviteId] = useState<number | null>(null)
   const [inviteActionId, setInviteActionId] = useState<number | null>(null)
+  const [activeImageURL, setActiveImageURL] = useState<string | null>(null)
+
+  useEffect(() => {
+    selectedMediaRef.current = selectedMedia
+  }, [selectedMedia])
+
+  useEffect(
+    () => () => {
+      selectedMediaRef.current.forEach((item) => URL.revokeObjectURL(item.previewURL))
+    },
+    [],
+  )
 
   const loadPosts = useCallback(async () => {
     try {
@@ -281,22 +303,26 @@ export function PlaygroundPage() {
   }
 
   const handleCreatePost = async () => {
-    const imageUrls = parseImageUrls(imageInput)
-    if (!content.trim() && imageUrls.length === 0) {
+    if (!content.trim() && selectedMedia.length === 0) {
       setNotice('请先输入内容')
       return
     }
 
     try {
       setSubmitting(true)
+      setNotice(selectedMedia.length > 0 ? '正在上传图片...' : '')
+      const uploads = []
+      for (const item of selectedMedia) {
+        uploads.push(await uploadPlaygroundMedia(item.file))
+      }
       await createPlaygroundPost({
         topic: composerTopic,
         content: content.trim(),
-        imageUrls,
+        imageUrls: uploads.map((asset) => asset.url),
       })
       setContent('')
-      setImageInput('')
-      setShowImageInput(false)
+      selectedMedia.forEach((item) => URL.revokeObjectURL(item.previewURL))
+      setSelectedMedia([])
       setSelectedTopic('')
       setSort('latest')
       setQuery('')
@@ -309,16 +335,77 @@ export function PlaygroundPage() {
     }
   }
 
+  const handleSelectMedia = (files: FileList | null) => {
+    if (!files) return
+    const available = maxComposerMedia - selectedMedia.length
+    const candidates = Array.from(files).slice(0, available)
+    const invalid = candidates.find(
+      (file) => !allowedMediaTypes.has(file.type) || file.size > maxMediaBytes,
+    )
+    if (invalid) {
+      setNotice('请选择小于 8 MB 的 JPEG、PNG、WebP 或 GIF 图片')
+      if (mediaInputRef.current) mediaInputRef.current.value = ''
+      return
+    }
+    if (files.length > available) {
+      setNotice(`每条树洞最多添加 ${maxComposerMedia} 张图片`)
+    } else {
+      setNotice('')
+    }
+    setSelectedMedia((current) => [
+      ...current,
+      ...candidates.map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        previewURL: URL.createObjectURL(file),
+      })),
+    ])
+    if (mediaInputRef.current) mediaInputRef.current.value = ''
+  }
+
+  const handleRemoveMedia = (id: string) => {
+    setSelectedMedia((current) => {
+      const target = current.find((item) => item.id === id)
+      if (target) URL.revokeObjectURL(target.previewURL)
+      return current.filter((item) => item.id !== id)
+    })
+  }
+
   const handleTogglePostLike = async (post: PlaygroundPost) => {
     try {
-      if (post.likedByMe) {
-        await unlikePlaygroundPost(post.id)
-      } else {
-        await likePlaygroundPost(post.id)
-      }
-      await loadPosts()
+      const result = post.likedByMe
+        ? await unlikePlaygroundPost(post.id)
+        : await likePlaygroundPost(post.id)
+      setPosts((current) =>
+        current.map((item) =>
+          item.id === post.id
+            ? { ...item, likedByMe: result.liked, likeCount: result.likeCount }
+            : item,
+        ),
+      )
     } catch (error) {
       setNotice(getErrorMessage(error, '操作失败，请稍后重试'))
+    }
+  }
+
+  const handleTogglePostFavorite = async (post: PlaygroundPost) => {
+    try {
+      const result = post.favoritedByMe
+        ? await unfavoritePlaygroundPost(post.id)
+        : await favoritePlaygroundPost(post.id)
+      setPosts((current) =>
+        current.map((item) =>
+          item.id === post.id
+            ? {
+                ...item,
+                favoritedByMe: result.favorited,
+                favoriteCount: result.favoriteCount,
+              }
+            : item,
+        ),
+      )
+    } catch (error) {
+      setNotice(getErrorMessage(error, '收藏操作失败，请稍后重试'))
     }
   }
 
@@ -453,27 +540,51 @@ export function PlaygroundPage() {
               placeholder="此刻想说什么？"
               value={content}
             />
-            {showImageInput ? (
-              <div className="mx-4 mb-3 flex items-center gap-2 border-t border-[#e5e3df] pt-3">
-                <ImagePlus className="h-4 w-4 shrink-0 text-[#777b77]" />
-                <input
-                  aria-label="图片链接"
-                  className="h-9 min-w-0 flex-1 rounded border border-[#cbc9c3] bg-white px-3 text-sm outline-none focus:border-[#527465]"
-                  onChange={(event) => setImageInput(event.target.value)}
-                  placeholder="图片链接，多个链接用逗号分隔"
-                  value={imageInput}
-                />
+            {selectedMedia.length > 0 ? (
+              <div className="mx-4 mb-3 grid grid-cols-2 gap-2 border-t border-[#e5e3df] pt-3 sm:grid-cols-4">
+                {selectedMedia.map((item) => (
+                  <div className="group relative aspect-square overflow-hidden rounded-md border border-[#d8d7d2] bg-[#eceeeb]" key={item.id}>
+                    <img
+                      alt="待发布图片预览"
+                      className="h-full w-full object-cover"
+                      src={item.previewURL}
+                    />
+                    {item.file.type === 'image/gif' ? (
+                      <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        GIF
+                      </span>
+                    ) : null}
+                    <button
+                      aria-label="移除图片"
+                      className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded bg-black/65 text-white opacity-100 hover:bg-black/80 sm:opacity-0 sm:group-hover:opacity-100"
+                      onClick={() => handleRemoveMedia(item.id)}
+                      title="移除图片"
+                      type="button"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : null}
             <div className="flex items-center justify-between border-t border-[#e0dfdb] px-3 py-2">
+              <input
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                multiple
+                onChange={(event) => handleSelectMedia(event.target.files)}
+                ref={mediaInputRef}
+                type="file"
+              />
               <button
-                aria-label="添加图片链接"
+                aria-label="上传图片或动图"
                 className={cn(
                   'inline-flex h-9 w-9 items-center justify-center rounded text-[#626660] hover:bg-[#eceeeb]',
-                  showImageInput && 'bg-[#e4ebe7] text-[#315d4f]',
+                  selectedMedia.length > 0 && 'bg-[#e4ebe7] text-[#315d4f]',
                 )}
-                onClick={() => setShowImageInput((current) => !current)}
-                title="添加图片"
+                disabled={selectedMedia.length >= maxComposerMedia || submitting}
+                onClick={() => mediaInputRef.current?.click()}
+                title={`上传图片或 GIF，最多 ${maxComposerMedia} 张`}
                 type="button"
               >
                 <ImagePlus className="h-4 w-4" />
@@ -565,15 +676,35 @@ export function PlaygroundPage() {
                       </p>
                     ) : null}
                     {post.imageUrls.length > 0 ? (
-                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div
+                        className={cn(
+                          'mt-3 grid gap-2',
+                          post.imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+                        )}
+                      >
                         {post.imageUrls.map((imageUrl) => (
-                          <img
-                            alt="树洞配图"
-                            className="max-h-80 w-full rounded-md border border-[#deddd9] object-cover"
+                          <button
+                            aria-label="查看大图"
+                            className={cn(
+                              'block overflow-hidden rounded-md border border-[#deddd9] bg-[#eceeeb] text-left',
+                              post.imageUrls.length === 1
+                                ? 'max-h-[34rem] max-w-2xl'
+                                : 'aspect-square',
+                            )}
                             key={imageUrl}
-                            loading="lazy"
-                            src={imageUrl}
-                          />
+                            onClick={() => setActiveImageURL(imageUrl)}
+                            type="button"
+                          >
+                            <AuthenticatedImage
+                              alt="树洞配图"
+                              className={cn(
+                                'w-full object-cover',
+                                post.imageUrls.length === 1 ? 'max-h-[34rem]' : 'h-full',
+                              )}
+                              loading="lazy"
+                              src={imageUrl}
+                            />
+                          </button>
                         ))}
                       </div>
                     ) : null}
@@ -606,6 +737,19 @@ export function PlaygroundPage() {
                       <MessageCircle className="h-4 w-4" />
                       {post.commentCount}
                     </span>
+                    <button
+                      aria-label={post.favoritedByMe ? '取消收藏' : '收藏树洞'}
+                      className={cn(
+                        'inline-flex h-8 items-center gap-1.5 rounded px-2 hover:bg-[#eceeeb]',
+                        post.favoritedByMe && 'text-[#9a6b2f]',
+                      )}
+                      onClick={() => void handleTogglePostFavorite(post)}
+                      title={post.favoritedByMe ? '取消收藏' : '收藏'}
+                      type="button"
+                    >
+                      <Bookmark className={cn('h-4 w-4', post.favoritedByMe && 'fill-current')} />
+                      {post.favoriteCount || ''}
+                    </button>
                     {post.author.isMe && !post.groupInvite ? (
                       <button
                         className="ml-auto inline-flex h-8 items-center gap-1.5 rounded px-2 text-xs font-medium text-[#42675a] hover:bg-[#e5ebe7]"
@@ -749,6 +893,35 @@ export function PlaygroundPage() {
           onChanged={() => void loadPosts()}
           onClose={() => setActiveInviteId(null)}
         />
+      ) : null}
+      {activeImageURL ? (
+        <div
+          aria-label="图片预览"
+          aria-modal="true"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+        >
+          <button
+            aria-label="关闭图片预览"
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-md bg-black/45 text-white hover:bg-black/70"
+            onClick={() => setActiveImageURL(null)}
+            title="关闭"
+            type="button"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <button
+            aria-label="关闭图片预览"
+            className="absolute inset-0 cursor-zoom-out"
+            onClick={() => setActiveImageURL(null)}
+            type="button"
+          />
+          <AuthenticatedImage
+            alt="树洞大图"
+            className="relative z-10 max-h-[calc(100dvh-3rem)] max-w-[calc(100vw-2rem)] object-contain"
+            src={activeImageURL}
+          />
+        </div>
       ) : null}
     </div>
   )

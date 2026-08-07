@@ -26,6 +26,7 @@ import (
 	"soulink-backend/internal/gate"
 	"soulink-backend/internal/mail"
 	"soulink-backend/internal/match"
+	"soulink-backend/internal/media"
 	"soulink-backend/internal/meetup"
 	"soulink-backend/internal/meta"
 	"soulink-backend/internal/migrate"
@@ -145,6 +146,7 @@ func main() {
 	feedbackService := feedback.NewService(dataStore, logger)
 	profileService := profile.NewService(dataStore)
 	playgroundService := playground.NewService(dataStore)
+	mediaService := media.NewService(dataStore)
 	var modelGenerator ai.Generator
 	if cfg.AI.Provider == "openai-compatible" {
 		provider := ai.NewOpenAICompatible(ai.OpenAICompatibleConfig{
@@ -217,6 +219,7 @@ func main() {
 		MetaHandler:          meta.NewHandler(metaService),
 		QuestionnaireHandler: questionnaire.NewHandler(questionnaireService),
 		MatchHandler:         match.NewHandler(matchService),
+		MediaHandler:         media.NewHandler(mediaService),
 		MeetupHandler:        meetup.NewHandler(meetupService),
 		FriendHandler:        friend.NewHandler(friendService),
 		ChatHandler:          chat.NewHandler(chatService, chatHub),

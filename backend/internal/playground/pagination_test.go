@@ -3,6 +3,8 @@ package playground
 import (
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestPostCursorRoundTrip(t *testing.T) {
@@ -28,6 +30,22 @@ func TestPostCursorRoundTrip(t *testing.T) {
 	wantTime, _ := time.Parse(time.RFC3339Nano, want.CreatedAt)
 	if !got.CreatedAt.Equal(wantTime) {
 		t.Fatalf("decoded time = %s, want %s", got.CreatedAt, wantTime)
+	}
+}
+
+func TestInternalMediaKey(t *testing.T) {
+	key := uuid.NewString()
+	if got, ok := internalMediaKey("/media/" + key); !ok || got != key {
+		t.Fatalf("internalMediaKey() = %q, %v", got, ok)
+	}
+	for _, value := range []string{
+		"https://example.com/image.png",
+		"/media/not-a-uuid",
+		"/media/" + key + "/extra",
+	} {
+		if _, ok := internalMediaKey(value); ok {
+			t.Fatalf("internalMediaKey(%q) accepted invalid path", value)
+		}
 	}
 }
 
