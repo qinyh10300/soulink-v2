@@ -6,11 +6,19 @@ import { AccountManagementCard } from '@/components/profile/account-management-c
 import { ChangePasswordModal } from '@/components/profile/change-password-modal'
 import { DeleteAccountConfirmModal } from '@/components/profile/delete-account-confirm-modal'
 import { ProfileFormCard } from '@/components/profile/profile-form-card'
+import { ProfilePrivacyPanel } from '@/components/profile/profile-privacy-panel'
 import { TrustVerificationPanel } from '@/components/profile/trust-verification-panel'
 import { getErrorMessage } from '@/lib/api'
 import { majorDescriptionMaxLength } from '@/lib/auth-schema'
 import { fetchContactTypes, fetchGrades } from '@/lib/meta-api'
-import { fetchMyProfile, updateMyProfile } from '@/lib/profile-api'
+import {
+  deleteMyAvatar,
+  fetchMyProfile,
+  type ProfilePrivacy,
+  updateMyProfile,
+  updateMyProfilePrivacy,
+  uploadMyAvatar,
+} from '@/lib/profile-api'
 import { clearSurveyDraft } from '@/lib/survey-storage'
 import {
   clearAuthSession,
@@ -42,6 +50,13 @@ export function ProfilePage() {
   const [contactTypes, setContactTypes] = useState<Array<{ label: string; value: string }>>([])
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
+  const [privacy, setPrivacy] = useState<ProfilePrivacy>({
+    profilePublic: false,
+    schedulePublic: false,
+    preferencesPublic: false,
+  })
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null)
+  const [removeAvatar, setRemoveAvatar] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -71,9 +86,11 @@ export function ProfilePage() {
           grade: profileData.grade,
           contactType: (profileData.contactType || '') as ContactType,
           contactValue: profileData.contactValue || '',
+          avatar: profileData.avatarUrl || '',
         }
 
         setProfile(nextProfile)
+        setPrivacy(profileData.privacy)
         saveUserProfile(nextProfile)
         setNotice('您可以随时更新公开给匹配对象的信息。')
       } catch (error) {
@@ -104,6 +121,8 @@ export function ProfilePage() {
   }
 
   const handleAvatarChange = (file: File) => {
+    setPendingAvatar(file)
+    setRemoveAvatar(false)
     const reader = new FileReader()
 
     reader.onload = () => {
@@ -114,6 +133,12 @@ export function ProfilePage() {
     }
 
     reader.readAsDataURL(file)
+  }
+
+  const handleAvatarRemove = () => {
+    setPendingAvatar(null)
+    setRemoveAvatar(true)
+    setProfile((current) => ({ ...current, avatar: '' }))
   }
 
   const handleSave = async () => {
@@ -154,8 +179,19 @@ export function ProfilePage() {
         contactValue: profile.contactValue.trim(),
       })
 
+      const updatedPrivacy = await updateMyProfilePrivacy(privacy)
+      let avatar = profile.avatar
+      if (pendingAvatar) {
+        const uploaded = await uploadMyAvatar(pendingAvatar)
+        avatar = uploaded.url
+      } else if (removeAvatar) {
+        await deleteMyAvatar()
+        avatar = ''
+      }
+
       const nextProfile: UserProfile = {
         ...profile,
+        avatar,
         nickname: updated.nickname,
         schoolName: updated.schoolName,
         department: updated.department,
@@ -165,6 +201,7 @@ export function ProfilePage() {
       }
 
       setProfile(nextProfile)
+      setPrivacy(updatedPrivacy)
       saveUserProfile(nextProfile)
       window.location.reload()
     } catch (error) {
@@ -203,12 +240,15 @@ export function ProfilePage() {
             grades={grades}
             notice={notice}
             onAvatarChange={handleAvatarChange}
+            onAvatarRemove={handleAvatarRemove}
             onChange={handleChange}
             onSubmit={() => {
               void handleSave()
             }}
             profile={profile}
           />
+
+          <ProfilePrivacyPanel onChange={setPrivacy} value={privacy} />
 
           <TrustVerificationPanel />
 

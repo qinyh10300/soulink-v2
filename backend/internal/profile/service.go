@@ -3,6 +3,7 @@ package profile
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -38,7 +39,25 @@ type Details struct {
 }
 
 type PublicDetails struct {
-	User store.User
+	User        store.User
+	Settings    PrivacySettings
+	Preferences *PublicPreferences
+}
+
+type PrivacySettings struct {
+	ProfilePublic     bool
+	SchedulePublic    bool
+	PreferencesPublic bool
+	AvatarURL         string
+}
+
+type PublicPreferences struct {
+	Bio                string
+	Skills             []string
+	Interests          []string
+	Availability       string
+	PreferredScenes    []string
+	CollaborationStyle string
 }
 
 // NewService 创建个人资料服务实例。
@@ -54,8 +73,46 @@ func (s *Service) Get(ctx context.Context, userID int64) (Details, error) {
 	return s.loadDetails(ctx, nil, userID)
 }
 
-// GetPublic returns the fields that can be shown on another user's public profile.
-func (s *Service) GetPublic(ctx context.Context, userID int64) (PublicDetails, error) {
+func (s *Service) GetPrivacy(ctx context.Context, userID int64) (PrivacySettings, error) {
+	if err := s.ensureReady(); err != nil {
+		return PrivacySettings{}, err
+	}
+	settings, err := s.store.GetUserProfileSettings(ctx, nil, userID)
+	if errors.Is(err, store.ErrNotFound) {
+		return PrivacySettings{}, nil
+	}
+	if err != nil {
+		return PrivacySettings{}, httpapi.InternalError(err)
+	}
+	return privacySettingsFromStore(settings), nil
+}
+
+func (s *Service) UpdatePrivacy(ctx context.Context, userID int64, settings PrivacySettings) (PrivacySettings, error) {
+	if err := s.ensureReady(); err != nil {
+		return PrivacySettings{}, err
+	}
+	if _, err := s.store.GetUserByID(ctx, nil, userID); err != nil {
+		return PrivacySettings{}, mapUserStoreError(err)
+	}
+	if !settings.ProfilePublic {
+		settings.SchedulePublic = false
+		settings.PreferencesPublic = false
+	}
+	updated, err := s.store.UpsertUserProfileSettings(ctx, nil, store.UpsertUserProfileSettingsParams{
+		UserID:            userID,
+		ProfilePublic:     settings.ProfilePublic,
+		SchedulePublic:    settings.SchedulePublic,
+		PreferencesPublic: settings.PreferencesPublic,
+		Now:               time.Now(),
+	})
+	if err != nil {
+		return PrivacySettings{}, httpapi.InternalError(err)
+	}
+	return privacySettingsFromStore(updated), nil
+}
+
+// GetPublic returns only the profile fields that the owner has explicitly shared.
+func (s *Service) GetPublic(ctx context.Context, viewerID, userID int64) (PublicDetails, error) {
 	if err := s.ensureReady(); err != nil {
 		return PublicDetails{}, err
 	}
@@ -63,7 +120,32 @@ func (s *Service) GetPublic(ctx context.Context, userID int64) (PublicDetails, e
 	if err != nil {
 		return PublicDetails{}, mapUserStoreError(err)
 	}
-	return PublicDetails{User: user}, nil
+	settings, err := s.GetPrivacy(ctx, userID)
+	if err != nil {
+		return PublicDetails{}, err
+	}
+	isSelf := viewerID == userID
+	if !isSelf && !settings.ProfilePublic {
+		return PublicDetails{}, httpapi.NewError(http.StatusForbidden, httpapi.CodeForbidden, "该用户尚未公开个人主页")
+	}
+
+	details := PublicDetails{User: user, Settings: settings}
+	if isSelf || settings.PreferencesPublic {
+		matchingProfile, profileErr := s.store.GetMatchingProfile(ctx, nil, userID)
+		if profileErr == nil {
+			details.Preferences = &PublicPreferences{
+				Bio:                matchingProfile.Bio,
+				Skills:             matchingProfile.Skills,
+				Interests:          matchingProfile.Interests,
+				Availability:       matchingProfile.Availability,
+				PreferredScenes:    matchingProfile.PreferredScenes,
+				CollaborationStyle: matchingProfile.CollaborationStyle,
+			}
+		} else if !errors.Is(profileErr, store.ErrNotFound) {
+			return PublicDetails{}, httpapi.InternalError(profileErr)
+		}
+	}
+	return details, nil
 }
 
 // Update 校验并更新当前用户的个人资料。
@@ -269,4 +351,17 @@ func mapUserStoreError(err error) error {
 
 func isDuplicateNicknameErr(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "ux_users_nickname_active")
+}
+
+func privacySettingsFromStore(settings store.UserProfileSettings) PrivacySettings {
+	avatarURL := ""
+	if settings.AvatarAssetKey != "" {
+		avatarURL = "/media/" + settings.AvatarAssetKey
+	}
+	return PrivacySettings{
+		ProfilePublic:     settings.ProfilePublic,
+		SchedulePublic:    settings.SchedulePublic,
+		PreferencesPublic: settings.PreferencesPublic,
+		AvatarURL:         avatarURL,
+	}
 }

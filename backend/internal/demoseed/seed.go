@@ -465,6 +465,9 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 		if err := ensureMatchingProfile(ctx, dataStore, user.ID, seed, now); err != nil {
 			return Result{}, err
 		}
+		if err := ensurePublicProfileSettings(ctx, dataStore, user.ID, now); err != nil {
+			return Result{}, err
+		}
 	}
 	if adminEmail != "" {
 		seed := demoAdminUser(adminEmail)
@@ -478,6 +481,9 @@ func Ensure(ctx context.Context, dataStore *store.Store, cfg Config) (Result, er
 		users[seed.Email] = user
 
 		if err := ensureMatchingProfile(ctx, dataStore, user.ID, seed, now); err != nil {
+			return Result{}, err
+		}
+		if err := ensurePublicProfileSettings(ctx, dataStore, user.ID, now); err != nil {
 			return Result{}, err
 		}
 	}
@@ -638,6 +644,25 @@ func ensureUser(
 		}
 	}
 	return user, false, nil
+}
+
+func ensurePublicProfileSettings(ctx context.Context, dataStore *store.Store, userID int64, now time.Time) error {
+	if _, err := dataStore.GetUserProfileSettings(ctx, nil, userID); err == nil {
+		return nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("get demo profile settings: %w", err)
+	}
+	_, err := dataStore.UpsertUserProfileSettings(ctx, nil, store.UpsertUserProfileSettingsParams{
+		UserID:            userID,
+		ProfilePublic:     true,
+		SchedulePublic:    true,
+		PreferencesPublic: true,
+		Now:               now,
+	})
+	if err != nil {
+		return fmt.Errorf("create demo profile settings: %w", err)
+	}
+	return nil
 }
 
 func ensureMatchingProfile(

@@ -110,6 +110,15 @@ func (s *Service) ListUserSchedule(ctx context.Context, viewerID, targetUserID i
 		}
 		return nil, httpapi.InternalError(err)
 	}
+	if viewerID != targetUserID {
+		settings, err := s.store.GetUserProfileSettings(ctx, nil, targetUserID)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && !settings.SchedulePublic) {
+			return nil, httpapi.NewError(http.StatusForbidden, httpapi.CodeForbidden, "该用户尚未公开时间表")
+		}
+		if err != nil {
+			return nil, httpapi.InternalError(err)
+		}
+	}
 	events, err := s.store.ListUserCalendarAvailability(ctx, nil, viewerID, targetUserID, from, to)
 	if err != nil {
 		return nil, httpapi.InternalError(err)

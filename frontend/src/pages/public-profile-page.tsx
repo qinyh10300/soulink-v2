@@ -26,6 +26,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { CalendarEventDialog } from '@/components/calendar/calendar-event-dialog'
 import { IntentCategoryIcon, intentCategoryMeta } from '@/components/connection/intent-category'
+import { AuthenticatedImage } from '@/components/media/authenticated-image'
 import { getErrorMessage } from '@/lib/api'
 import { fetchUserSchedule, type CalendarEvent } from '@/lib/calendar-api'
 import { ensureConversation } from '@/lib/chat-api'
@@ -38,6 +39,8 @@ import {
 } from '@/lib/friend-api'
 import { fetchPublicProfile, type PublicProfileDetails } from '@/lib/profile-api'
 import { fetchPublicTrustProfile, type TrustProfile } from '@/lib/safety-api'
+import { getAuthSession } from '@/lib/user-profile-storage'
+import { cn } from '@/lib/utils'
 
 type RelationshipStatus = 'friend' | 'none' | 'received' | 'sent' | 'unknown'
 
@@ -225,6 +228,71 @@ function ContextProfileSection({ profile }: { profile: ContextProfile }) {
   )
 }
 
+function PublicPreferencesSection({
+  profile,
+  isSelf,
+}: {
+  profile: PublicProfileDetails
+  isSelf: boolean
+}) {
+  const preferences = profile.preferences
+  if (!preferences) return null
+
+  return (
+    <section className="mt-6 border-y border-[#d9dcd8] bg-white px-5 py-5 sm:px-7">
+      <div className="flex items-center justify-between gap-3 border-b border-[#e7e9e5] pb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-[#527164]" />
+          <h2 className="text-base font-semibold text-[#292b28]">个人偏好</h2>
+        </div>
+        {isSelf && !profile.preferencesPublic ? (
+          <span className="text-[11px] text-[#888d87]">仅自己可见</span>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-5 md:grid-cols-2">
+        <div>
+          <p className="text-[11px] font-semibold text-[#858a84]">关于我</p>
+          <p className="mt-1.5 text-sm leading-6 text-[#565b56]">
+            {preferences.bio || '还没有填写自我介绍。'}
+          </p>
+        </div>
+        <div className="space-y-3 text-xs leading-5 text-[#626762]">
+          {preferences.availability ? (
+            <p><span className="text-[#8c918b]">通常有空：</span>{preferences.availability}</p>
+          ) : null}
+          {preferences.collaborationStyle ? (
+            <p><span className="text-[#8c918b]">协作方式：</span>{preferences.collaborationStyle}</p>
+          ) : null}
+          {preferences.preferredScenes.length > 0 ? (
+            <p><span className="text-[#8c918b]">偏好场景：</span>{preferences.preferredScenes.join('、')}</p>
+          ) : null}
+        </div>
+      </div>
+      {preferences.skills.length > 0 || preferences.interests.length > 0 ? (
+        <div className="mt-5 grid gap-4 border-t border-[#eceeeb] pt-4 md:grid-cols-2">
+          {[
+            { label: '技能', values: preferences.skills, tone: 'bg-[#eaf1ed] text-[#426456]' },
+            { label: '兴趣', values: preferences.interests, tone: 'bg-[#f0edf2] text-[#66566f]' },
+          ].map((group) =>
+            group.values.length > 0 ? (
+              <div key={group.label}>
+                <p className="text-[11px] text-[#8c918b]">{group.label}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {group.values.map((value) => (
+                    <span className={cn('rounded-md px-2 py-1 text-[11px]', group.tone)} key={value}>
+                      {value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null,
+          )}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 export function PublicProfilePage() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -232,6 +300,7 @@ export function PublicProfilePage() {
   const numericUserId = Number(userId)
   const contextIntentId = Number(searchParams.get('intentId'))
   const hasContext = Number.isInteger(contextIntentId) && contextIntentId > 0
+  const isSelf = getAuthSession()?.userId === numericUserId
   const [profile, setProfile] = useState<PublicProfileDetails | null>(null)
   const [trust, setTrust] = useState<TrustProfile | null>(null)
   const [contextProfile, setContextProfile] = useState<ContextProfile | null>(null)
@@ -248,14 +317,16 @@ export function PublicProfilePage() {
       return
     }
     try {
-      const [profileData, events, relationship, contextData, trustData] = await Promise.all([
-        fetchPublicProfile(numericUserId),
-        fetchUserSchedule(numericUserId, weekStart, addDays(weekStart, 7)),
+      const profileData = await fetchPublicProfile(numericUserId)
+      const [events, relationship, contextData, trustData] = await Promise.all([
+        isSelf || profileData.schedulePublic
+          ? fetchUserSchedule(numericUserId, weekStart, addDays(weekStart, 7)).catch(() => [])
+          : Promise.resolve([]),
         fetchRelationshipStatus(numericUserId),
         hasContext
-          ? fetchContextProfile(contextIntentId, numericUserId)
+          ? fetchContextProfile(contextIntentId, numericUserId).catch(() => null)
           : Promise.resolve(null),
-        fetchPublicTrustProfile(numericUserId),
+        fetchPublicTrustProfile(numericUserId).catch(() => null),
       ])
       setProfile(profileData)
       setContextProfile(contextData)
@@ -266,13 +337,14 @@ export function PublicProfilePage() {
     } catch (error) {
       setNotice(getErrorMessage(error, '个人主页加载失败，请稍后重试'))
     }
-  }, [contextIntentId, hasContext, numericUserId, weekStart])
+  }, [contextIntentId, hasContext, isSelf, numericUserId, weekStart])
 
   useEffect(() => {
     void loadProfile()
   }, [loadProfile])
 
   const displayProfile = contextProfile ?? profile
+  const canViewSchedule = isSelf || Boolean(profile?.schedulePublic)
 
   const handleMessage = async () => {
     if (!displayProfile) return
@@ -315,9 +387,17 @@ export function PublicProfilePage() {
           <section className="mt-4 border-y border-[#d9dcd8] bg-white">
             <div className="h-24 bg-[#dce8e1]" />
             <div className="flex flex-col gap-5 px-5 pb-5 sm:flex-row sm:items-end sm:px-7">
-              <div className="-mt-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-4 border-white bg-[#cad9d1] text-3xl font-semibold text-[#315d4f] shadow-sm">
-                {displayProfile.nickname.trim().slice(0, 1) || <UserRound className="h-7 w-7" />}
-              </div>
+              {profile?.avatarUrl ? (
+                <AuthenticatedImage
+                  alt={displayProfile.nickname}
+                  className="-mt-10 h-20 w-20 shrink-0 rounded-lg border-4 border-white bg-[#cad9d1] object-cover shadow-sm"
+                  src={profile.avatarUrl}
+                />
+              ) : (
+                <div className="-mt-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-4 border-white bg-[#cad9d1] text-3xl font-semibold text-[#315d4f] shadow-sm">
+                  {displayProfile.nickname.trim().slice(0, 1) || <UserRound className="h-7 w-7" />}
+                </div>
+              )}
               <div className="min-w-0 flex-1 sm:pb-1">
                 <h1 className="text-2xl font-semibold text-[#292b28]">
                   {displayProfile.nickname}
@@ -419,6 +499,8 @@ export function PublicProfilePage() {
 
         {contextProfile ? <ContextProfileSection profile={contextProfile} /> : null}
 
+        {profile ? <PublicPreferencesSection isSelf={isSelf} profile={profile} /> : null}
+
         {displayProfile ? (
           <section className="mt-6">
             <div className="flex items-end justify-between border-b border-[#d9dcd8] pb-3">
@@ -436,39 +518,45 @@ export function PublicProfilePage() {
               </button>
             </div>
 
-            <div className="mt-3 grid gap-px overflow-hidden border border-[#d9dcd8] bg-[#d9dcd8] sm:grid-cols-7">
-              {days.map((day) => {
-                const dayEvents = schedule.filter((event) => isSameDay(parseISO(event.startsAt), day))
-                return (
-                  <div className="min-h-32 bg-white p-2" key={day.toISOString()}>
-                    <div className="flex items-center justify-between sm:block">
-                      <p className="text-[11px] text-[#858a84]">{format(day, 'EEE', { locale: zhCN })}</p>
-                      <p className="text-sm font-semibold">{format(day, 'd')}</p>
-                    </div>
-                    <div className="mt-2 space-y-1.5">
-                      {dayEvents.map((event) => (
-                        <div
-                          className="rounded border-l-2 border-[#638775] bg-[#edf3ef] px-2 py-1.5"
-                          key={event.id}
-                        >
-                          <p className="truncate text-[11px] font-medium text-[#365a49]">{event.title}</p>
-                          <p className="mt-0.5 text-[10px] text-[#718078]">
-                            {format(parseISO(event.startsAt), 'HH:mm')} - {format(parseISO(event.endsAt), 'HH:mm')}
-                          </p>
-                          {event.location && !event.isBusyOnly ? (
-                            <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-[#718078]">
-                              <MapPin className="h-3 w-3 shrink-0" />
-                              {event.location}
+            {canViewSchedule ? (
+              <div className="mt-3 grid gap-px overflow-hidden border border-[#d9dcd8] bg-[#d9dcd8] sm:grid-cols-7">
+                {days.map((day) => {
+                  const dayEvents = schedule.filter((event) => isSameDay(parseISO(event.startsAt), day))
+                  return (
+                    <div className="min-h-32 bg-white p-2" key={day.toISOString()}>
+                      <div className="flex items-center justify-between sm:block">
+                        <p className="text-[11px] text-[#858a84]">{format(day, 'EEE', { locale: zhCN })}</p>
+                        <p className="text-sm font-semibold">{format(day, 'd')}</p>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {dayEvents.map((event) => (
+                          <div
+                            className="rounded border-l-2 border-[#638775] bg-[#edf3ef] px-2 py-1.5"
+                            key={event.id}
+                          >
+                            <p className="truncate text-[11px] font-medium text-[#365a49]">{event.title}</p>
+                            <p className="mt-0.5 text-[10px] text-[#718078]">
+                              {format(parseISO(event.startsAt), 'HH:mm')} - {format(parseISO(event.endsAt), 'HH:mm')}
                             </p>
-                          ) : null}
-                        </div>
-                      ))}
-                      {dayEvents.length === 0 ? <p className="text-[10px] text-[#adb0ac]">暂无安排</p> : null}
+                            {event.location && !event.isBusyOnly ? (
+                              <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-[#718078]">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                {event.location}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))}
+                        {dayEvents.length === 0 ? <p className="text-[10px] text-[#adb0ac]">暂无安排</p> : null}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="mt-3 flex min-h-28 items-center justify-center border border-[#d9dcd8] bg-white px-5 text-center text-sm text-[#858a84]">
+                对方没有公开时间表，你仍然可以直接发起邀约。
+              </div>
+            )}
           </section>
         ) : null}
       </div>

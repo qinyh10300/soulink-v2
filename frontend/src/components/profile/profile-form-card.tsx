@@ -19,6 +19,7 @@ interface ProfileFormCardProps {
   notice: string
   profile: UserProfile
   onAvatarChange: (file: File) => void
+  onAvatarRemove: () => void
   onChange: (field: keyof UserProfile, value: string) => void
   onSubmit: () => void
 }
@@ -30,6 +31,7 @@ export function ProfileFormCard({
   notice,
   profile,
   onAvatarChange,
+  onAvatarRemove,
   onChange,
   onSubmit,
 }: ProfileFormCardProps) {
@@ -40,6 +42,7 @@ export function ProfileFormCard({
           avatar={profile.avatar}
           nickname={profile.nickname}
           onFileChange={onAvatarChange}
+          onRemove={onAvatarRemove}
         />
 
         <div className="grid gap-6 md:grid-cols-2">

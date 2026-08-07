@@ -261,3 +261,53 @@ func TestServiceUpdateRejectsDuplicateNickname(t *testing.T) {
 		t.Fatalf("sql expectations: %v", err)
 	}
 }
+
+func TestGetPrivacyDefaultsToPrivate(t *testing.T) {
+	service, mock, cleanup := newProfileServiceForTest(t)
+	defer cleanup()
+
+	mock.ExpectQuery(`(?s)SELECT s.user_id, s.profile_public, s.schedule_public, s.preferences_public.*FROM user_profile_settings s.*WHERE s.user_id = \$1`).
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"user_id", "profile_public", "schedule_public", "preferences_public",
+			"avatar_media_id", "asset_key", "updated_at",
+		}))
+
+	privacy, err := service.GetPrivacy(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("GetPrivacy() error = %v", err)
+	}
+	if privacy.ProfilePublic || privacy.SchedulePublic || privacy.PreferencesPublic || privacy.AvatarURL != "" {
+		t.Fatalf("GetPrivacy() = %#v, want private defaults", privacy)
+	}
+}
+
+func TestUpdatePrivacyClosesDependentSharingWhenProfileIsPrivate(t *testing.T) {
+	service, mock, cleanup := newProfileServiceForTest(t)
+	defer cleanup()
+	now := time.Now()
+
+	mock.ExpectQuery(`(?s)SELECT id, email, school_key, password_hash, nickname, department, grade, contact_type, contact_value,.*FROM users.*WHERE id = \$1.*LIMIT 1`).
+		WithArgs(int64(1)).
+		WillReturnRows(userRows(now, nil, nil))
+	mock.ExpectQuery(`(?s)INSERT INTO user_profile_settings.*ON CONFLICT.*RETURNING user_id, profile_public, schedule_public, preferences_public`).
+		WithArgs(int64(1), false, false, false, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"user_id", "profile_public", "schedule_public", "preferences_public", "avatar_media_id", "updated_at",
+		}).AddRow(int64(1), false, false, false, nil, now))
+
+	privacy, err := service.UpdatePrivacy(context.Background(), 1, PrivacySettings{
+		ProfilePublic:     false,
+		SchedulePublic:    true,
+		PreferencesPublic: true,
+	})
+	if err != nil {
+		t.Fatalf("UpdatePrivacy() error = %v", err)
+	}
+	if privacy.SchedulePublic || privacy.PreferencesPublic {
+		t.Fatalf("UpdatePrivacy() = %#v, dependent settings should be private", privacy)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations: %v", err)
+	}
+}

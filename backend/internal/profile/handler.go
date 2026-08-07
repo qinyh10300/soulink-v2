@@ -30,6 +30,12 @@ type upsertContactRequest struct {
 	Value string `json:"value"`
 }
 
+type updatePrivacyRequest struct {
+	ProfilePublic     bool `json:"profilePublic"`
+	SchedulePublic    bool `json:"schedulePublic"`
+	PreferencesPublic bool `json:"preferencesPublic"`
+}
+
 type profileResponse struct {
 	ID           int64             `json:"id,omitempty"`
 	Email        string            `json:"email,omitempty"`
@@ -40,16 +46,37 @@ type profileResponse struct {
 	ContactType  string            `json:"contactType"`
 	ContactValue string            `json:"contactValue"`
 	Contacts     []contactResponse `json:"contacts"`
+	AvatarURL    string            `json:"avatarUrl,omitempty"`
+	Privacy      *privacyResponse  `json:"privacy,omitempty"`
 	CreatedAt    string            `json:"createdAt,omitempty"`
 }
 
 type publicProfileResponse struct {
-	ID         int64  `json:"id"`
-	Nickname   string `json:"nickname"`
-	SchoolName string `json:"schoolName"`
-	Department string `json:"department"`
-	Grade      string `json:"grade"`
-	CreatedAt  string `json:"createdAt"`
+	ID                int64                      `json:"id"`
+	Nickname          string                     `json:"nickname"`
+	SchoolName        string                     `json:"schoolName"`
+	Department        string                     `json:"department"`
+	Grade             string                     `json:"grade"`
+	AvatarURL         string                     `json:"avatarUrl,omitempty"`
+	SchedulePublic    bool                       `json:"schedulePublic"`
+	PreferencesPublic bool                       `json:"preferencesPublic"`
+	Preferences       *publicPreferencesResponse `json:"preferences,omitempty"`
+	CreatedAt         string                     `json:"createdAt"`
+}
+
+type privacyResponse struct {
+	ProfilePublic     bool `json:"profilePublic"`
+	SchedulePublic    bool `json:"schedulePublic"`
+	PreferencesPublic bool `json:"preferencesPublic"`
+}
+
+type publicPreferencesResponse struct {
+	Bio                string   `json:"bio"`
+	Skills             []string `json:"skills"`
+	Interests          []string `json:"interests"`
+	Availability       string   `json:"availability"`
+	PreferredScenes    []string `json:"preferredScenes"`
+	CollaborationStyle string   `json:"collaborationStyle"`
 }
 
 type contactResponse struct {
@@ -83,7 +110,12 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpapi.OK(w, toProfileResponse(details, true))
+	privacy, err := h.service.GetPrivacy(r.Context(), user.ID)
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, toProfileResponse(details, true, &privacy))
 }
 
 func (h *Handler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
@@ -98,13 +130,42 @@ func (h *Handler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	details, err := h.service.GetPublic(r.Context(), userID)
+	viewer, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "未登录"))
+		return
+	}
+
+	details, err := h.service.GetPublic(r.Context(), viewer.ID, userID)
 	if err != nil {
 		httpapi.Error(w, err)
 		return
 	}
 
 	httpapi.OK(w, toPublicProfileResponse(details))
+}
+
+func (h *Handler) UpdatePrivacy(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		httpapi.Error(w, httpapi.NewError(http.StatusUnauthorized, httpapi.CodeUnauthorized, "未登录"))
+		return
+	}
+	var req updatePrivacyRequest
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	updated, err := h.service.UpdatePrivacy(r.Context(), user.ID, PrivacySettings{
+		ProfilePublic:     req.ProfilePublic,
+		SchedulePublic:    req.SchedulePublic,
+		PreferencesPublic: req.PreferencesPublic,
+	})
+	if err != nil {
+		httpapi.Error(w, err)
+		return
+	}
+	httpapi.OK(w, toPrivacyResponse(updated))
 }
 
 // UpdateProfile 处理个人资料更新请求。
@@ -137,7 +198,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpapi.Respond(w, http.StatusOK, "profile updated", toProfileResponse(updated, false))
+	httpapi.Respond(w, http.StatusOK, "profile updated", toProfileResponse(updated, false, nil))
 }
 
 // GetContacts 返回当前用户保存的联系方式列表；如果用户没有设置联系方式，则返回注册邮箱作为只读默认联系方式。
@@ -213,7 +274,7 @@ func (h *Handler) DeleteContact(w http.ResponseWriter, r *http.Request) {
 }
 
 // toProfileResponse 将完整资料模型转换成接口响应。
-func toProfileResponse(details Details, includeReadonly bool) profileResponse {
+func toProfileResponse(details Details, includeReadonly bool, privacy *PrivacySettings) profileResponse {
 	response := profileResponse{
 		Nickname:     details.User.Nickname,
 		SchoolName:   schoolNameForEmail(details.User.Email),
@@ -222,6 +283,11 @@ func toProfileResponse(details Details, includeReadonly bool) profileResponse {
 		ContactType:  details.User.ContactType,
 		ContactValue: details.User.ContactValue,
 		Contacts:     contactsForResponse(details),
+	}
+	if privacy != nil {
+		response.AvatarURL = privacy.AvatarURL
+		value := toPrivacyResponse(*privacy)
+		response.Privacy = &value
 	}
 	if includeReadonly {
 		response.ID = details.User.ID
@@ -232,13 +298,35 @@ func toProfileResponse(details Details, includeReadonly bool) profileResponse {
 }
 
 func toPublicProfileResponse(details PublicDetails) publicProfileResponse {
-	return publicProfileResponse{
-		ID:         details.User.ID,
-		Nickname:   details.User.Nickname,
-		SchoolName: schoolNameForEmail(details.User.Email),
-		Department: details.User.Department,
-		Grade:      details.User.Grade,
-		CreatedAt:  details.User.CreatedAt.Format(time.RFC3339),
+	response := publicProfileResponse{
+		ID:                details.User.ID,
+		Nickname:          details.User.Nickname,
+		SchoolName:        schoolNameForEmail(details.User.Email),
+		Department:        details.User.Department,
+		Grade:             details.User.Grade,
+		AvatarURL:         details.Settings.AvatarURL,
+		SchedulePublic:    details.Settings.SchedulePublic,
+		PreferencesPublic: details.Settings.PreferencesPublic,
+		CreatedAt:         details.User.CreatedAt.Format(time.RFC3339),
+	}
+	if details.Preferences != nil {
+		response.Preferences = &publicPreferencesResponse{
+			Bio:                details.Preferences.Bio,
+			Skills:             details.Preferences.Skills,
+			Interests:          details.Preferences.Interests,
+			Availability:       details.Preferences.Availability,
+			PreferredScenes:    details.Preferences.PreferredScenes,
+			CollaborationStyle: details.Preferences.CollaborationStyle,
+		}
+	}
+	return response
+}
+
+func toPrivacyResponse(settings PrivacySettings) privacyResponse {
+	return privacyResponse{
+		ProfilePublic:     settings.ProfilePublic,
+		SchedulePublic:    settings.SchedulePublic,
+		PreferencesPublic: settings.PreferencesPublic,
 	}
 }
 

@@ -1,20 +1,25 @@
+import { Trash2 } from 'lucide-react'
+
+import { AuthenticatedImage } from '@/components/media/authenticated-image'
 import { getAvatarFallbackLabel } from '@/lib/avatar'
 
 interface ProfileAvatarUploaderProps {
   avatar: string
   nickname: string
   onFileChange: (file: File) => void
+  onRemove?: () => void
 }
 
 export function ProfileAvatarUploader({
   avatar,
   nickname,
   onFileChange,
+  onRemove,
 }: ProfileAvatarUploaderProps) {
   return (
     <div className="flex items-center gap-5">
       {avatar ? (
-        <img
+        <AuthenticatedImage
           alt={nickname}
           className="h-20 w-20 rounded-full border border-white/80 object-cover shadow-[0_14px_28px_rgba(73,49,33,0.12)]"
           src={avatar}
@@ -42,6 +47,17 @@ export function ProfileAvatarUploader({
             type="file"
           />
         </label>
+        {avatar && onRemove ? (
+          <button
+            aria-label="移除头像"
+            className="ml-2 inline-flex h-10 w-10 items-center justify-center rounded-md text-[#8c6a59] hover:bg-[#f3e7e1]"
+            onClick={onRemove}
+            title="移除头像"
+            type="button"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
     </div>
   )

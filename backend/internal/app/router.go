@@ -145,6 +145,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			r.Get("/users/me/profile", deps.ProfileHandler.GetProfile)
 			r.With(matchWriteGuard).Put("/users/me/profile", deps.ProfileHandler.UpdateProfile)
+			r.With(matchWriteGuard).Put("/users/me/profile/privacy", deps.ProfileHandler.UpdatePrivacy)
 			r.Get("/users/{userId}/profile", deps.ProfileHandler.GetPublicProfile)
 			if deps.CalendarHandler != nil {
 				r.Get("/users/{userId}/calendar", deps.CalendarHandler.ListUserSchedule)

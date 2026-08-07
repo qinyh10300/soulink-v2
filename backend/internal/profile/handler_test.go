@@ -56,3 +56,27 @@ func TestContactsForResponsePrefersStoredContacts(t *testing.T) {
 		t.Fatalf("stored contact should not be readonly: %#v", contacts[0])
 	}
 }
+
+func TestPublicProfileResponseIncludesAuthorizedPreferences(t *testing.T) {
+	now := time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC)
+	response := toPublicProfileResponse(PublicDetails{
+		User: store.User{
+			ID: 4, Email: "student@mails.tsinghua.edu.cn", Nickname: "清华同学",
+			Department: "计算机系", Grade: "本科三年级", CreatedAt: now,
+		},
+		Settings: PrivacySettings{
+			ProfilePublic: true, SchedulePublic: true, PreferencesPublic: true,
+			AvatarURL: "/media/asset-key",
+		},
+		Preferences: &PublicPreferences{
+			Bio: "想找长期项目伙伴", Skills: []string{"产品"}, Interests: []string{"AI"},
+		},
+	})
+
+	if response.AvatarURL != "/media/asset-key" || !response.SchedulePublic || !response.PreferencesPublic {
+		t.Fatalf("unexpected public profile settings: %#v", response)
+	}
+	if response.Preferences == nil || response.Preferences.Bio == "" || len(response.Preferences.Skills) != 1 {
+		t.Fatalf("authorized preferences missing: %#v", response.Preferences)
+	}
+}
