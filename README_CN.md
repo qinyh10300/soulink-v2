@@ -13,7 +13,7 @@ SouLink V2 是一个仅面向清华大学的 AI 原生校内匹配平台。用�
 - 双向同意、校内见面计划、站内消息和联系方式解锁；
 - 举报、拉黑、账号删除与管理员审核。
 
-完整需求见 [V2 Web 设计需求](docs/SOULINK_V2_WEB_DESIGN_REQUIREMENTS.md)，实现覆盖情况见 [V2 实现说明](docs/SOULINK_V2_IMPLEMENTATION.md)。
+完整需求见 [V2 Web 设计需求](docs/SOULINK_V2_WEB_DESIGN_REQUIREMENTS.md)，实现覆盖情况见 [V2 实现说明](docs/SOULINK_V2_IMPLEMENTATION.md)。新的分阶段开发方向见 [开发路线图](ROADMAP.md)。
 
 ## 本地启动
 

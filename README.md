@@ -13,7 +13,7 @@ SouLink is not a public people directory or an infinite profile feed. The curren
 - mutual interest, focused match rooms, messaging, and contact reveal;
 - reporting, blocking, account deletion, and admin moderation.
 
-See the [V2 web requirements](docs/SOULINK_V2_WEB_DESIGN_REQUIREMENTS.md) and the [implementation coverage](docs/SOULINK_V2_IMPLEMENTATION.md). A Chinese version of this guide is available in [README_CN.md](README_CN.md).
+See the [V2 web requirements](docs/SOULINK_V2_WEB_DESIGN_REQUIREMENTS.md), the [implementation coverage](docs/SOULINK_V2_IMPLEMENTATION.md), and the current [development roadmap](ROADMAP.md). A Chinese version of this guide is available in [README_CN.md](README_CN.md).
 
 ## Run Locally
 
